@@ -14,7 +14,7 @@ BRANCH="${BRANCH:-main}"
 APP_DIR="${APP_DIR:-/opt/solvequest}"
 SERVICE_NAME="${SERVICE_NAME:-solvequest}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://reelender.com/health}"
-SSH_BATCH_MODE="${SSH_BATCH_MODE:-no}"
+SSH_BATCH_MODE="${SSH_BATCH_MODE:-yes}"
 
 echo "==> Deploy target: ${TARGET}"
 echo "==> App dir: ${APP_DIR}"
@@ -35,9 +35,14 @@ git checkout "${BRANCH}"
 echo "==> Pull latest code"
 git pull --ff-only origin "${BRANCH}"
 
-echo "==> Install backend dependencies if needed"
+echo "==> Install backend dependencies (prefer npm ci)"
 cd backend
-npm install --omit=dev >/dev/null 2>&1 || npm install
+if npm ci --omit=dev >/dev/null 2>&1; then
+  echo "Dependencies installed via npm ci"
+else
+  echo "npm ci failed, falling back to npm install"
+  npm install --omit=dev >/dev/null 2>&1 || npm install
+fi
 
 echo "==> Restart service"
 systemctl restart "${SERVICE_NAME}"
