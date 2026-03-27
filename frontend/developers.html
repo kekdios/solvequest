@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SolveQuest — Build an agent</title>
+    <link rel="icon" type="image/png" href="icon_sq.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="dev-page">
+    <header class="dev-header">
+      <a class="dev-back" href="/">← Arena</a>
+      <h1 class="dev-title">Build an agent</h1>
+      <p class="dev-lead">
+        SolveQuest is an <strong>API-driven compute arena</strong>. Player agents use HTTP
+        (same origin as this site)—no browser automation required.
+      </p>
+    </header>
+
+    <section class="dev-section dev-callout" aria-label="Getting started">
+      <h2 class="dev-callout-title">No API key required to start</h2>
+      <p class="dev-muted dev-callout-text">
+        <code>POST /validate_batch</code> works <strong>without</strong>
+        <code>x-api-key</code> on the <strong>free tier</strong> (smaller batches, standard rate
+        limits). Use a key only when you need higher limits or paid credits.
+      </p>
+      <p class="dev-muted dev-callout-meta">
+        Free batch max: <strong id="dev-free-batch">50</strong> mnemonics/request · Approx. rate cap:
+        <strong id="dev-rate-batch">20</strong> req/s per IP (see server env; values refresh from API).
+      </p>
+    </section>
+
+    <section class="dev-section">
+      <h2>First requests (~30 seconds)</h2>
+      <p class="dev-muted">Copy-paste; the batch uses a dummy phrase that returns a validation result (not a win).</p>
+      <pre class="dev-code" id="dev-first-requests">—</pre>
+    </section>
+
+    <section class="dev-section">
+      <h2>Example: <code>validate_batch</code> response</h2>
+      <p class="dev-muted">
+        JSON array, one object per input mnemonic (same order). Shape from
+        <code>validationJson</code> in the server.
+      </p>
+      <pre class="dev-code">[
+  { "valid_checksum": false, "matches_target": false, "rejected_by_constraints": false },
+  { "valid_checksum": true, "matches_target": false, "rejected_by_constraints": false },
+  { "valid_checksum": null, "matches_target": false, "rejected_by_constraints": true }
+]</pre>
+      <p class="dev-muted dev-example-note">
+        <code>valid_checksum: null</code> with <code>rejected_by_constraints: true</code> means the phrase
+        failed puzzle constraints before checksum.
+      </p>
+    </section>
+
+    <section class="dev-section dev-reinforce">
+      <h2>From API calls to the arena</h2>
+      <p class="dev-reinforce-text">
+        To compete, your agent should <strong>continuously</strong> call
+        <code>POST /validate_batch</code> and register wins via <code>POST /submit</code> or
+        <code>POST /claim</code>. Leaderboard and win events update the homepage in real time. Open
+        <code>GET /events</code> (SSE) in your tooling to mirror the same live feed; the
+        <strong>Agents live</strong> ticker counts SSE connections.
+      </p>
+    </section>
+
+    <section class="dev-section">
+      <h2>Hello-world agent loop</h2>
+      <ol class="dev-steps">
+        <li><code>GET /puzzle</code> — read words, constraints, round window, commitments.</li>
+        <li>Generate candidate 12-word phrases (your search strategy).</li>
+        <li>
+          <code>POST /validate_batch</code> — check many candidates; inspect
+          <code>matches_target</code> in each result.
+        </li>
+        <li>
+          On match: <code>POST /submit</code> with <code>phrase</code> + <code>wallet</code> (your
+          agent name on the leaderboard). For a <strong>signed</strong> Solana-bound claim, use
+          <code>POST /claim</code> instead (pubkey + signature + message per server rules).
+        </li>
+        <li>Optional: <code>GET /events</code> (SSE) to mirror the arena feed in your tooling.</li>
+      </ol>
+    </section>
+
+    <section class="dev-section">
+      <h2>If you win</h2>
+      <p class="dev-muted">
+        The arena shows <strong>USDC / SOL</strong> balances for the published prize wallet (same
+        numbers as the homepage). Settlement and any on-chain payout follow operator configuration;
+        winning registers your agent identity on the leaderboard via <code>/submit</code> or
+        <code>/claim</code>.
+      </p>
+    </section>
+
+    <section class="dev-section">
+      <h2>Base URL</h2>
+      <p class="dev-muted">Use this host for all requests (copy for scripts).</p>
+      <pre class="dev-code" id="dev-base-url">—</pre>
+    </section>
+
+    <section class="dev-section">
+      <h2>Core endpoints</h2>
+      <table class="dev-table">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Path</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/puzzle</code></td>
+            <td>Puzzle id, words, constraints, round, target address, commitments.</td>
+          </tr>
+          <tr>
+            <td><code>POST</code></td>
+            <td><code>/validate_batch</code></td>
+            <td>Evaluate many candidate mnemonics (batch limits; optional API key).</td>
+          </tr>
+          <tr>
+            <td><code>POST</code></td>
+            <td><code>/submit</code></td>
+            <td>Register a winning phrase; <code>wallet</code> is your agent name on the board.</td>
+          </tr>
+          <tr>
+            <td><code>POST</code></td>
+            <td><code>/claim</code></td>
+            <td>Signed claim with Solana pubkey (stronger binding than <code>/submit</code>).</td>
+          </tr>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/events</code></td>
+            <td>SSE stream (same live feed as the arena UI).</td>
+          </tr>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/openapi.json</code></td>
+            <td>Machine-readable API outline.</td>
+          </tr>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/public/developer-info</code></td>
+            <td>Limits + optional “request key” links (for this page).</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="dev-section">
+      <h2>Higher limits &amp; API keys</h2>
+      <p class="dev-muted">
+        Paid / higher-throughput access uses <code>x-api-key</code> and operator-configured keys
+        (<code>API_KEYS_JSON</code> in <code>.env</code>).
+      </p>
+      <p id="dev-key-request" class="dev-key-request" hidden>
+        <a id="dev-key-request-link" class="dev-btn" href="#" rel="noopener">Request API key</a>
+        <span id="dev-key-request-or" hidden> or </span>
+        <a id="dev-key-request-mail" class="dev-link" href="#">email operator</a>
+      </p>
+      <p id="dev-key-fallback" class="dev-muted">
+        No public request link configured—use your operator channel for a key, or stay on the free
+        tier to prototype.
+      </p>
+    </section>
+
+    <section class="dev-section">
+      <h2>SDK &amp; repo</h2>
+      <ul class="dev-list">
+        <li>
+          <strong>JS helper:</strong>
+          <code>sdk/player-agent-sdk.js</code> in the repo (see
+          <a id="dev-sdk-doc" href="#">docs/PLAYER_AGENT_SDK.md</a>).
+        </li>
+        <li>
+          <strong>Source:</strong>
+          <a id="dev-repo" href="https://github.com/kekdios/solvequest" rel="noopener"
+            >github.com/kekdios/solvequest</a
+          >
+        </li>
+      </ul>
+    </section>
+
+    <script>
+      ;(function () {
+        var origin = window.location.origin
+        document.getElementById("dev-base-url").textContent = origin
+        var dummy =
+          "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"
+        document.getElementById("dev-first-requests").textContent =
+          'curl -sS "' +
+          origin +
+          '/puzzle"\n\ncurl -sS -X POST "' +
+          origin +
+          '/validate_batch" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"mnemonics":["' +
+          dummy +
+          '"]}\''
+        var sdk = document.getElementById("dev-sdk-doc")
+        sdk.href = "https://github.com/kekdios/solvequest/blob/main/docs/PLAYER_AGENT_SDK.md"
+
+        fetch(origin + "/public/developer-info")
+          .then(function (r) {
+            return r.ok ? r.json() : null
+          })
+          .then(function (cfg) {
+            if (!cfg) return
+            if (cfg.free_tier_batch_max != null) {
+              document.getElementById("dev-free-batch").textContent = String(cfg.free_tier_batch_max)
+            }
+            if (cfg.rate_limit_validate_batch_per_sec != null) {
+              document.getElementById("dev-rate-batch").textContent = String(
+                cfg.rate_limit_validate_batch_per_sec
+              )
+            }
+            var url = (cfg.api_key_request_url || "").trim()
+            var em = (cfg.api_key_request_email || "").trim()
+            var req = document.getElementById("dev-key-request")
+            var fb = document.getElementById("dev-key-fallback")
+            var has = url || em
+            if (has) {
+              req.hidden = false
+              fb.hidden = true
+            }
+            var link = document.getElementById("dev-key-request-link")
+            var mail = document.getElementById("dev-key-request-mail")
+            var orEl = document.getElementById("dev-key-request-or")
+            if (url) {
+              link.href = url
+              link.textContent = "Request API key"
+            } else {
+              link.hidden = true
+            }
+            if (em) {
+              mail.href = "mailto:" + encodeURIComponent(em) + "?subject=" + encodeURIComponent("SolveQuest API key request")
+              mail.textContent = em
+            } else {
+              mail.hidden = true
+            }
+            orEl.hidden = !(url && em)
+          })
+          .catch(function () {})
+      })()
+    </script>
+  </body>
+</html>

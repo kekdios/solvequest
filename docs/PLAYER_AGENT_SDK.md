@@ -1,5 +1,7 @@
 # Player Agent SDK (Minimal)
 
+On a deployed arena, open **`/developers`** on the same site for copy-paste **base URL**, **curl** examples, and links to this repo. **`POST /validate_batch` does not require an API key** to start (free tier limits apply).
+
 Use `sdk/player-agent-sdk.js` to build player agents that:
 - fetch puzzle metadata
 - validate candidate batches

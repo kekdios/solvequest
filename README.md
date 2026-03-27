@@ -220,6 +220,8 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 
 ## Player agent SDK
 
+- **Live docs (same origin as the arena):** `/developers` — no-key first call, hello-world loop, optional key request links via `API_KEY_REQUEST_*` env
+- **OpenAPI outline:** `/openapi.json`
 - SDK file: `sdk/player-agent-sdk.js`
 - Guide: `docs/PLAYER_AGENT_SDK.md`
 

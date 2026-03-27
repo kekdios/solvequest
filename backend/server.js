@@ -1,4 +1,5 @@
 import "dotenv/config"
+import { readFileSync } from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
 import { spawn } from "child_process"
@@ -63,6 +64,15 @@ import {
 } from "./store.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+const APP_VERSION = (() => {
+  try {
+    const pkg = JSON.parse(readFileSync(path.join(__dirname, "package.json"), "utf8"))
+    return typeof pkg.version === "string" && pkg.version.trim() ? pkg.version.trim() : "0.0.0"
+  } catch {
+    return "0.0.0"
+  }
+})()
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
 let DISPLAY_WORDS = shuffle(PUZZLE.words)
@@ -439,6 +449,22 @@ async function batchCreditsMiddleware(req, res, next) {
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true })
+})
+
+app.get("/version", (_req, res) => {
+  res.json({ version: APP_VERSION })
+})
+
+/** Public metadata for /developers (optional operator links + limits). */
+app.get("/public/developer-info", (_req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=60")
+  res.json({
+    api_key_request_url: process.env.API_KEY_REQUEST_URL?.trim() || "",
+    api_key_request_email: process.env.API_KEY_REQUEST_EMAIL?.trim() || "",
+    free_tier_batch_max: FREE_TIER_BATCH_MAX,
+    rate_limit_validate_batch_per_sec:
+      Number(process.env.RATE_LIMIT_VALIDATE_BATCH_MAX) || 20,
+  })
 })
 
 app.get("/puzzle", async (_req, res) => {
@@ -894,6 +920,11 @@ app.get("/leaderboard", async (req, res) => {
       gap_to_leader: gap,
     },
   })
+})
+
+app.get("/developers", (_req, res) => {
+  res.type("html")
+  res.sendFile(path.join(__dirname, "../frontend/developers.html"))
 })
 
 app.use(express.static(path.join(__dirname, "../frontend")))

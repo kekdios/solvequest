@@ -118,6 +118,14 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
   - `POST /worker/start`
   - `POST /worker/stop`
 
+### `API_KEY_REQUEST_URL` (optional)
+- **Purpose:** URL for “Request API key” on `/developers` (e.g. Google Form).
+- **Used by:** `backend/server.js` (`GET /public/developer-info`).
+
+### `API_KEY_REQUEST_EMAIL` (optional)
+- **Purpose:** Shown as mailto on `/developers` when operators prefer email over a form.
+- **Used by:** `backend/server.js` (`GET /public/developer-info`).
+
 ### `PAYOUT_AMOUNT_USDC` (optional, default `0`)
 - **Purpose:** If >0, create audited payout job on round settlement when a winner exists.
 - **Used by:** `backend/server.js` + `backend/store.js`.

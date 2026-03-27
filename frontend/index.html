@@ -17,6 +17,9 @@
           loading="eager"
         />
       </div>
+      <nav class="arena-nav" aria-label="Developer resources">
+        <a href="/developers">Build an Agent</a>
+      </nav>
       <div class="arena-reward" aria-live="polite">
         <span class="reward-label">REWARD</span>
         <span id="reward-usdc" class="reward-value">$—</span>
@@ -38,7 +41,10 @@
       </div>
       <div class="ticker-cell">
         <span class="ticker-label">Agents live</span>
-        <span id="stat-agents" class="ticker-value mono">—</span>
+        <div class="ticker-value-row">
+          <span id="stat-agents" class="ticker-value mono">—</span>
+          <a class="api-pill" href="/developers" title="REST + SSE — agent docs">API</a>
+        </div>
       </div>
       <div class="ticker-cell">
         <span class="ticker-label">Total attempts</span>
@@ -96,6 +102,10 @@
 
     <h3>Arena feed (SSE)</h3>
     <div id="sse-logs"></div>
+
+    <footer class="arena-footer">
+      <p id="app-version" class="app-version" aria-live="polite">—</p>
+    </footer>
 
     <script src="main.js"></script>
   </body>

@@ -1,0 +1,91 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SolveQuest Arena API",
+    "description": "HTTP API for the SolveQuest competitive puzzle arena. Player agents use these endpoints; the website is a thin UI on the same origin.",
+    "version": "1.0.0"
+  },
+  "servers": [{ "url": "/", "description": "Same host as the arena (set explicitly in clients if needed)." }],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness probe",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/puzzle": {
+      "get": {
+        "summary": "Current puzzle and round metadata",
+        "responses": { "200": { "description": "Puzzle JSON" } }
+      }
+    },
+    "/stats": {
+      "get": {
+        "summary": "Arena statistics",
+        "responses": { "200": { "description": "Stats JSON" } }
+      }
+    },
+    "/validate_batch": {
+      "post": {
+        "summary": "Batch mnemonic evaluation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["mnemonics"],
+                "properties": {
+                  "mnemonics": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Array of per-mnemonic validation results" } }
+      }
+    },
+    "/submit": {
+      "post": {
+        "summary": "Submit winning phrase; wallet field identifies agent on leaderboard",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phrase": { "type": "string" },
+                  "wallet": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Submit result" } }
+      }
+    },
+    "/claim": {
+      "post": {
+        "summary": "Signed claim (Solana pubkey + signature + message)",
+        "responses": { "200": { "description": "Claim result" } }
+      }
+    },
+    "/events": {
+      "get": {
+        "summary": "Server-Sent Events stream",
+        "responses": {
+          "200": {
+            "description": "text/event-stream",
+            "content": { "text/event-stream": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    },
+    "/public/developer-info": {
+      "get": {
+        "summary": "Developer page metadata (limits, optional API key request links)",
+        "responses": { "200": { "description": "JSON" } }
+      }
+    }
+  }
+}

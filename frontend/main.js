@@ -108,6 +108,21 @@ async function loadStats() {
   }
 }
 
+async function loadVersion() {
+  try {
+    const res = await fetch(`${API}/version`)
+    if (!res.ok) return
+    const data = await res.json()
+    const v = data?.version
+    const el = document.getElementById("app-version")
+    if (el && typeof v === "string" && v) {
+      el.textContent = `SolveQuest v${v}`
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 async function loadPrizeBalances() {
   try {
     const res = await fetch(`${API}/prize/balances`)
@@ -294,6 +309,7 @@ function connectEvents() {
 document.getElementById("worker-toggle-btn").addEventListener("click", toggleWorker)
 
 connectEvents()
+loadVersion()
 loadPuzzle()
 loadStats()
 loadPrizeBalances()
