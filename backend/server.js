@@ -5,6 +5,7 @@ import { spawn } from "child_process"
 import express from "express"
 import cors from "cors"
 import rateLimit from "express-rate-limit"
+import { Connection, PublicKey } from "@solana/web3.js"
 import {
   PUZZLE,
   shuffle,
@@ -119,6 +120,18 @@ const CLAIM_REQUIRE_ROUND_IN_MESSAGE =
   process.env.CLAIM_REQUIRE_ROUND_IN_MESSAGE === "1" ||
   process.env.CLAIM_REQUIRE_ROUND_IN_MESSAGE === "true"
 
+const SOLANA_RPC_URL =
+  process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
+const USDC_MINT =
+  process.env.USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+const PRIZE_BALANCE_TTL_MS = Math.max(
+  1000,
+  Number(process.env.PRIZE_BALANCE_TTL_MS) || 10_000
+)
+const solanaConn = new Connection(SOLANA_RPC_URL, "confirmed")
+let prizeBalanceCache = null
+let prizeBalanceCacheAt = 0
+
 function localBroadcast(event) {
   const payload = `data: ${JSON.stringify(event)}\n\n`
   for (const res of sseClients) {
@@ -193,6 +206,39 @@ function stopWorkerProcess() {
   workerStopping = true
   workerProcess.kill("SIGTERM")
   return getWorkerStatus()
+}
+
+async function fetchPrizeBalances() {
+  const now = Date.now()
+  if (prizeBalanceCache && now - prizeBalanceCacheAt < PRIZE_BALANCE_TTL_MS) {
+    return prizeBalanceCache
+  }
+
+  const owner = new PublicKey(PUZZLE.target_address)
+  const [lamports, tokenAccounts] = await Promise.all([
+    solanaConn.getBalance(owner),
+    solanaConn.getParsedTokenAccountsByOwner(owner, {
+      mint: new PublicKey(USDC_MINT),
+    }),
+  ])
+
+  let usdc = 0
+  for (const { account } of tokenAccounts.value) {
+    const amount =
+      account?.data?.parsed?.info?.tokenAmount?.uiAmount ??
+      Number(account?.data?.parsed?.info?.tokenAmount?.uiAmountString ?? "0")
+    usdc += Number(amount) || 0
+  }
+
+  prizeBalanceCache = {
+    address: PUZZLE.target_address,
+    usdc_mint: USDC_MINT,
+    usdc_balance: usdc,
+    sol_balance: lamports / 1_000_000_000,
+    fetched_at_ms: now,
+  }
+  prizeBalanceCacheAt = now
+  return prizeBalanceCache
 }
 
 async function broadcastLeaderboardScoreEvents(pubkey) {
@@ -334,6 +380,16 @@ app.get("/stats", async (_req, res) => {
     attempts_per_sec: attempts_total / time_elapsed,
     ...extra,
   })
+})
+
+app.get("/prize/balances", async (_req, res) => {
+  try {
+    const data = await fetchPrizeBalances()
+    res.json(data)
+  } catch (e) {
+    console.error("[prize/balances]", e)
+    res.status(500).json({ error: "prize_balance_unavailable" })
+  }
 })
 
 app.get("/worker/status", (_req, res) => {

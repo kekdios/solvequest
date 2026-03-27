@@ -107,6 +107,20 @@ async function loadStats() {
   }
 }
 
+async function loadPrizeBalances() {
+  try {
+    const res = await fetch(`${API}/prize/balances`)
+    if (!res.ok) return
+    const p = await res.json()
+    const usdc = Number(p.usdc_balance)
+    const sol = Number(p.sol_balance)
+    document.getElementById("prize-usdc").textContent = `USDC ${Number.isFinite(usdc) ? usdc.toFixed(2) : "—"}`
+    document.getElementById("prize-sol").textContent = `SOL ${Number.isFinite(sol) ? sol.toFixed(4) : "—"}`
+  } catch {
+    /* ignore */
+  }
+}
+
 function renderWorkerStatus(data) {
   const statusEl = document.getElementById("worker-status")
   const btnEl = document.getElementById("worker-toggle-btn")
@@ -257,9 +271,11 @@ document.getElementById("worker-toggle-btn").addEventListener("click", toggleWor
 connectEvents()
 loadPuzzle()
 loadStats()
+loadPrizeBalances()
 loadWorkerStatus()
 loadLeaderboard()
 setInterval(loadStats, 1500)
+setInterval(loadPrizeBalances, 10000)
 setInterval(loadWorkerStatus, 2500)
 setInterval(loadLeaderboard, 8000)
 setInterval(loadPuzzle, 5000)

@@ -342,6 +342,25 @@ body {
   margin: 4px 0 0;
 }
 
+.prize-balances {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prize-usdc {
+  display: inline-block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.prize-sol {
+  color: var(--muted);
+}
+
 .constraints {
   margin: 0 0 1rem;
   padding: 10px 12px;

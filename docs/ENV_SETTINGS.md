@@ -70,6 +70,19 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Used by:** `backend/store.js`.
 - **If missing:** falls back to in-memory mode (dev only).
 
+### `SOLANA_RPC_URL` (optional, default `https://api.mainnet-beta.solana.com`)
+- **Purpose:** RPC endpoint for prize wallet balance reads (`/prize/balances`).
+- **Used by:** `backend/server.js`.
+
+### `USDC_MINT` (optional, default mainnet USDC mint)
+- **Purpose:** Token mint used for prize USDC balance lookup.
+- **Used by:** `backend/server.js`.
+- **Default:** `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`.
+
+### `PRIZE_BALANCE_TTL_MS` (optional, default `10000`)
+- **Purpose:** Cache TTL for RPC prize balance reads.
+- **Used by:** `backend/server.js`.
+
 ### `SOLQUEST_API` (optional)
 - **Purpose:** API URL passed to internally spawned House Agent process.
 - **Used by:** `backend/server.js` worker spawn env.
