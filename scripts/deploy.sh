@@ -36,11 +36,20 @@ echo "==> Pull latest code"
 git pull --ff-only origin "${BRANCH}"
 
 echo "==> Install backend dependencies (prefer npm ci)"
-cd backend
+cd "${APP_DIR}/backend"
 if npm ci --omit=dev >/dev/null 2>&1; then
-  echo "Dependencies installed via npm ci"
+  echo "Backend dependencies installed via npm ci"
 else
-  echo "npm ci failed, falling back to npm install"
+  echo "Backend npm ci failed, falling back to npm install"
+  npm install --omit=dev >/dev/null 2>&1 || npm install
+fi
+
+echo "==> Install worker dependencies (prefer npm ci)"
+cd "${APP_DIR}/worker"
+if npm ci --omit=dev >/dev/null 2>&1; then
+  echo "Worker dependencies installed via npm ci"
+else
+  echo "Worker npm ci failed, falling back to npm install"
   npm install --omit=dev >/dev/null 2>&1 || npm install
 fi
 
