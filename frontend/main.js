@@ -77,13 +77,23 @@ async function loadPuzzle() {
   const fp = data.constraints?.fixed_positions
   const sec = document.getElementById("constraints-section")
   const txt = document.getElementById("constraints-text")
+  const envLine = document.getElementById("constraints-env-line")
   if (fp && Object.keys(fp).length > 0) {
     const parts = Object.entries(fp)
       .sort(([a], [b]) => Number(a) - Number(b))
       .map(([i, w]) => `position ${Number(i) + 1} = ${w}`)
     txt.textContent = `Fixed words: ${parts.join("; ")}`
+    const sorted = {}
+    for (const k of Object.keys(fp).sort((a, b) => Number(a) - Number(b))) {
+      sorted[k] = String(fp[k]).trim().toLowerCase()
+    }
+    envLine.textContent = `PUZZLE_CONSTRAINTS_JSON=${JSON.stringify({
+      fixed_positions: sorted,
+    })}`
     sec.hidden = false
   } else {
+    txt.textContent = ""
+    envLine.textContent = ""
     sec.hidden = true
   }
 }

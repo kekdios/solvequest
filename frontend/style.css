@@ -411,6 +411,23 @@ body {
   font-size: 1rem;
 }
 
+.constraints-env-label {
+  margin: 10px 0 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.constraints-env-line {
+  margin: 0;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  line-height: 1.4;
+}
+
 .small {
   font-size: 0.88rem;
   line-height: 1.45;
