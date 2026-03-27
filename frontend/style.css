@@ -144,6 +144,54 @@ body {
   font-size: 0.78rem;
 }
 
+.race-lane {
+  position: relative;
+  height: 18px;
+  margin-top: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      to right,
+      transparent 0,
+      transparent 18px,
+      color-mix(in srgb, var(--border) 70%, transparent) 18px,
+      color-mix(in srgb, var(--border) 70%, transparent) 19px
+    )
+    0 0 / 20px 100% repeat-x,
+    color-mix(in srgb, var(--panel) 86%, black);
+  overflow: hidden;
+}
+
+.house-runner {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translate(0, -50%);
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1;
+  text-shadow: none;
+}
+
+.race-lane.is-running .house-runner {
+  color: var(--accent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 65%, transparent);
+  animation: house-race 2.4s linear infinite;
+}
+
+@keyframes house-race {
+  0% {
+    transform: translate(0, -50%);
+  }
+  50% {
+    transform: translate(calc(100% - 22px), -50%);
+  }
+  100% {
+    transform: translate(0, -50%);
+  }
+}
+
 .arena-grid {
   display: grid;
   grid-template-columns: 1fr minmax(14rem, 18rem);
