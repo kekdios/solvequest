@@ -205,29 +205,6 @@ async function loadLeaderboard() {
   }
 }
 
-async function submit() {
-  const phrase = document.getElementById("input").value
-  const res = await fetch(`${API}/submit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      phrase,
-      wallet: MY_WALLET,
-    }),
-  })
-  const data = await res.json()
-  log(JSON.stringify(data))
-  loadLeaderboard()
-  loadPuzzle()
-}
-
-function log(msg) {
-  const div = document.createElement("div")
-  div.className = "log-line"
-  div.textContent = msg
-  document.getElementById("logs").prepend(div)
-}
-
 function logSse(msg) {
   const div = document.createElement("div")
   div.className = "log-line sse"
@@ -266,11 +243,7 @@ function connectEvents() {
   }
 }
 
-document.getElementById("submit-btn").addEventListener("click", submit)
 document.getElementById("worker-toggle-btn").addEventListener("click", toggleWorker)
-document.getElementById("input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") submit()
-})
 
 connectEvents()
 loadPuzzle()
