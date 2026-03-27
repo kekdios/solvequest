@@ -95,11 +95,58 @@
       </div>
 
       <aside class="arena-side" aria-label="Leaderboard">
-        <h2>Leaderboard</h2>
+        <div class="leaderboard-head">
+          <h2>Leaderboard</h2>
+          <button type="button" id="runner-names-open" class="runner-names-btn">
+            Name runners
+          </button>
+        </div>
         <p class="side-hint">Player Agents: valid checksum, wrong target</p>
+        <p class="side-hint runner-names-hint">
+          Link a display name to an address (saved in this browser only).
+        </p>
         <div id="you-vs-top" class="you-vs" aria-live="polite"></div>
         <ol id="leaderboard-list" class="leaderboard"></ol>
       </aside>
+
+      <dialog id="runner-names-dialog" class="runner-dialog" aria-labelledby="runner-dialog-title">
+        <form id="runner-form" class="runner-dialog-inner">
+          <h3 id="runner-dialog-title">Name a runner</h3>
+          <p class="runner-dialog-desc">
+            One name per address and one address per name. Letters, numbers, spaces,
+            <code>-</code> <code>_</code> <code>'</code> · max 32 characters.
+          </p>
+          <label class="runner-field">
+            <span>Address (full pubkey / wallet id)</span>
+            <input
+              type="text"
+              id="runner-input-address"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="e.g. team-alpha or Solana base58 pubkey"
+            />
+          </label>
+          <label class="runner-field">
+            <span>Display name</span>
+            <input
+              type="text"
+              id="runner-input-name"
+              maxlength="32"
+              autocomplete="off"
+              placeholder="e.g. Seabiscuit"
+            />
+          </label>
+          <p id="runner-form-error" class="runner-form-error" role="alert" hidden></p>
+          <div class="runner-dialog-actions">
+            <button type="submit" id="runner-btn-add" class="runner-btn primary">Add / update</button>
+            <button type="button" id="runner-btn-close" class="runner-btn">Close</button>
+          </div>
+        </form>
+        <div class="runner-list-wrap">
+          <h4 class="runner-list-title">Saved names</h4>
+          <ul id="runner-saved-list" class="runner-saved-list"></ul>
+        </div>
+      </dialog>
     </div>
 
     <h3>Arena feed (SSE)</h3>
