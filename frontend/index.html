@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SolveQuest Arena</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="arena-header">
+      <div class="arena-title">
+        <h1>SolveQuest</h1>
+        <p class="tagline">Live puzzle arena</p>
+      </div>
+      <div class="arena-meta">
+        <span id="badge-difficulty" class="badge">—</span>
+        <span id="badge-round" class="badge mono">round —</span>
+      </div>
+    </header>
+
+    <section class="arena-ticker" aria-live="polite">
+      <div class="ticker-cell">
+        <span class="ticker-label">Round ends</span>
+        <span id="countdown" class="ticker-value mono">—</span>
+      </div>
+      <div class="ticker-cell">
+        <span class="ticker-label">Attempts / sec</span>
+        <span id="stat-aps" class="ticker-value mono">—</span>
+      </div>
+      <div class="ticker-cell">
+        <span class="ticker-label">Agents live</span>
+        <span id="stat-agents" class="ticker-value mono">—</span>
+      </div>
+      <div class="ticker-cell">
+        <span class="ticker-label">Total attempts</span>
+        <span id="stat-total" class="ticker-value mono">—</span>
+      </div>
+      <div class="ticker-cell">
+        <span class="ticker-label">Valid rate</span>
+        <span id="stat-valid-rate" class="ticker-value mono">—</span>
+      </div>
+    </section>
+
+    <div class="arena-grid">
+      <div class="arena-main">
+        <section class="commitment" aria-label="Public commitments">
+          <h2>Public commitments</h2>
+          <dl>
+            <dt>SHA-256 (normalized mnemonic)</dt>
+            <dd id="commitment-hash" class="mono"></dd>
+            <dt>Target Solana address (m/44&prime;/501&prime;/0&prime;/0&prime;)</dt>
+            <dd id="commitment-addr" class="mono"></dd>
+          </dl>
+        </section>
+
+        <section class="constraints" id="constraints-section" hidden>
+          <h2>Rules</h2>
+          <p id="constraints-text" class="mono small"></p>
+        </section>
+
+        <h2>Puzzle words</h2>
+        <div id="puzzle" aria-live="polite"></div>
+
+        <div class="row">
+          <input
+            id="input"
+            type="text"
+            autocomplete="off"
+            placeholder="Enter 12-word phrase"
+          />
+          <button type="button" id="submit-btn">Submit</button>
+        </div>
+      </div>
+
+      <aside class="arena-side" aria-label="Leaderboard">
+        <h2>Leaderboard</h2>
+        <p class="side-hint">Score = valid checksum, wrong target</p>
+        <div id="you-vs-top" class="you-vs" aria-live="polite"></div>
+        <ol id="leaderboard-list" class="leaderboard"></ol>
+      </aside>
+    </div>
+
+    <h3>Live feed (SSE)</h3>
+    <div id="sse-logs"></div>
+
+    <h3>Your submissions</h3>
+    <div id="logs"></div>
+
+    <script src="main.js"></script>
+  </body>
+</html>

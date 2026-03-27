@@ -1,0 +1,26 @@
+.DS_Store
+
+# Node dependencies
+node_modules/
+**/node_modules/
+
+# Environment files
+.env
+**/.env
+.env.local
+**/.env.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime/editor artifacts
+.idea/
+.vscode/
+coverage/
+dist/
+build/
+
