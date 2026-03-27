@@ -14,10 +14,14 @@ const LEADERBOARD_ZSET = "leaderboard:global"
 const CLAIM_LOCK_KEY = "puzzle:claim_lock"
 const CHANNEL_EVENTS = "arena:events"
 const ROUND_END_MS_KEY = "puzzle:round_end_ms"
+const ROUND_START_MS_KEY = "puzzle:round_start_ms"
 const ROUND_ID_STORE_KEY = "puzzle:round_id"
 const ROUND_SETTLED_KEY = "puzzle:round_settled"
+const ROUND_ARCHIVED_KEY = "puzzle:round_archived"
 const ROUND_LEADERBOARD_WINNER_KEY = "puzzle:round_leaderboard_winner"
 const ROUND_SETTLE_LOCK_KEY = "puzzle:round_settle_lock"
+const PAYOUT_JOB_SEQ_KEY = "payout:job_seq"
+const PAYOUT_JOB_INDEX_KEY = "payout:jobs"
 
 const LEADERBOARD_MAX_INCR_PER_SEC = Math.min(
   Math.max(Number(process.env.LEADERBOARD_MAX_INCR_PER_SEC) || 20, 1),
@@ -76,6 +80,7 @@ function mem() {
       winner: null,
       leaderboardZ: {},
       roundEndMs: null,
+      roundStartMs: null,
       roundId: null,
       claimLock: false,
       claimResults: {},
@@ -83,7 +88,11 @@ function mem() {
       roundSettledFor: null,
       roundEndEventSentFor: null,
       roundLeaderboardWinner: null,
+      roundArchivedFor: null,
       lbRate: {},
+      payoutJobs: {},
+      payoutJobsOrder: [],
+      payoutIdempotency: {},
     }
   }
   return memory
@@ -98,6 +107,11 @@ export async function initStore(options = {}) {
     await redis.set(ARENA_START_KEY, String(Date.now()), { NX: true })
     const rid = process.env.ROUND_ID?.trim() || "default"
     await redis.set(ROUND_ID_STORE_KEY, rid, { NX: true })
+    const startDelay = Number(process.env.ROUND_START_DELAY_SEC)
+    if (Number.isFinite(startDelay) && startDelay > 0) {
+      const startMs = String(Date.now() + startDelay * 1000)
+      await redis.set(ROUND_START_MS_KEY, startMs, { NX: true })
+    }
     const dur = Number(process.env.ROUND_DURATION_SEC)
     if (Number.isFinite(dur) && dur > 0) {
       const endMs = String(Date.now() + dur * 1000)
@@ -123,6 +137,10 @@ export async function initStore(options = {}) {
     )
     const m0 = mem()
     m0.roundId = process.env.ROUND_ID?.trim() || "default"
+    const startDelay = Number(process.env.ROUND_START_DELAY_SEC)
+    if (Number.isFinite(startDelay) && startDelay > 0) {
+      m0.roundStartMs = Date.now() + startDelay * 1000
+    }
     const dur = Number(process.env.ROUND_DURATION_SEC)
     if (Number.isFinite(dur) && dur > 0) {
       m0.roundEndMs = Date.now() + dur * 1000
@@ -347,11 +365,16 @@ const MESSAGE_DEDUP_TTL_SEC = Math.min(
  */
 async function isRoundActiveInternal() {
   if (redis) {
-    const endMs = await redis.get(ROUND_END_MS_KEY)
+    const [startMs, endMs] = await Promise.all([
+      redis.get(ROUND_START_MS_KEY),
+      redis.get(ROUND_END_MS_KEY),
+    ])
+    if (startMs && Date.now() < Number(startMs)) return false
     if (!endMs) return true
     return Date.now() < Number(endMs)
   }
   const m = mem()
+  if (m.roundStartMs != null && Date.now() < m.roundStartMs) return false
   if (m.roundEndMs == null) return true
   return Date.now() < m.roundEndMs
 }
@@ -360,57 +383,80 @@ function roundSettleGraceMs() {
   return Math.round((Number(process.env.ROUND_SETTLE_GRACE_SEC) || 3) * 1000)
 }
 
+function roundArchiveDelayMs() {
+  return Math.round((Number(process.env.ROUND_ARCHIVE_DELAY_SEC) || 120) * 1000)
+}
+
 /** Round metadata for clients (timed arena). */
 export async function getRoundState() {
   const ridEnv = process.env.ROUND_ID?.trim() || "default"
   const graceMs = roundSettleGraceMs()
   const now = Date.now()
   if (redis) {
-    const [endMs, rid, settledVal] = await Promise.all([
+    const [startMs, endMs, rid, settledVal, archivedVal] = await Promise.all([
+      redis.get(ROUND_START_MS_KEY),
       redis.get(ROUND_END_MS_KEY),
       redis.get(ROUND_ID_STORE_KEY),
       redis.get(ROUND_SETTLED_KEY),
+      redis.get(ROUND_ARCHIVED_KEY),
     ])
     const ridCur = rid || ridEnv
+    const start = startMs ? Number(startMs) : null
     const end = endMs ? Number(endMs) : null
-    const active = end == null || now < end
+    const active =
+      (start == null || now >= start) && (end == null || now < end)
     const settleAt = end != null ? end + graceMs : null
     const settled = settledVal === ridCur
+    const archiveAt = settleAt != null ? settleAt + roundArchiveDelayMs() : null
+    const archived = archivedVal === ridCur
     const lbWinner = await redis.get(ROUND_LEADERBOARD_WINNER_KEY)
     let phase = "active"
-    if (end != null) {
-      if (now < end) phase = "active"
+    if (start != null && now < start) {
+      phase = "scheduled"
+    } else if (end != null && now >= end) {
+      if (archived) phase = "archived"
       else if (settled) phase = "settled"
-      else phase = "grace"
+      else phase = "ended"
     }
     return {
       round_id: ridCur,
+      round_start_ms: start,
       round_end_ms: end,
       round_active: active,
       round_phase: phase,
       round_settle_at_ms: settleAt,
+      round_archive_at_ms: archiveAt,
       round_settled: settled,
+      round_archived: archived,
       round_leaderboard_winner: lbWinner || null,
     }
   }
   const m = mem()
+  const start = m.roundStartMs
   const end = m.roundEndMs
-  const active = end == null || now < end
+  const active = (start == null || now >= start) && (end == null || now < end)
   const settleAt = end != null ? end + graceMs : null
+  const archiveAt = settleAt != null ? settleAt + roundArchiveDelayMs() : null
   const settled = m.roundSettledFor === m.roundId && m.roundId != null
+  const archived = m.roundArchivedFor === m.roundId && m.roundId != null
   let phase = "active"
-  if (end != null) {
-    if (now < end) phase = "active"
+  if (start != null && now < start) {
+    phase = "scheduled"
+  } else if (end != null && now >= end) {
+    if (archived) phase = "archived"
     else if (settled) phase = "settled"
-    else phase = "grace"
+    else phase = "ended"
   }
   return {
     round_id: m.roundId || ridEnv,
+    round_start_ms: start,
     round_end_ms: end,
     round_active: active,
     round_phase: phase,
     round_settle_at_ms: settleAt,
+    round_archive_at_ms: archiveAt,
     round_settled: settled,
+    round_archived: archived,
     round_leaderboard_winner: m.roundLeaderboardWinner || null,
   }
 }
@@ -483,6 +529,177 @@ export async function maybeSettleRound(publishFn) {
   } finally {
     await redis.del(ROUND_SETTLE_LOCK_KEY)
   }
+}
+
+export async function maybeArchiveRound(publishFn) {
+  const graceMs = roundSettleGraceMs()
+  const archiveDelayMs = roundArchiveDelayMs()
+  const ridEnv = process.env.ROUND_ID?.trim() || "default"
+  if (!redis) {
+    const m = mem()
+    if (!m.roundEndMs || !m.roundId) return
+    if (Date.now() < m.roundEndMs + graceMs + archiveDelayMs) return
+    if (m.roundArchivedFor === m.roundId) return
+    m.roundArchivedFor = m.roundId
+    publishFn({ type: "round_archived", round_id: m.roundId })
+    return
+  }
+  const endMs = await redis.get(ROUND_END_MS_KEY)
+  if (!endMs) return
+  const rid = (await redis.get(ROUND_ID_STORE_KEY)) || ridEnv
+  if (Date.now() < Number(endMs) + graceMs + archiveDelayMs) return
+  if ((await redis.get(ROUND_ARCHIVED_KEY)) === rid) return
+  const ok = await redis.set(ROUND_ARCHIVED_KEY, rid, { NX: true })
+  if (ok !== "OK") return
+  publishFn({ type: "round_archived", round_id: rid })
+}
+
+function payoutIdempotencyKey(roundId, winnerAddress, amountUsdc) {
+  return `payout:${roundId}:${winnerAddress}:${amountUsdc}`
+}
+
+export async function createPayoutJob({ roundId, winnerAddress, amountUsdc }) {
+  const idem = payoutIdempotencyKey(roundId, winnerAddress, amountUsdc)
+  const maxRetries = Math.max(0, Number(process.env.PAYOUT_MAX_RETRIES) || 5)
+  if (!redis) {
+    const m = mem()
+    const existingId = m.payoutIdempotency[idem]
+    if (existingId && m.payoutJobs[existingId]) return m.payoutJobs[existingId]
+    const jobId = `payout_${m.payoutJobsOrder.length + 1}`
+    const job = {
+      job_id: jobId,
+      idempotency_key: idem,
+      round_id: roundId,
+      winner_address: winnerAddress,
+      amount_usdc: amountUsdc,
+      status: "pending",
+      retries: 0,
+      max_retries: maxRetries,
+      tx_sig: null,
+      last_error: null,
+      created_at_ms: Date.now(),
+      updated_at_ms: Date.now(),
+    }
+    m.payoutJobs[jobId] = job
+    m.payoutJobsOrder.unshift(jobId)
+    m.payoutIdempotency[idem] = jobId
+    return job
+  }
+  const idemKey = `payout:idem:${idem}`
+  let existingId = await redis.get(idemKey)
+  if (existingId) {
+    const raw = await redis.get(`payout:job:${existingId}`)
+    return raw ? JSON.parse(raw) : null
+  }
+  const seq = await redis.incr(PAYOUT_JOB_SEQ_KEY)
+  const jobId = `payout_${seq}`
+  const job = {
+    job_id: jobId,
+    idempotency_key: idem,
+    round_id: roundId,
+    winner_address: winnerAddress,
+    amount_usdc: amountUsdc,
+    status: "pending",
+    retries: 0,
+    max_retries: maxRetries,
+    tx_sig: null,
+    last_error: null,
+    created_at_ms: Date.now(),
+    updated_at_ms: Date.now(),
+  }
+  const ok = await redis.set(idemKey, jobId, { NX: true })
+  if (ok !== "OK") {
+    existingId = await redis.get(idemKey)
+    const raw = existingId ? await redis.get(`payout:job:${existingId}`) : null
+    return raw ? JSON.parse(raw) : null
+  }
+  await redis.set(`payout:job:${jobId}`, JSON.stringify(job))
+  await redis.lPush(PAYOUT_JOB_INDEX_KEY, jobId)
+  await redis.lTrim(PAYOUT_JOB_INDEX_KEY, 0, 999)
+  return job
+}
+
+export async function listPayoutJobs(limit = 20) {
+  const lim = Math.min(Math.max(Number(limit) || 20, 1), 200)
+  if (!redis) {
+    const m = mem()
+    return m.payoutJobsOrder.slice(0, lim).map((id) => m.payoutJobs[id]).filter(Boolean)
+  }
+  const ids = await redis.lRange(PAYOUT_JOB_INDEX_KEY, 0, lim - 1)
+  const raws = await Promise.all(ids.map((id) => redis.get(`payout:job:${id}`)))
+  return raws.filter(Boolean).map((x) => JSON.parse(x))
+}
+
+export async function recordPayoutAttempt(jobId, { txSig = null, error = null }) {
+  if (!jobId) return null
+  const maxRetries = Math.max(0, Number(process.env.PAYOUT_MAX_RETRIES) || 5)
+  if (!redis) {
+    const job = mem().payoutJobs[jobId]
+    if (!job) return null
+    job.retries = (job.retries || 0) + 1
+    job.max_retries = maxRetries
+    job.updated_at_ms = Date.now()
+    if (txSig) {
+      job.tx_sig = txSig
+      job.status = "confirmed"
+      job.last_error = null
+    } else {
+      job.last_error = error || "attempt_failed"
+      job.status = job.retries >= maxRetries ? "failed" : "pending_retry"
+    }
+    return job
+  }
+  const raw = await redis.get(`payout:job:${jobId}`)
+  if (!raw) return null
+  const job = JSON.parse(raw)
+  job.retries = (job.retries || 0) + 1
+  job.max_retries = maxRetries
+  job.updated_at_ms = Date.now()
+  if (txSig) {
+    job.tx_sig = txSig
+    job.status = "confirmed"
+    job.last_error = null
+  } else {
+    job.last_error = error || "attempt_failed"
+    job.status = job.retries >= maxRetries ? "failed" : "pending_retry"
+  }
+  await redis.set(`payout:job:${jobId}`, JSON.stringify(job))
+  return job
+}
+
+export async function startNewRound({
+  roundId,
+  durationSec = Number(process.env.ROUND_DURATION_SEC) || 0,
+  startDelaySec = Number(process.env.ROUND_START_DELAY_SEC) || 0,
+} = {}) {
+  const rid = String(roundId || process.env.ROUND_ID?.trim() || "default")
+  const now = Date.now()
+  const startMs = startDelaySec > 0 ? now + startDelaySec * 1000 : null
+  const endMs = durationSec > 0 ? (startMs || now) + durationSec * 1000 : null
+  if (!redis) {
+    const m = mem()
+    m.roundId = rid
+    m.roundStartMs = startMs
+    m.roundEndMs = endMs
+    m.roundSettledFor = null
+    m.roundArchivedFor = null
+    m.roundEndEventSentFor = null
+    m.roundLeaderboardWinner = null
+    m.winner = null
+    m.leaderboardZ = {}
+    return { round_id: rid, round_start_ms: startMs, round_end_ms: endMs }
+  }
+  await Promise.all([
+    redis.set(ROUND_ID_STORE_KEY, rid),
+    startMs != null ? redis.set(ROUND_START_MS_KEY, String(startMs)) : redis.del(ROUND_START_MS_KEY),
+    endMs != null ? redis.set(ROUND_END_MS_KEY, String(endMs)) : redis.del(ROUND_END_MS_KEY),
+    redis.del(PUZZLE_WINNER_KEY),
+    redis.del(ROUND_SETTLED_KEY),
+    redis.del(ROUND_ARCHIVED_KEY),
+    redis.del(ROUND_LEADERBOARD_WINNER_KEY),
+    redis.del(LEADERBOARD_ZSET),
+  ])
+  return { round_id: rid, round_start_ms: startMs, round_end_ms: endMs }
 }
 
 export async function isApiKeyValid(apiKeyHeader) {

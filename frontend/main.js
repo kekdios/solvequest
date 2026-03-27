@@ -47,7 +47,7 @@ async function loadPuzzle() {
       el.textContent = "settled"
       return
     }
-    if (phase === "grace" && endMs) {
+    if (phase === "ended" && endMs) {
       el.textContent = "ended"
       return
     }
@@ -276,9 +276,10 @@ function connectEvents() {
         loadStats()
         loadLeaderboard()
       }
-      if (t === "round_end" || t === "round_settled") {
+      if (t === "round_end" || t === "round_settled" || t === "round_archived" || t === "round_rotated") {
         loadPuzzle()
         loadStats()
+        loadPrizeBalances()
         loadLeaderboard()
       }
     } catch {

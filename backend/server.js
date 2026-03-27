@@ -53,6 +53,11 @@ import {
   CREDITS_SCALE_UNITS,
   maybeSendRoundEndEvent,
   maybeSettleRound,
+  maybeArchiveRound,
+  createPayoutJob,
+  listPayoutJobs,
+  recordPayoutAttempt,
+  startNewRound,
   getLeaderboardScore,
   getLeaderboardRank1Based,
 } from "./store.js"
@@ -60,7 +65,7 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
-const DISPLAY_WORDS = shuffle(PUZZLE.words)
+let DISPLAY_WORDS = shuffle(PUZZLE.words)
 const WORKER_SCRIPT = path.join(__dirname, "../worker/worker.js")
 
 const sseClients = new Set()
@@ -131,6 +136,13 @@ const HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC = Math.max(
   0,
   Number(process.env.HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC) || 0
 )
+const AUTO_ROTATE_ROUNDS =
+  process.env.AUTO_ROTATE_ROUNDS === "1" || process.env.AUTO_ROTATE_ROUNDS === "true"
+const PAYOUT_AMOUNT_USDC = Number(process.env.PAYOUT_AMOUNT_USDC || 0)
+const ROUND_ROTATION_JSON = process.env.ROUND_ROTATION_JSON?.trim() || ""
+let roundRotation = []
+let rotationIndex = 0
+let lastAutoRotatedRoundId = null
 
 const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
@@ -143,6 +155,17 @@ const PRIZE_BALANCE_TTL_MS = Math.max(
 const solanaConn = new Connection(SOLANA_RPC_URL, "confirmed")
 let prizeBalanceCache = null
 let prizeBalanceCacheAt = 0
+
+if (ROUND_ROTATION_JSON) {
+  try {
+    const parsed = JSON.parse(ROUND_ROTATION_JSON)
+    if (Array.isArray(parsed)) {
+      roundRotation = parsed
+    }
+  } catch (e) {
+    console.error("[round rotation] invalid ROUND_ROTATION_JSON", e)
+  }
+}
 
 function localBroadcast(event) {
   const payload = `data: ${JSON.stringify(event)}\n\n`
@@ -254,6 +277,35 @@ function requireAdminControl(req, res, next) {
     return res.status(401).json({ error: "unauthorized" })
   }
   next()
+}
+
+function applyRotationItem(item) {
+  if (!item || typeof item !== "object") return false
+  if (typeof item.id === "string" && item.id.trim()) PUZZLE.id = item.id.trim()
+  if (typeof item.round_id === "string" && item.round_id.trim()) {
+    PUZZLE.round_id = item.round_id.trim()
+  }
+  if (typeof item.target_address === "string" && item.target_address.trim()) {
+    PUZZLE.target_address = item.target_address.trim()
+  }
+  if (typeof item.solution_hash === "string" && item.solution_hash.trim()) {
+    PUZZLE.solution_hash = item.solution_hash.trim()
+  }
+  if (typeof item.difficulty === "string" && item.difficulty.trim()) {
+    PUZZLE.difficulty = item.difficulty.trim().toLowerCase()
+  }
+  if (item.constraints && typeof item.constraints === "object") {
+    PUZZLE.constraints = item.constraints
+  }
+  if (Array.isArray(item.words) && item.words.length === 12) {
+    PUZZLE.words = item.words.map((w) => String(w).trim().toLowerCase()).filter(Boolean)
+    if (PUZZLE.words.length === 12) {
+      DISPLAY_WORDS = shuffle(PUZZLE.words)
+    }
+  }
+  prizeBalanceCache = null
+  prizeBalanceCacheAt = 0
+  return true
 }
 
 async function fetchPrizeBalances() {
@@ -402,11 +454,14 @@ app.get("/puzzle", async (_req, res) => {
     target_address: PUZZLE.target_address,
     constraints: PUZZLE.constraints,
     winner: state.winner,
+    round_start_ms: round.round_start_ms,
     round_end_ms: round.round_end_ms,
     round_active: round.round_active,
     round_phase: round.round_phase,
     round_settle_at_ms: round.round_settle_at_ms,
+    round_archive_at_ms: round.round_archive_at_ms,
     round_settled: round.round_settled,
+    round_archived: round.round_archived,
     round_leaderboard_winner: round.round_leaderboard_winner,
   })
 })
@@ -466,6 +521,23 @@ app.post("/worker/stop", requireAdminControl, (_req, res) => {
         : "already_stopped",
     ...status,
   })
+})
+
+app.get("/payout/jobs", async (req, res) => {
+  const limit = Number(req.query.limit) || 20
+  const jobs = await listPayoutJobs(limit)
+  res.json({ jobs })
+})
+
+app.post("/payout/jobs/:jobId/attempt", requireAdminControl, async (req, res) => {
+  const { jobId } = req.params
+  const { tx_sig, error } = req.body ?? {}
+  const job = await recordPayoutAttempt(jobId, {
+    txSig: tx_sig || null,
+    error: error || null,
+  })
+  if (!job) return res.status(404).json({ error: "job_not_found" })
+  res.json(job)
 })
 
 app.post("/validate", validateLimiter, async (req, res) => {
@@ -829,6 +901,62 @@ app.use(express.static(path.join(__dirname, "../frontend")))
 async function tickRoundLifecycle() {
   await maybeSendRoundEndEvent((ev) => broadcast(ev))
   await maybeSettleRound((ev) => broadcast(ev))
+  await maybeArchiveRound((ev) => broadcast(ev))
+
+  const round = await getRoundState()
+  if (round.round_settled && PAYOUT_AMOUNT_USDC > 0) {
+    const state = await getPuzzleState()
+    if (state.winner) {
+      const job = await createPayoutJob({
+        roundId: round.round_id,
+        winnerAddress: state.winner,
+        amountUsdc: PAYOUT_AMOUNT_USDC,
+      })
+      if (job) {
+        broadcast({
+          type: "payout_job",
+          job_id: job.job_id,
+          round_id: job.round_id,
+          winner_address: job.winner_address,
+          amount_usdc: job.amount_usdc,
+          status: job.status,
+        })
+      }
+    }
+  }
+
+  if (
+    AUTO_ROTATE_ROUNDS &&
+    round.round_archived &&
+    round.round_id &&
+    round.round_id !== lastAutoRotatedRoundId &&
+    roundRotation.length > 0
+  ) {
+    const item = roundRotation[rotationIndex % roundRotation.length]
+    const ok = applyRotationItem(item)
+    if (ok) {
+      lastAutoRotatedRoundId = round.round_id
+      rotationIndex += 1
+      const nextRound = await startNewRound({
+        roundId: item.round_id || `${round.round_id}-next-${rotationIndex}`,
+        durationSec:
+          Number(item.round_duration_sec) ||
+          Number(process.env.ROUND_DURATION_SEC) ||
+          0,
+        startDelaySec:
+          Number(item.round_start_delay_sec) ||
+          Number(process.env.ROUND_START_DELAY_SEC) ||
+          0,
+      })
+      PUZZLE.round_id = nextRound.round_id
+      broadcast({
+        type: "round_rotated",
+        from_round_id: round.round_id,
+        to_round_id: nextRound.round_id,
+        puzzle_id: PUZZLE.id,
+      })
+    }
+  }
 }
 
 async function main() {

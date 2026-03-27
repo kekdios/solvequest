@@ -45,6 +45,28 @@ Notes:
 - In `NODE_ENV=production`, backend now fails fast if `REDIS_URL` is missing.
 - `POST /worker/start` and `POST /worker/stop` now require `x-admin-key: <ADMIN_CONTROL_KEY>`.
 
+Round automation (new):
+
+```env
+ROUND_START_DELAY_SEC=0
+ROUND_DURATION_SEC=86400
+ROUND_SETTLE_GRACE_SEC=3
+ROUND_ARCHIVE_DELAY_SEC=120
+AUTO_ROTATE_ROUNDS=0
+ROUND_ROTATION_JSON=[]
+```
+
+Payout pipeline (audited jobs):
+
+```env
+PAYOUT_AMOUNT_USDC=0
+PAYOUT_MAX_RETRIES=5
+```
+
+API:
+- `GET /payout/jobs`
+- `POST /payout/jobs/:jobId/attempt` (admin key required)
+
 Checkpoint key format:
 - `house_agent:checkpoint:<HOUSE_AGENT_ID>:<PUZZLE_ID>`
 
@@ -195,6 +217,11 @@ Optional overrides:
 ```bash
 DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NAME=solvequest PUBLIC_HEALTH_URL=https://your-domain/health ./scripts/deploy.sh
 ```
+
+## Player agent SDK
+
+- SDK file: `sdk/player-agent-sdk.js`
+- Guide: `docs/PLAYER_AGENT_SDK.md`
 
 ---
 

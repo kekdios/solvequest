@@ -118,6 +118,14 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
   - `POST /worker/start`
   - `POST /worker/stop`
 
+### `PAYOUT_AMOUNT_USDC` (optional, default `0`)
+- **Purpose:** If >0, create audited payout job on round settlement when a winner exists.
+- **Used by:** `backend/server.js` + `backend/store.js`.
+
+### `PAYOUT_MAX_RETRIES` (optional, default `5`)
+- **Purpose:** Max retries for payout attempt tracking.
+- **Used by:** `backend/store.js`.
+
 ---
 
 ## Round lifecycle settings
@@ -130,9 +138,26 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Purpose:** Set round end timestamp on init.
 - **Used by:** `backend/store.js`.
 
+### `ROUND_START_DELAY_SEC` (optional, default `0`)
+- **Purpose:** Delay round activation after boot/rotation.
+- **Used by:** `backend/store.js`.
+
 ### `ROUND_SETTLE_GRACE_SEC` (optional, default `3`)
 - **Purpose:** Grace window after round end before settlement.
 - **Used by:** `backend/store.js`.
+
+### `ROUND_ARCHIVE_DELAY_SEC` (optional, default `120`)
+- **Purpose:** Delay from settled -> archived phase.
+- **Used by:** `backend/store.js`.
+
+### `AUTO_ROTATE_ROUNDS` (optional, default off)
+- **Purpose:** Enable automatic metadata rotation after round archive.
+- **Used by:** `backend/server.js`.
+
+### `ROUND_ROTATION_JSON` (optional, default empty)
+- **Purpose:** Array of next-round metadata objects for auto-rotation.
+- **Used by:** `backend/server.js`.
+- **Supported fields per item:** `id`, `round_id`, `target_address`, `solution_hash`, `words` (12), `constraints`, `difficulty`, `round_duration_sec`, `round_start_delay_sec`.
 
 ---
 
