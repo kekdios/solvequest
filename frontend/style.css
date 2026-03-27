@@ -28,6 +28,7 @@ body {
 
 .tagline {
   margin-top: 4px;
+  margin-left: 112px;
 }
 
 .arena-header {
@@ -54,6 +55,12 @@ body {
   max-height: 64px;
   object-fit: contain;
   margin: 0;
+}
+
+@media (max-width: 640px) {
+  .tagline {
+    margin-left: 0;
+  }
 }
 
 .arena-meta {

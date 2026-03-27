@@ -14,6 +14,28 @@ node server.js
 
 Set **`REDIS_URL`** for persistence and horizontal scaling. Without it, the process uses **in-memory** state (dev only).
 
+## Deploy from local machine
+
+Use the included deploy helper from your local terminal:
+
+```bash
+./scripts/deploy.sh
+```
+
+Default behavior:
+- SSH target: `root@152.42.168.173`
+- Branch: `main`
+- App path on server: `/opt/solvequest`
+- Service restart: `solvequest`
+- SSH mode: key-only (`BatchMode=yes`)
+- Health checks: local (`127.0.0.1:3001/health`) and public (`https://reelender.com/health`)
+
+Optional overrides:
+
+```bash
+DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NAME=solvequest PUBLIC_HEALTH_URL=https://your-domain/health ./scripts/deploy.sh
+```
+
 ---
 
 ## Phase 5: abuse resistance + performance
@@ -68,6 +90,7 @@ Set **`REDIS_URL`** for persistence and horizontal scaling. Without it, the proc
 ### Puzzle metadata
 
 - **`GET /puzzle`** includes **`difficulty`**, **`round_id`**, **`round_end_ms`**, **`round_active`**, **`round_phase`**, settlement fields (see Timed rounds).
+- **Word display order is stable per backend process**: words are shuffled once at startup and reused on each `/puzzle` response.
 
 ### SSE across instances
 
