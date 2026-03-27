@@ -67,6 +67,8 @@ const sseClients = new Set()
 let workerProcess = null
 let workerStartedAtMs = null
 let workerStopping = false
+let workerStartTimer = null
+let workerStartAtMs = null
 
 const FREE_TIER_BATCH_MAX = Math.min(
   Math.max(Number(process.env.FREE_TIER_BATCH_MAX) || 50, 1),
@@ -119,6 +121,16 @@ const CLAIM_REQUIRE_MNEMONIC_BINDING =
 const CLAIM_REQUIRE_ROUND_IN_MESSAGE =
   process.env.CLAIM_REQUIRE_ROUND_IN_MESSAGE === "1" ||
   process.env.CLAIM_REQUIRE_ROUND_IN_MESSAGE === "true"
+const IS_PROD = process.env.NODE_ENV === "production"
+const ADMIN_CONTROL_KEY = process.env.ADMIN_CONTROL_KEY?.trim() || ""
+const HOUSE_AGENT_START_DELAY_SEC = Math.max(
+  0,
+  Math.floor(Number(process.env.HOUSE_AGENT_START_DELAY_SEC) || 0)
+)
+const HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC = Math.max(
+  0,
+  Number(process.env.HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC) || 0
+)
 
 const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
@@ -154,10 +166,13 @@ function broadcast(event) {
 function getWorkerStatus() {
   const running =
     !!workerProcess && workerProcess.exitCode == null && workerProcess.killed !== true
+  const scheduled = !!workerStartTimer && !running
   return {
     running,
+    scheduled,
     pid: running ? workerProcess.pid : null,
     started_at_ms: running ? workerStartedAtMs : null,
+    scheduled_start_at_ms: scheduled ? workerStartAtMs : null,
   }
 }
 
@@ -169,6 +184,10 @@ function startWorkerProcess() {
     WORKER_STRATEGY:
       process.env.HOUSE_AGENT_STRATEGY || process.env.WORKER_STRATEGY || "exhaustive",
     HOUSE_AGENT_ID: process.env.HOUSE_AGENT_ID || "house-default",
+    HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC:
+      HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC > 0
+        ? String(HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC)
+        : process.env.HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC || "",
   }
   const p = spawn(process.execPath, [WORKER_SCRIPT], {
     cwd: path.join(__dirname, "../worker"),
@@ -177,6 +196,8 @@ function startWorkerProcess() {
   })
   workerProcess = p
   workerStartedAtMs = Date.now()
+  workerStartAtMs = null
+  workerStartTimer = null
   workerStopping = false
 
   p.on("exit", (code, signal) => {
@@ -202,10 +223,37 @@ function startWorkerProcess() {
 }
 
 function stopWorkerProcess() {
+  if (workerStartTimer) {
+    clearTimeout(workerStartTimer)
+    workerStartTimer = null
+    workerStartAtMs = null
+  }
   if (!getWorkerStatus().running) return getWorkerStatus()
   workerStopping = true
   workerProcess.kill("SIGTERM")
   return getWorkerStatus()
+}
+
+function scheduleWorkerStart(delaySec) {
+  if (getWorkerStatus().running) return getWorkerStatus()
+  if (workerStartTimer) return getWorkerStatus()
+  const delayMs = Math.max(0, delaySec * 1000)
+  workerStartAtMs = Date.now() + delayMs
+  workerStartTimer = setTimeout(() => {
+    startWorkerProcess()
+  }, delayMs)
+  return getWorkerStatus()
+}
+
+function requireAdminControl(req, res, next) {
+  if (!ADMIN_CONTROL_KEY) {
+    return res.status(503).json({ error: "admin_control_not_configured" })
+  }
+  const given = String(req.headers["x-admin-key"] || "").trim()
+  if (!given || given !== ADMIN_CONTROL_KEY) {
+    return res.status(401).json({ error: "unauthorized" })
+  }
+  next()
 }
 
 async function fetchPrizeBalances() {
@@ -396,15 +444,28 @@ app.get("/worker/status", (_req, res) => {
   res.json(getWorkerStatus())
 })
 
-app.post("/worker/start", (_req, res) => {
-  const status = startWorkerProcess()
-  res.json({ status: status.running ? "started" : "failed", ...status })
+app.post("/worker/start", requireAdminControl, (_req, res) => {
+  const status =
+    HOUSE_AGENT_START_DELAY_SEC > 0
+      ? scheduleWorkerStart(HOUSE_AGENT_START_DELAY_SEC)
+      : startWorkerProcess()
+  res.json({
+    status: status.running ? "started" : status.scheduled ? "scheduled" : "failed",
+    ...status,
+  })
 })
 
-app.post("/worker/stop", (_req, res) => {
+app.post("/worker/stop", requireAdminControl, (_req, res) => {
   const prev = getWorkerStatus()
   const status = stopWorkerProcess()
-  res.json({ status: prev.running ? "stopping" : "already_stopped", ...status })
+  res.json({
+    status: prev.running
+      ? "stopping"
+      : prev.scheduled
+        ? "cancelled_scheduled_start"
+        : "already_stopped",
+    ...status,
+  })
 })
 
 app.post("/validate", validateLimiter, async (req, res) => {
@@ -771,6 +832,9 @@ async function tickRoundLifecycle() {
 }
 
 async function main() {
+  if (IS_PROD && !process.env.REDIS_URL?.trim()) {
+    throw new Error("REDIS_URL is required in production")
+  }
   await initStore({
     onRedisBroadcast: localBroadcast,
   })

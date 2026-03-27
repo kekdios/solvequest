@@ -69,6 +69,7 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Purpose:** Enable Redis-backed persistence and multi-instance safety.
 - **Used by:** `backend/store.js`.
 - **If missing:** falls back to in-memory mode (dev only).
+- **Production rule:** with `NODE_ENV=production`, backend now fails to start if `REDIS_URL` is missing.
 
 ### `SOLANA_RPC_URL` (optional, default `https://api.mainnet-beta.solana.com`)
 - **Purpose:** RPC endpoint for prize wallet balance reads (`/prize/balances`).
@@ -101,6 +102,21 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Purpose:** Save House Agent exhaustive checkpoint every N permutations.
 - **Used by:** `worker/worker.js`.
 - **Note:** Requires `REDIS_URL` and exhaustive strategy for persistent resume.
+
+### `HOUSE_AGENT_START_DELAY_SEC` (optional, default `0`)
+- **Purpose:** Delay House Agent start after start request (fairness/boss-fight timing).
+- **Used by:** `backend/server.js`.
+
+### `HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC` (optional, default `0` = unlimited)
+- **Purpose:** Rate limit House Agent attempt loop for fairness perception.
+- **Used by:** passed from `backend/server.js` to `worker/worker.js`.
+
+### `ADMIN_CONTROL_KEY` (recommended in all non-local environments)
+- **Purpose:** Protect House Agent control endpoints.
+- **Used by:** `backend/server.js`.
+- **How:** client must send `x-admin-key: <ADMIN_CONTROL_KEY>` for:
+  - `POST /worker/start`
+  - `POST /worker/stop`
 
 ---
 

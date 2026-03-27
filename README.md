@@ -33,6 +33,18 @@ HOUSE_AGENT_ID=house-default
 WORKER_CHECKPOINT_EVERY=10000
 ```
 
+Fairness + control hardening:
+
+```env
+HOUSE_AGENT_START_DELAY_SEC=30
+HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC=200
+ADMIN_CONTROL_KEY=change-me
+```
+
+Notes:
+- In `NODE_ENV=production`, backend now fails fast if `REDIS_URL` is missing.
+- `POST /worker/start` and `POST /worker/stop` now require `x-admin-key: <ADMIN_CONTROL_KEY>`.
+
 Checkpoint key format:
 - `house_agent:checkpoint:<HOUSE_AGENT_ID>:<PUZZLE_ID>`
 

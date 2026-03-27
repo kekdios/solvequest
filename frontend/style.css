@@ -179,6 +179,11 @@ body {
   color: var(--muted);
 }
 
+.worker-status.is-scheduled {
+  color: #fbbf24;
+  border-color: color-mix(in srgb, #fbbf24 40%, var(--border));
+}
+
 .worker-btn {
   padding: 9px 12px;
   font-size: 0.78rem;

@@ -8,10 +8,15 @@ const VERBOSE = process.env.WORKER_LOG_VERBOSE === "1"
 const PROGRESS_EVERY = Number(process.env.WORKER_PROGRESS_EVERY) || 250_000
 const HOUSE_AGENT_ID = process.env.HOUSE_AGENT_ID || "house-default"
 const CHECKPOINT_EVERY = Number(process.env.WORKER_CHECKPOINT_EVERY) || 10_000
+const HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC = Math.max(
+  0,
+  Number(process.env.HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC) || 0
+)
 
 let redis = null
 let checkpointKey = null
 let checkpointState = null
+let nextAttemptAtMs = 0
 
 function wordsSignature(words) {
   return [...words].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(" ")
@@ -35,6 +40,16 @@ function normalizePhrase(phrase) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+async function throttleAttempt() {
+  if (HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC <= 0) return
+  const minGapMs = 1000 / HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC
+  const now = Date.now()
+  if (now < nextAttemptAtMs) {
+    await sleep(nextAttemptAtMs - now)
+  }
+  nextAttemptAtMs = Math.max(now, nextAttemptAtMs) + minGapMs
 }
 
 /** Lexicographic next permutation; mutates `a`. Returns false when done. */
@@ -150,6 +165,7 @@ async function runRandom(puzzleWords) {
   let wrongValid = 0
 
   while (true) {
+    await throttleAttempt()
     const candidate = shuffle(puzzleWords).join(" ")
 
     if (!bip39.validateMnemonic(candidate)) {
@@ -203,6 +219,7 @@ async function runExhaustive(puzzleWords, puzzleId) {
   }
 
   while (true) {
+    await throttleAttempt()
     permutations++
     checkpointState = {
       puzzleId: checkpointState?.puzzleId ?? "",
