@@ -232,11 +232,37 @@
         </button>
       </div>
 
-      <label style="margin-top: 14px">PUZZLE_WORDS</label>
-      <p class="hint">Comma-separated, lowercase (canonical word order from the phrase).</p>
+      <label style="margin-top: 14px">PUZZLE_WORDS (canonical order)</label>
+      <p class="hint">Comma-separated — same order as the mnemonic (for your records).</p>
       <div class="out">
         <code id="out-words">—</code>
         <button type="button" class="copy-btn" data-copy="out-words" title="Copy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+          Copy
+        </button>
+      </div>
+
+      <label style="margin-top: 14px">PUZZLE_WORDS (random scramble for <code>.env</code>)</label>
+      <p class="hint">Same 12 words, Fisher–Yates shuffle — use this value in <code>PUZZLE_WORDS</code> in the block below.</p>
+      <div class="out">
+        <code id="out-words-scrambled">—</code>
+        <button type="button" class="copy-btn" data-copy="out-words-scrambled" title="Copy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+          Copy
+        </button>
+      </div>
+
+      <label style="margin-top: 14px">PUZZLE_CONSTRAINTS_JSON</label>
+      <p class="hint">Locks position <strong>0</strong> to the mnemonic’s <strong>first</strong> word and position <strong>11</strong> to the <strong>last</strong> word.</p>
+      <div class="out">
+        <code id="out-constraints">—</code>
+        <button type="button" class="copy-btn" data-copy="out-constraints" title="Copy">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="9" y="9" width="13" height="13" rx="2" />
             <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
@@ -323,7 +349,25 @@
           .replace(/\s+/g, " ")
       }
 
-      let imported = { target: "", hash: "", words: "" }
+      let imported = { target: "", hash: "", words: "", constraints_json: "" }
+
+      function wordMultisetKey(csv) {
+        return csv
+          .split(",")
+          .map((w) => w.trim().toLowerCase())
+          .filter(Boolean)
+          .sort()
+          .join("|")
+      }
+
+      function normConstraintsJson(s) {
+        if (!s || !String(s).trim()) return ""
+        try {
+          return JSON.stringify(JSON.parse(String(s).trim()))
+        } catch {
+          return String(s).trim().replace(/\s+/g, "")
+        }
+      }
 
       function parseEnvText(text) {
         const out = {}
@@ -350,6 +394,7 @@
           target: (o.TARGET_ADDRESS || "").trim(),
           hash: (o.SOLUTION_HASH || "").trim(),
           words: (o.PUZZLE_WORDS || "").trim(),
+          constraints_json: (o.PUZZLE_CONSTRAINTS_JSON || "").trim(),
         }
         if (o.PUZZLE_ID != null && String(o.PUZZLE_ID).trim()) {
           document.getElementById("puzzle-id").value = String(o.PUZZLE_ID).trim()
@@ -359,21 +404,31 @@
         }
       }
 
-      function applyOutputs(addr, hash, cw, statusEl, okMsg) {
+      function applyOutputs(addr, hash, canonical, scrambled, constraintsJson, statusEl, okMsg) {
         document.getElementById("out-target").textContent = addr
         document.getElementById("out-hash").textContent = hash
-        document.getElementById("out-words").textContent = cw
+        document.getElementById("out-words").textContent = canonical
+        document.getElementById("out-words-scrambled").textContent = scrambled
+        document.getElementById("out-constraints").textContent = constraintsJson
         if (okMsg) statusEl.innerHTML = okMsg
         const vb = document.getElementById("verify-box")
-        if (imported.target || imported.hash || imported.words) {
+        const hasImport =
+          imported.target || imported.hash || imported.words || imported.constraints_json
+        if (hasImport) {
           const tOk = !imported.target || imported.target === addr
           const hOk = !imported.hash || imported.hash.toLowerCase() === hash.toLowerCase()
-          const wOk = !imported.words || imported.words.replace(/\s/g, "") === cw.replace(/\s/g, "")
+          const wOk =
+            !imported.words ||
+            wordMultisetKey(imported.words) === wordMultisetKey(canonical)
+          const cOk =
+            !imported.constraints_json ||
+            normConstraintsJson(imported.constraints_json) === normConstraintsJson(constraintsJson)
           vb.innerHTML = `
             <div class="hint"><strong>Verify vs imported .env</strong></div>
             <div class="${tOk ? "ok" : "bad"}">TARGET_ADDRESS ${tOk ? "✓ match" : "✗ mismatch"}</div>
             <div class="${hOk ? "ok" : "bad"}">SOLUTION_HASH ${hOk ? "✓ match" : "✗ mismatch"}</div>
-            <div class="${wOk ? "ok" : "bad"}">PUZZLE_WORDS ${wOk ? "✓ match" : "✗ mismatch"}</div>
+            <div class="${wOk ? "ok" : "bad"}">PUZZLE_WORDS (same 12 words) ${wOk ? "✓ match" : "✗ mismatch"}</div>
+            <div class="${cOk ? "ok" : "bad"}">PUZZLE_CONSTRAINTS_JSON ${cOk ? "✓ match" : "✗ mismatch"}</div>
           `
         } else {
           vb.innerHTML = ""
@@ -385,6 +440,8 @@
         document.getElementById("out-target").textContent = "—"
         document.getElementById("out-hash").textContent = "—"
         document.getElementById("out-words").textContent = "—"
+        document.getElementById("out-words-scrambled").textContent = "—"
+        document.getElementById("out-constraints").textContent = "—"
         if (msgHtml !== undefined) statusEl.innerHTML = msgHtml
         document.getElementById("verify-box").innerHTML = ""
         updateEnvBlock()
@@ -445,6 +502,8 @@
             data.target_address,
             data.solution_hash,
             data.puzzle_words,
+            data.puzzle_words_scrambled,
+            data.puzzle_constraints_json,
             statusEl,
             '<span class="ok">Valid BIP39 (12 words).</span>'
           )
@@ -459,10 +518,16 @@
       function updateEnvBlock() {
         const target = document.getElementById("out-target").textContent
         const hash = document.getElementById("out-hash").textContent
-        const words = document.getElementById("out-words").textContent
+        const scrambled = document.getElementById("out-words-scrambled").textContent
+        const constraints = document.getElementById("out-constraints").textContent
         const pid = document.getElementById("puzzle-id").value.trim() || "001"
         const rid = document.getElementById("round-id").value.trim() || "default"
-        if (target === "—" || hash === "—" || words === "—") {
+        if (
+          target === "—" ||
+          hash === "—" ||
+          scrambled === "—" ||
+          constraints === "—"
+        ) {
           document.getElementById("out-env").textContent = "# Enter a valid mnemonic above first."
           return
         }
@@ -470,7 +535,8 @@
           `# Puzzle (paste into backend/.env — do not commit mnemonic)\n` +
           `TARGET_ADDRESS=${target}\n` +
           `SOLUTION_HASH=${hash}\n` +
-          `PUZZLE_WORDS=${words}\n` +
+          `PUZZLE_WORDS=${scrambled}\n` +
+          `PUZZLE_CONSTRAINTS_JSON=${constraints}\n` +
           `PUZZLE_ID=${pid}\n` +
           `ROUND_ID=${rid}\n`
       }
@@ -504,6 +570,8 @@
             data.target_address,
             data.solution_hash,
             data.puzzle_words,
+            data.puzzle_words_scrambled,
+            data.puzzle_constraints_json,
             statusEl,
             '<span class="ok">Valid BIP39 (12 words).</span>'
           )

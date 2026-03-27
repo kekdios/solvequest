@@ -432,6 +432,25 @@ const wizardDeriveLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+/** Wizard: canonical + Fisher–Yates scrambled pool + fixed first/last for .env */
+function buildWizardDerivationFromNormalizedPhrase(n) {
+  const wordArr = n.split(" ")
+  const target_address = mnemonicToAddress(n)
+  const solution_hash = hashMnemonic(n)
+  const puzzle_words = wordArr.join(",")
+  const puzzle_words_scrambled = shuffle([...wordArr]).join(",")
+  const puzzle_constraints_json = JSON.stringify({
+    fixed_positions: { "0": wordArr[0], "11": wordArr[11] },
+  })
+  return {
+    target_address,
+    solution_hash,
+    puzzle_words,
+    puzzle_words_scrambled,
+    puzzle_constraints_json,
+  }
+}
+
 async function batchCreditsMiddleware(req, res, next) {
   const n = Array.isArray(req.body?.mnemonics) ? req.body.mnemonics.length : 0
   const key = req.headers["x-api-key"]
@@ -494,16 +513,12 @@ app.post("/public/wizard-derive", wizardDeriveLimiter, (req, res) => {
     if (req.body?.generate === true) {
       const mnemonic = bip39.generateMnemonic(128)
       const n = normalizePhrase(mnemonic)
-      const target_address = mnemonicToAddress(n)
-      const solution_hash = hashMnemonic(n)
-      const puzzle_words = n.split(" ").join(",")
+      const d = buildWizardDerivationFromNormalizedPhrase(n)
       return res.json({
         mnemonic,
         valid: true,
         word_count: 12,
-        target_address,
-        solution_hash,
-        puzzle_words,
+        ...d,
       })
     }
     const raw = req.body?.mnemonic
@@ -525,15 +540,11 @@ app.post("/public/wizard-derive", wizardDeriveLimiter, (req, res) => {
     if (!bip39.validateMnemonic(n)) {
       return res.json({ valid: false, error: "invalid_bip39", word_count: 12 })
     }
-    const target_address = mnemonicToAddress(n)
-    const solution_hash = hashMnemonic(n)
-    const puzzle_words = n.split(" ").join(",")
+    const d = buildWizardDerivationFromNormalizedPhrase(n)
     return res.json({
       valid: true,
       word_count: 12,
-      target_address,
-      solution_hash,
-      puzzle_words,
+      ...d,
     })
   }
 )
