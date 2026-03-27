@@ -44,10 +44,13 @@
         <span id="stat-valid-rate" class="ticker-value mono">—</span>
       </div>
       <div class="ticker-cell">
-        <span class="ticker-label">Worker</span>
+        <span class="ticker-label">House Agent</span>
         <div class="worker-row">
           <span id="worker-status" class="worker-status mono">unknown</span>
-          <button type="button" id="worker-toggle-btn" class="worker-btn">Start</button>
+          <button type="button" id="worker-toggle-btn" class="worker-btn">Start House</button>
+        </div>
+        <div class="race-lane" aria-hidden="true">
+          <div id="house-runner" class="house-runner">◆</div>
         </div>
       </div>
     </section>
@@ -75,13 +78,13 @@
 
       <aside class="arena-side" aria-label="Leaderboard">
         <h2>Leaderboard</h2>
-        <p class="side-hint">Score = valid checksum, wrong target</p>
+        <p class="side-hint">Player Agents: valid checksum, wrong target</p>
         <div id="you-vs-top" class="you-vs" aria-live="polite"></div>
         <ol id="leaderboard-list" class="leaderboard"></ol>
       </aside>
     </div>
 
-    <h3>Live feed (SSE)</h3>
+    <h3>Arena feed (SSE)</h3>
     <div id="sse-logs"></div>
 
     <script src="main.js"></script>

@@ -2,6 +2,12 @@
 
 Competition backend with **Redis** (optional in-memory fallback), **atomic claims**, **Solana signatures**, **batch validation + credits**, and **SSE** (Redis pub/sub when Redis is enabled).
 
+## Arena terminology
+
+- **House Agent**: the platform-controlled agent process (formerly called worker).
+- **Player Agents**: user-run agents/bots competing to solve the same puzzle.
+- **Leaderboard score**: counts Player Agent valid-checksum near misses (`valid_but_wrong`).
+
 ## Quick start
 
 ```bash

@@ -17,7 +17,7 @@ function fmtShortPubkey(pk) {
 async function loadPuzzle() {
   const res = await fetch(`${API}/puzzle`)
   if (!res.ok) {
-    log(`Failed to load puzzle: ${res.status}`)
+    uiNotice(`Failed to load puzzle: ${res.status}`)
     return
   }
   const data = await res.json()
@@ -110,11 +110,17 @@ async function loadStats() {
 function renderWorkerStatus(data) {
   const statusEl = document.getElementById("worker-status")
   const btnEl = document.getElementById("worker-toggle-btn")
+  const laneEl = document.querySelector(".race-lane")
   workerRunning = !!data?.running
   statusEl.textContent = workerRunning ? "running" : "stopped"
   statusEl.classList.toggle("is-running", workerRunning)
   statusEl.classList.toggle("is-stopped", !workerRunning)
-  btnEl.textContent = workerRunning ? "Stop" : "Start"
+  btnEl.textContent = workerRunning ? "Stop House" : "Start House"
+  laneEl?.classList.toggle("is-running", workerRunning)
+}
+
+function uiNotice(msg) {
+  logSse(`[UI] ${msg}`)
 }
 
 async function loadWorkerStatus() {
@@ -133,23 +139,26 @@ async function toggleWorker() {
   const btnEl = document.getElementById("worker-toggle-btn")
   const prevText = btnEl.textContent
   btnEl.disabled = true
-  btnEl.textContent = workerRunning ? "Stopping..." : "Starting..."
+  btnEl.textContent = workerRunning ? "Stopping House..." : "Starting House..."
   try {
     const res = await fetch(`${API}${route}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     })
     if (!res.ok) {
-      log(`Worker toggle failed: ${res.status}`)
+      uiNotice(`House Agent toggle failed: ${res.status}`)
       return
     }
     const data = await res.json()
     renderWorkerStatus(data)
   } catch {
-    log("Worker toggle failed")
+    uiNotice("House Agent toggle failed")
   } finally {
     btnEl.disabled = false
-    if (btnEl.textContent === "Starting..." || btnEl.textContent === "Stopping...") {
+    if (
+      btnEl.textContent === "Starting House..." ||
+      btnEl.textContent === "Stopping House..."
+    ) {
       btnEl.textContent = prevText
     }
     loadWorkerStatus()
