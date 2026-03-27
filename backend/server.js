@@ -58,6 +58,7 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
+const DISPLAY_WORDS = shuffle(PUZZLE.words)
 
 const sseClients = new Set()
 
@@ -239,7 +240,7 @@ app.get("/puzzle", async (_req, res) => {
     id: PUZZLE.id,
     round_id: PUZZLE.round_id,
     difficulty: PUZZLE.difficulty,
-    words: shuffle(PUZZLE.words),
+    words: DISPLAY_WORDS,
     solved: state.solved,
     solution_hash: PUZZLE.solution_hash,
     target_address: PUZZLE.target_address,
