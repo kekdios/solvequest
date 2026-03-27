@@ -42,6 +42,32 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.arena-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding-top: 2px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.reward-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.reward-value {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
 .arena-title {
   display: flex;
   flex-direction: column;
@@ -61,6 +87,12 @@ body {
 @media (max-width: 640px) {
   .arena-title {
     margin-left: -84px;
+  }
+
+  .arena-reward {
+    order: 3;
+    width: 100%;
+    margin-top: 4px;
   }
 }
 

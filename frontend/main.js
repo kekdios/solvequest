@@ -116,6 +116,7 @@ async function loadPrizeBalances() {
     const sol = Number(p.sol_balance)
     document.getElementById("prize-usdc").textContent = `USDC ${Number.isFinite(usdc) ? usdc.toFixed(2) : "—"}`
     document.getElementById("prize-sol").textContent = `SOL ${Number.isFinite(sol) ? sol.toFixed(4) : "—"}`
+    document.getElementById("reward-usdc").textContent = `$${Number.isFinite(usdc) ? Math.round(usdc).toLocaleString() : "—"}`
   } catch {
     /* ignore */
   }
