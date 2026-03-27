@@ -153,6 +153,9 @@ function startWorkerProcess() {
   const env = {
     ...process.env,
     SOLQUEST_API: process.env.SOLQUEST_API || `http://127.0.0.1:${PORT}`,
+    WORKER_STRATEGY:
+      process.env.HOUSE_AGENT_STRATEGY || process.env.WORKER_STRATEGY || "exhaustive",
+    HOUSE_AGENT_ID: process.env.HOUSE_AGENT_ID || "house-default",
   }
   const p = spawn(process.execPath, [WORKER_SCRIPT], {
     cwd: path.join(__dirname, "../worker"),

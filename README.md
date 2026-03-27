@@ -20,6 +20,22 @@ node server.js
 
 Set **`REDIS_URL`** for persistence and horizontal scaling. Without it, the process uses **in-memory** state (dev only).
 
+### House Agent resume (continue from last checkpoint)
+
+When Redis is enabled, the backend-spawned House Agent can resume exhaustive search after restarts.
+
+Recommended settings:
+
+```env
+REDIS_URL=redis://127.0.0.1:6379
+HOUSE_AGENT_STRATEGY=exhaustive
+HOUSE_AGENT_ID=house-default
+WORKER_CHECKPOINT_EVERY=10000
+```
+
+Checkpoint key format:
+- `house_agent:checkpoint:<HOUSE_AGENT_ID>:<PUZZLE_ID>`
+
 ## Create a new puzzle (step-by-step)
 
 Use this process each time you want to launch a fresh round.

@@ -75,6 +75,20 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Used by:** `backend/server.js` worker spawn env.
 - **Default:** `http://127.0.0.1:${PORT}`.
 
+### `HOUSE_AGENT_STRATEGY` (optional, default `exhaustive` for House Agent)
+- **Purpose:** Strategy used by backend-spawned House Agent.
+- **Used by:** `backend/server.js` -> worker env (`WORKER_STRATEGY`).
+- **Values:** `exhaustive` or `random`.
+
+### `HOUSE_AGENT_ID` (optional, default `house-default`)
+- **Purpose:** Stable identifier used for House Agent checkpoint key namespace.
+- **Used by:** `backend/server.js` and `worker/worker.js`.
+
+### `WORKER_CHECKPOINT_EVERY` (optional, default `10000`)
+- **Purpose:** Save House Agent exhaustive checkpoint every N permutations.
+- **Used by:** `worker/worker.js`.
+- **Note:** Requires `REDIS_URL` and exhaustive strategy for persistent resume.
+
 ---
 
 ## Round lifecycle settings
