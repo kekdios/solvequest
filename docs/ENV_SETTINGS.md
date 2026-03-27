@@ -127,9 +127,10 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Used by:** `backend/server.js` (`GET /public/developer-info`).
 
 ### `ALLOW_WIZARD_DERIVE` (optional)
-- **Purpose:** In **`NODE_ENV=production`**, enables **`POST /public/wizard-derive`** used by **`puzzle-wizard.html`** (mnemonic in JSON body). In non-production, the endpoint is on by default.
+- **Purpose:** In **`NODE_ENV=production`**, enables **`POST /public/wizard-derive`** used by **`puzzle-wizard.html`** (mnemonic in JSON body). In non-production, the endpoint is on by default unless set to a falsy value (`0`, `false`, `no`, `off`).
+- **Truthy values:** `1`, `true`, `yes`, `on` (case-insensitive). **Falsy:** `0`, `false`, `no`, `off`.
 - **Used by:** `backend/server.js`.
-- **Recommendation:** use only with **HTTPS**; treat as operator-only.
+- **Recommendation:** use only with **HTTPS**; treat as operator-only. After changing `.env`, **restart** the backend so `GET /public/developer-info` returns `wizard_derive_enabled: true`.
 
 ### `WIZARD_DERIVE_MAX_PER_MIN` (optional, default `40`)
 - **Purpose:** Rate limit for **`/public/wizard-derive`** per IP per minute (clamped 5–200).

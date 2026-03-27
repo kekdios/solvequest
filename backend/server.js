@@ -420,9 +420,20 @@ const claimLimiter = rateLimit({
   legacyHeaders: false,
 })
 
-/** Same-origin puzzle wizard (no CDN). Off in production unless ALLOW_WIZARD_DERIVE=1. */
+/** Same-origin puzzle wizard (no CDN). Off in production unless ALLOW_WIZARD_DERIVE is truthy. */
+function parseEnvTruthy(name) {
+  const v = process.env[name]?.trim().toLowerCase()
+  if (!v) return null
+  if (["1", "true", "yes", "on"].includes(v)) return true
+  if (["0", "false", "no", "off"].includes(v)) return false
+  return null
+}
+
 function isWizardDeriveEnabled() {
-  return process.env.ALLOW_WIZARD_DERIVE === "1" || process.env.NODE_ENV !== "production"
+  const w = parseEnvTruthy("ALLOW_WIZARD_DERIVE")
+  if (w === false) return false
+  if (w === true) return true
+  return process.env.NODE_ENV !== "production"
 }
 
 const wizardDeriveLimiter = rateLimit({

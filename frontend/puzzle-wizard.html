@@ -171,8 +171,9 @@
       <strong>Open via the backend, not as a local file.</strong> Use
       <code>http://127.0.0.1:3001/puzzle-wizard.html</code> (or your deployed URL). Derivation runs on
       <strong>your server</strong> (<code>POST /public/wizard-derive</code>)—no CDN modules, so Firefox
-      and strict MIME/CORS policies are not an issue. Production: enable with
-      <code>ALLOW_WIZARD_DERIVE=1</code> (mnemonic travels in the HTTP body).
+      and strict MIME/CORS policies are not an issue. Production: set
+      <code>ALLOW_WIZARD_DERIVE=1</code> or <code>true</code> in <code>backend/.env</code> and
+      <strong>restart the server</strong> (mnemonic travels in the HTTP body).
     </div>
 
     <div class="warn">
@@ -329,7 +330,7 @@
           deriveEnabled = !!d.wizard_derive_enabled
           if (!deriveEnabled) {
             showBootError(
-              "<strong>Puzzle wizard API is off.</strong> In production set <code>ALLOW_WIZARD_DERIVE=1</code> in <code>backend/.env</code> (you are sending the mnemonic to this server). Development enables it by default."
+              "<strong>Puzzle wizard API is off.</strong> Your server is likely in <code>NODE_ENV=production</code>. Add <code>ALLOW_WIZARD_DERIVE=1</code> (or <code>true</code>) to <code>backend/.env</code>, then <strong>restart</strong> systemd / the Node process. Use HTTPS in production. Non-production enables the wizard by default."
             )
           } else {
             clearBootError()
@@ -455,7 +456,7 @@
 
         if (!deriveEnabled) {
           statusEl.innerHTML =
-            '<span class="bad">Wizard API unavailable — fix the banner above or set ALLOW_WIZARD_DERIVE=1.</span>'
+            '<span class="bad">Wizard API off for this server. If you use production mode, set <code>ALLOW_WIZARD_DERIVE=1</code> in <code>backend/.env</code> and restart — then reload this page.</span>'
           return
         }
 
