@@ -117,6 +117,33 @@ body {
   color: var(--text);
 }
 
+.worker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.worker-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.worker-status.is-running {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.worker-status.is-stopped {
+  color: var(--muted);
+}
+
+.worker-btn {
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
 .arena-grid {
   display: grid;
   grid-template-columns: 1fr minmax(14rem, 18rem);

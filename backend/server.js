@@ -1,6 +1,7 @@
 import "dotenv/config"
 import path from "path"
 import { fileURLToPath } from "url"
+import { spawn } from "child_process"
 import express from "express"
 import cors from "cors"
 import rateLimit from "express-rate-limit"
@@ -59,8 +60,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
 const DISPLAY_WORDS = shuffle(PUZZLE.words)
+const WORKER_SCRIPT = path.join(__dirname, "../worker/worker.js")
 
 const sseClients = new Set()
+let workerProcess = null
+let workerStartedAtMs = null
+let workerStopping = false
 
 const FREE_TIER_BATCH_MAX = Math.min(
   Math.max(Number(process.env.FREE_TIER_BATCH_MAX) || 50, 1),
@@ -131,6 +136,60 @@ function broadcast(event) {
   } else {
     localBroadcast(event)
   }
+}
+
+function getWorkerStatus() {
+  const running =
+    !!workerProcess && workerProcess.exitCode == null && workerProcess.killed !== true
+  return {
+    running,
+    pid: running ? workerProcess.pid : null,
+    started_at_ms: running ? workerStartedAtMs : null,
+  }
+}
+
+function startWorkerProcess() {
+  if (getWorkerStatus().running) return getWorkerStatus()
+  const env = {
+    ...process.env,
+    SOLQUEST_API: process.env.SOLQUEST_API || `http://127.0.0.1:${PORT}`,
+  }
+  const p = spawn(process.execPath, [WORKER_SCRIPT], {
+    cwd: path.join(__dirname, "../worker"),
+    env,
+    stdio: "inherit",
+  })
+  workerProcess = p
+  workerStartedAtMs = Date.now()
+  workerStopping = false
+
+  p.on("exit", (code, signal) => {
+    const wasStopping = workerStopping
+    workerProcess = null
+    workerStartedAtMs = null
+    workerStopping = false
+    broadcast({
+      type: "worker_status",
+      running: false,
+      code: code ?? null,
+      signal: signal ?? null,
+      reason: wasStopping ? "stopped" : "exited",
+    })
+  })
+
+  p.on("error", (err) => {
+    console.error("[worker]", err)
+  })
+
+  broadcast({ type: "worker_status", ...getWorkerStatus(), reason: "started" })
+  return getWorkerStatus()
+}
+
+function stopWorkerProcess() {
+  if (!getWorkerStatus().running) return getWorkerStatus()
+  workerStopping = true
+  workerProcess.kill("SIGTERM")
+  return getWorkerStatus()
 }
 
 async function broadcastLeaderboardScoreEvents(pubkey) {
@@ -272,6 +331,21 @@ app.get("/stats", async (_req, res) => {
     attempts_per_sec: attempts_total / time_elapsed,
     ...extra,
   })
+})
+
+app.get("/worker/status", (_req, res) => {
+  res.json(getWorkerStatus())
+})
+
+app.post("/worker/start", (_req, res) => {
+  const status = startWorkerProcess()
+  res.json({ status: status.running ? "started" : "failed", ...status })
+})
+
+app.post("/worker/stop", (_req, res) => {
+  const prev = getWorkerStatus()
+  const status = stopWorkerProcess()
+  res.json({ status: prev.running ? "stopping" : "already_stopped", ...status })
 })
 
 app.post("/validate", validateLimiter, async (req, res) => {

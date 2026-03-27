@@ -7,6 +7,7 @@ const MY_WALLET =
 
 let countdownTimer = null
 let lastTopSig = ""
+let workerRunning = false
 
 function fmtShortPubkey(pk) {
   if (!pk || pk.length < 12) return pk || "—"
@@ -103,6 +104,55 @@ async function loadStats() {
       typeof vr === "number" ? vr.toFixed(4) : "—"
   } catch {
     /* ignore */
+  }
+}
+
+function renderWorkerStatus(data) {
+  const statusEl = document.getElementById("worker-status")
+  const btnEl = document.getElementById("worker-toggle-btn")
+  workerRunning = !!data?.running
+  statusEl.textContent = workerRunning ? "running" : "stopped"
+  statusEl.classList.toggle("is-running", workerRunning)
+  statusEl.classList.toggle("is-stopped", !workerRunning)
+  btnEl.textContent = workerRunning ? "Stop" : "Start"
+}
+
+async function loadWorkerStatus() {
+  try {
+    const res = await fetch(`${API}/worker/status`)
+    if (!res.ok) return
+    const data = await res.json()
+    renderWorkerStatus(data)
+  } catch {
+    /* ignore */
+  }
+}
+
+async function toggleWorker() {
+  const route = workerRunning ? "/worker/stop" : "/worker/start"
+  const btnEl = document.getElementById("worker-toggle-btn")
+  const prevText = btnEl.textContent
+  btnEl.disabled = true
+  btnEl.textContent = workerRunning ? "Stopping..." : "Starting..."
+  try {
+    const res = await fetch(`${API}${route}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    })
+    if (!res.ok) {
+      log(`Worker toggle failed: ${res.status}`)
+      return
+    }
+    const data = await res.json()
+    renderWorkerStatus(data)
+  } catch {
+    log("Worker toggle failed")
+  } finally {
+    btnEl.disabled = false
+    if (btnEl.textContent === "Starting..." || btnEl.textContent === "Stopping...") {
+      btnEl.textContent = prevText
+    }
+    loadWorkerStatus()
   }
 }
 
@@ -217,6 +267,7 @@ function connectEvents() {
 }
 
 document.getElementById("submit-btn").addEventListener("click", submit)
+document.getElementById("worker-toggle-btn").addEventListener("click", toggleWorker)
 document.getElementById("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") submit()
 })
@@ -224,7 +275,9 @@ document.getElementById("input").addEventListener("keydown", (e) => {
 connectEvents()
 loadPuzzle()
 loadStats()
+loadWorkerStatus()
 loadLeaderboard()
 setInterval(loadStats, 1500)
+setInterval(loadWorkerStatus, 2500)
 setInterval(loadLeaderboard, 8000)
 setInterval(loadPuzzle, 5000)
