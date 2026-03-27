@@ -74,6 +74,8 @@ Checkpoint key format:
 
 Use this process each time you want to launch a fresh round.
 
+**Local wizard (derived values + copy buttons):** with the backend running, open **`http://127.0.0.1:<port>/puzzle-wizard.html`**. Derivation uses **`POST /public/wizard-derive`** on the same server (no browser CDN). On production set **`ALLOW_WIZARD_DERIVE=1`** if you want the wizard enabled.
+
 ### 0) Safety first (important)
 
 - Generate and store the canonical 12-word phrase in a secure/offline workflow.

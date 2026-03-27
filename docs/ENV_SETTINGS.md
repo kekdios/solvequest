@@ -126,6 +126,15 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Purpose:** Shown as mailto on `/developers` when operators prefer email over a form.
 - **Used by:** `backend/server.js` (`GET /public/developer-info`).
 
+### `ALLOW_WIZARD_DERIVE` (optional)
+- **Purpose:** In **`NODE_ENV=production`**, enables **`POST /public/wizard-derive`** used by **`puzzle-wizard.html`** (mnemonic in JSON body). In non-production, the endpoint is on by default.
+- **Used by:** `backend/server.js`.
+- **Recommendation:** use only with **HTTPS**; treat as operator-only.
+
+### `WIZARD_DERIVE_MAX_PER_MIN` (optional, default `40`)
+- **Purpose:** Rate limit for **`/public/wizard-derive`** per IP per minute (clamped 5–200).
+- **Used by:** `backend/server.js`.
+
 ### `PAYOUT_AMOUNT_USDC` (optional, default `0`)
 - **Purpose:** If >0, create audited payout job on round settlement when a winner exists.
 - **Used by:** `backend/server.js` + `backend/store.js`.

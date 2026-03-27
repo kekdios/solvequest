@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SolveQuest — New puzzle wizard</title>
+    <link rel="icon" type="image/png" href="icon_sq.png" />
+    <style>
+      :root {
+        --bg: #0d0d0f;
+        --panel: #121214;
+        --border: #1e1e24;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #34d399;
+        --warn: #fbbf24;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        margin: 0;
+        padding: 24px 20px 48px;
+        max-width: 44rem;
+        margin-inline: auto;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 8px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.95rem;
+        margin: 0 0 24px;
+      }
+      .warn {
+        background: rgba(251, 191, 36, 0.08);
+        border: 1px solid rgba(251, 191, 36, 0.35);
+        border-radius: 8px;
+        padding: 12px 14px;
+        color: var(--warn);
+        font-size: 0.9rem;
+        margin-bottom: 24px;
+      }
+      .step {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+        background: var(--panel);
+      }
+      .step h2 {
+        font-size: 1rem;
+        margin: 0 0 12px;
+        color: var(--accent);
+      }
+      label {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      textarea,
+      input[type="text"] {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #0d0d0f;
+        color: var(--text);
+        font-family: ui-monospace, monospace;
+        font-size: 0.85rem;
+      }
+      textarea {
+        min-height: 72px;
+        resize: vertical;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-top: 10px;
+      }
+      button {
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      button:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      button.primary {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .out {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+      }
+      .out code {
+        flex: 1;
+        min-width: 0;
+        word-break: break-all;
+        font-size: 0.8rem;
+        padding: 8px 10px;
+        background: #0d0d0f;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+      }
+      .copy-btn {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+      }
+      .copy-btn svg {
+        width: 16px;
+        height: 16px;
+        opacity: 0.85;
+      }
+      .ok {
+        color: var(--accent);
+        font-size: 0.85rem;
+      }
+      .bad {
+        color: #f87171;
+        font-size: 0.85rem;
+      }
+      .env-block {
+        white-space: pre-wrap;
+        word-break: break-all;
+        font-size: 0.78rem;
+        line-height: 1.45;
+      }
+      a {
+        color: var(--accent);
+      }
+      .hint {
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Create a new puzzle</h1>
+    <p class="sub">
+      Step-by-step helper. Values match <code>backend/puzzle.js</code> (normalize → SHA-256) and
+      <code>backend/solana.js</code> (<code>m/44'/501'/0'/0'</code>). Open this page via your backend
+      (e.g. <code>http://127.0.0.1:3001/puzzle-wizard.html</code>) so clipboard and modules work reliably.
+    </p>
+
+    <div id="wizard-bootstrap-error" class="warn" style="display: none"></div>
+
+    <div class="warn">
+      <strong>Open via the backend, not as a local file.</strong> Use
+      <code>http://127.0.0.1:3001/puzzle-wizard.html</code> (or your deployed URL). Derivation runs on
+      <strong>your server</strong> (<code>POST /public/wizard-derive</code>)—no CDN modules, so Firefox
+      and strict MIME/CORS policies are not an issue. Production: enable with
+      <code>ALLOW_WIZARD_DERIVE=1</code> (mnemonic travels in the HTTP body).
+    </div>
+
+    <div class="warn">
+      Never commit your mnemonic. This page runs in the browser—treat it like any online form; use an
+      air-gapped or offline workflow for high-value secrets.
+    </div>
+
+    <section class="step">
+      <h2>Import existing <code>.env</code> (optional)</h2>
+      <p class="hint">Paste lines from <code>backend/.env</code> to pre-fill fields and verify against a mnemonic you paste in step 2.</p>
+      <textarea id="env-paste" placeholder="TARGET_ADDRESS=...&#10;SOLUTION_HASH=...&#10;PUZZLE_WORDS=word1,word2,..."></textarea>
+      <div class="row">
+        <button type="button" id="btn-parse-env">Apply to fields below</button>
+      </div>
+    </section>
+
+    <section class="step">
+      <h2>1) Canonical 12-word mnemonic</h2>
+      <label for="mnemonic">Solution phrase (private)</label>
+      <p class="hint" style="margin-top: 0">
+        Must be exactly <strong>12 English BIP39 words</strong> (spaces only—not a wallet passphrase or
+        arbitrary password).
+      </p>
+      <textarea id="mnemonic" placeholder="twelve words separated by spaces" autocomplete="off" spellcheck="false"></textarea>
+      <div class="row">
+        <button type="button" class="primary" id="btn-gen">Generate new (BIP39)</button>
+        <button type="button" id="btn-recalc">Recalculate</button>
+      </div>
+      <p id="mnemonic-status" class="hint"></p>
+    </section>
+
+    <section class="step">
+      <h2>2) Derived values (for <code>.env</code>)</h2>
+      <p class="hint">Same as README: <code>TARGET_ADDRESS</code> from derivation; <code>SOLUTION_HASH</code> = SHA-256 of normalized phrase.</p>
+
+      <label>TARGET_ADDRESS</label>
+      <div class="out">
+        <code id="out-target">—</code>
+        <button type="button" class="copy-btn" data-copy="out-target" title="Copy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+          Copy
+        </button>
+      </div>
+
+      <label style="margin-top: 14px">SOLUTION_HASH</label>
+      <div class="out">
+        <code id="out-hash">—</code>
+        <button type="button" class="copy-btn" data-copy="out-hash" title="Copy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+          Copy
+        </button>
+      </div>
+
+      <label style="margin-top: 14px">PUZZLE_WORDS</label>
+      <p class="hint">Comma-separated, lowercase (canonical word order from the phrase).</p>
+      <div class="out">
+        <code id="out-words">—</code>
+        <button type="button" class="copy-btn" data-copy="out-words" title="Copy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+          Copy
+        </button>
+      </div>
+
+      <div id="verify-box" style="margin-top: 14px"></div>
+    </section>
+
+    <section class="step">
+      <h2>3) Optional labels</h2>
+      <label for="puzzle-id">PUZZLE_ID</label>
+      <input type="text" id="puzzle-id" value="001" placeholder="001" />
+      <label for="round-id" style="margin-top: 12px">ROUND_ID</label>
+      <input type="text" id="round-id" value="default" placeholder="default" />
+    </section>
+
+    <section class="step">
+      <h2>4) Ready-to-paste <code>.env</code> block</h2>
+      <div class="out" style="width: 100%">
+        <code class="env-block" id="out-env">—</code>
+        <button type="button" class="copy-btn" data-copy="out-env" title="Copy all">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+          Copy
+        </button>
+      </div>
+    </section>
+
+    <section class="step">
+      <h2>5) Next (manual)</h2>
+      <ul class="hint" style="margin: 0; padding-left: 1.2rem">
+        <li>Fund <strong>TARGET_ADDRESS</strong> with prize USDC and SOL for fees.</li>
+        <li>Merge the block above into <code>backend/.env</code> (with <code>REDIS_URL</code>, claim flags, etc.).</li>
+        <li>Restart backend; run <code>curl</code> validate test from README.</li>
+      </ul>
+      <p class="hint"><a href="/developers">Developer API</a> · <a href="/">Arena</a></p>
+    </section>
+
+    <script type="module">
+      const bootErr = document.getElementById("wizard-bootstrap-error")
+
+      function showBootError(html) {
+        bootErr.style.display = "block"
+        bootErr.innerHTML = html
+      }
+
+      function clearBootError() {
+        bootErr.style.display = "none"
+        bootErr.innerHTML = ""
+      }
+
+      let deriveEnabled = false
+
+      async function loadWizardFlag() {
+        try {
+          const r = await fetch("/public/developer-info")
+          if (!r.ok) throw new Error(String(r.status))
+          const d = await r.json()
+          deriveEnabled = !!d.wizard_derive_enabled
+          if (!deriveEnabled) {
+            showBootError(
+              "<strong>Puzzle wizard API is off.</strong> In production set <code>ALLOW_WIZARD_DERIVE=1</code> in <code>backend/.env</code> (you are sending the mnemonic to this server). Development enables it by default."
+            )
+          } else {
+            clearBootError()
+          }
+        } catch {
+          deriveEnabled = false
+          showBootError(
+            "<strong>Cannot reach the backend.</strong> Start <code>node server.js</code> in <code>backend/</code> and open <code>http://127.0.0.1:3001/puzzle-wizard.html</code> (same host/port as the API)."
+          )
+        }
+      }
+
+      function normalizePhrase(p) {
+        return String(p ?? "")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+      }
+
+      let imported = { target: "", hash: "", words: "" }
+
+      function parseEnvText(text) {
+        const out = {}
+        for (const line of text.split(/\r?\n/)) {
+          const t = line.trim()
+          if (!t || t.startsWith("#")) continue
+          const eq = t.indexOf("=")
+          if (eq === -1) continue
+          const k = t.slice(0, eq).trim()
+          let v = t.slice(eq + 1).trim()
+          if (
+            (v.startsWith('"') && v.endsWith('"')) ||
+            (v.startsWith("'") && v.endsWith("'"))
+          ) {
+            v = v.slice(1, -1)
+          }
+          out[k] = v
+        }
+        return out
+      }
+
+      function setImported(o) {
+        imported = {
+          target: (o.TARGET_ADDRESS || "").trim(),
+          hash: (o.SOLUTION_HASH || "").trim(),
+          words: (o.PUZZLE_WORDS || "").trim(),
+        }
+        if (o.PUZZLE_ID != null && String(o.PUZZLE_ID).trim()) {
+          document.getElementById("puzzle-id").value = String(o.PUZZLE_ID).trim()
+        }
+        if (o.ROUND_ID != null && String(o.ROUND_ID).trim()) {
+          document.getElementById("round-id").value = String(o.ROUND_ID).trim()
+        }
+      }
+
+      function applyOutputs(addr, hash, cw, statusEl, okMsg) {
+        document.getElementById("out-target").textContent = addr
+        document.getElementById("out-hash").textContent = hash
+        document.getElementById("out-words").textContent = cw
+        if (okMsg) statusEl.innerHTML = okMsg
+        const vb = document.getElementById("verify-box")
+        if (imported.target || imported.hash || imported.words) {
+          const tOk = !imported.target || imported.target === addr
+          const hOk = !imported.hash || imported.hash.toLowerCase() === hash.toLowerCase()
+          const wOk = !imported.words || imported.words.replace(/\s/g, "") === cw.replace(/\s/g, "")
+          vb.innerHTML = `
+            <div class="hint"><strong>Verify vs imported .env</strong></div>
+            <div class="${tOk ? "ok" : "bad"}">TARGET_ADDRESS ${tOk ? "✓ match" : "✗ mismatch"}</div>
+            <div class="${hOk ? "ok" : "bad"}">SOLUTION_HASH ${hOk ? "✓ match" : "✗ mismatch"}</div>
+            <div class="${wOk ? "ok" : "bad"}">PUZZLE_WORDS ${wOk ? "✓ match" : "✗ mismatch"}</div>
+          `
+        } else {
+          vb.innerHTML = ""
+        }
+        updateEnvBlock()
+      }
+
+      function clearOutputs(statusEl, msgHtml) {
+        document.getElementById("out-target").textContent = "—"
+        document.getElementById("out-hash").textContent = "—"
+        document.getElementById("out-words").textContent = "—"
+        if (msgHtml !== undefined) statusEl.innerHTML = msgHtml
+        document.getElementById("verify-box").innerHTML = ""
+        updateEnvBlock()
+      }
+
+      async function recalc() {
+        const raw = document.getElementById("mnemonic").value
+        const statusEl = document.getElementById("mnemonic-status")
+        const n = normalizePhrase(raw)
+        const words = n.split(" ").filter(Boolean)
+
+        if (!deriveEnabled) {
+          statusEl.innerHTML =
+            '<span class="bad">Wizard API unavailable — fix the banner above or set ALLOW_WIZARD_DERIVE=1.</span>'
+          return
+        }
+
+        if (words.length === 0) {
+          clearOutputs(statusEl, "")
+          return
+        }
+
+        if (words.length !== 12) {
+          clearOutputs(
+            statusEl,
+            `<span class="bad">Expected exactly 12 words; got ${words.length}.</span>`
+          )
+          return
+        }
+
+        try {
+          const res = await fetch("/public/wizard-derive", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mnemonic: raw }),
+          })
+          if (res.status === 404) {
+            deriveEnabled = false
+            showBootError(
+              "<strong>Wizard derive disabled on server.</strong> Set <code>ALLOW_WIZARD_DERIVE=1</code> and restart."
+            )
+            clearOutputs(statusEl, "")
+            return
+          }
+          const data = await res.json()
+          if (!data.valid) {
+            if (data.error === "invalid_bip39") {
+              clearOutputs(
+                statusEl,
+                '<span class="bad">Not a valid BIP39 mnemonic (word list / checksum).</span>'
+              )
+            } else {
+              clearOutputs(statusEl, `<span class="bad">Error: ${data.error || "unknown"}</span>`)
+            }
+            return
+          }
+          applyOutputs(
+            data.target_address,
+            data.solution_hash,
+            data.puzzle_words,
+            statusEl,
+            '<span class="ok">Valid BIP39 (12 words).</span>'
+          )
+        } catch (e) {
+          clearOutputs(
+            statusEl,
+            `<span class="bad">Request failed: ${String(e.message || e)}</span>`
+          )
+        }
+      }
+
+      function updateEnvBlock() {
+        const target = document.getElementById("out-target").textContent
+        const hash = document.getElementById("out-hash").textContent
+        const words = document.getElementById("out-words").textContent
+        const pid = document.getElementById("puzzle-id").value.trim() || "001"
+        const rid = document.getElementById("round-id").value.trim() || "default"
+        if (target === "—" || hash === "—" || words === "—") {
+          document.getElementById("out-env").textContent = "# Enter a valid mnemonic above first."
+          return
+        }
+        document.getElementById("out-env").textContent =
+          `# Puzzle (paste into backend/.env — do not commit mnemonic)\n` +
+          `TARGET_ADDRESS=${target}\n` +
+          `SOLUTION_HASH=${hash}\n` +
+          `PUZZLE_WORDS=${words}\n` +
+          `PUZZLE_ID=${pid}\n` +
+          `ROUND_ID=${rid}\n`
+      }
+
+      document.getElementById("btn-gen").addEventListener("click", async () => {
+        if (!deriveEnabled) {
+          await loadWizardFlag()
+        }
+        if (!deriveEnabled) return
+        const statusEl = document.getElementById("mnemonic-status")
+        try {
+          const res = await fetch("/public/wizard-derive", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ generate: true }),
+          })
+          if (res.status === 404) {
+            deriveEnabled = false
+            showBootError(
+              "<strong>Wizard derive disabled.</strong> Set <code>ALLOW_WIZARD_DERIVE=1</code>."
+            )
+            return
+          }
+          const data = await res.json()
+          if (!data.mnemonic) {
+            statusEl.innerHTML = '<span class="bad">Server did not return a mnemonic.</span>'
+            return
+          }
+          document.getElementById("mnemonic").value = data.mnemonic
+          applyOutputs(
+            data.target_address,
+            data.solution_hash,
+            data.puzzle_words,
+            statusEl,
+            '<span class="ok">Valid BIP39 (12 words).</span>'
+          )
+        } catch (e) {
+          statusEl.innerHTML = `<span class="bad">${String(e.message || e)}</span>`
+        }
+      })
+
+      document.getElementById("btn-recalc").addEventListener("click", () => {
+        recalc()
+      })
+      let recalcTimer = null
+      document.getElementById("mnemonic").addEventListener("input", () => {
+        clearTimeout(recalcTimer)
+        recalcTimer = setTimeout(recalc, 400)
+      })
+
+      document.getElementById("btn-parse-env").addEventListener("click", () => {
+        const text = document.getElementById("env-paste").value
+        const o = parseEnvText(text)
+        setImported(o)
+        recalc()
+      })
+
+      document.getElementById("puzzle-id").addEventListener("input", updateEnvBlock)
+      document.getElementById("round-id").addEventListener("input", updateEnvBlock)
+
+      document.querySelectorAll(".copy-btn").forEach((btn) => {
+        if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-copy")
+          const el = document.getElementById(id)
+          const text = el.textContent
+          if (!text || text === "—" || text.startsWith("# Enter")) return
+          try {
+            await navigator.clipboard.writeText(text)
+            btn.innerHTML = '<span class="ok">Copied ✓</span>'
+            setTimeout(() => {
+              btn.innerHTML = btn.dataset.originalHtml
+            }, 1400)
+          } catch {
+            alert("Clipboard failed — select and copy manually.")
+          }
+        })
+      })
+
+      await loadWizardFlag()
+      recalc()
+    </script>
+  </body>
+</html>

@@ -6,16 +6,18 @@ import { spawn } from "child_process"
 import express from "express"
 import cors from "cors"
 import rateLimit from "express-rate-limit"
+import bip39 from "bip39"
 import { Connection, PublicKey } from "@solana/web3.js"
 import {
   PUZZLE,
   shuffle,
+  normalizePhrase,
   evaluateMnemonicCached,
   hashMnemonic,
   validationJson,
   parseSolveMessage,
 } from "./puzzle.js"
-import { mnemonicToAddressCached } from "./solana.js"
+import { mnemonicToAddressCached, mnemonicToAddress } from "./solana.js"
 import { verifySolanaSignature } from "./verify.js"
 import {
   initStore,
@@ -418,6 +420,18 @@ const claimLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+/** Same-origin puzzle wizard (no CDN). Off in production unless ALLOW_WIZARD_DERIVE=1. */
+function isWizardDeriveEnabled() {
+  return process.env.ALLOW_WIZARD_DERIVE === "1" || process.env.NODE_ENV !== "production"
+}
+
+const wizardDeriveLimiter = rateLimit({
+  windowMs: 60_000,
+  max: Math.min(Math.max(Number(process.env.WIZARD_DERIVE_MAX_PER_MIN) || 40, 5), 200),
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 async function batchCreditsMiddleware(req, res, next) {
   const n = Array.isArray(req.body?.mnemonics) ? req.body.mnemonics.length : 0
   const key = req.headers["x-api-key"]
@@ -464,8 +478,65 @@ app.get("/public/developer-info", (_req, res) => {
     free_tier_batch_max: FREE_TIER_BATCH_MAX,
     rate_limit_validate_batch_per_sec:
       Number(process.env.RATE_LIMIT_VALIDATE_BATCH_MAX) || 20,
+    wizard_derive_enabled: isWizardDeriveEnabled(),
   })
 })
+
+/**
+ * Puzzle wizard: derive TARGET_ADDRESS, SOLUTION_HASH, PUZZLE_WORDS (same logic as README).
+ * POST JSON: { "mnemonic": "12 words" } or { "generate": true } for a new mnemonic.
+ * Disabled in production unless ALLOW_WIZARD_DERIVE=1 (mnemonic in HTTP body — trust your network).
+ */
+app.post("/public/wizard-derive", wizardDeriveLimiter, (req, res) => {
+    if (!isWizardDeriveEnabled()) {
+      return res.status(404).json({ error: "wizard_derive_disabled" })
+    }
+    if (req.body?.generate === true) {
+      const mnemonic = bip39.generateMnemonic(128)
+      const n = normalizePhrase(mnemonic)
+      const target_address = mnemonicToAddress(n)
+      const solution_hash = hashMnemonic(n)
+      const puzzle_words = n.split(" ").join(",")
+      return res.json({
+        mnemonic,
+        valid: true,
+        word_count: 12,
+        target_address,
+        solution_hash,
+        puzzle_words,
+      })
+    }
+    const raw = req.body?.mnemonic
+    if (typeof raw !== "string") {
+      return res.status(400).json({ error: "missing_mnemonic" })
+    }
+    const n = normalizePhrase(raw)
+    const words = n.split(" ").filter(Boolean)
+    if (words.length === 0) {
+      return res.json({ valid: false, error: "empty", word_count: 0 })
+    }
+    if (words.length !== 12) {
+      return res.json({
+        valid: false,
+        error: "word_count",
+        word_count: words.length,
+      })
+    }
+    if (!bip39.validateMnemonic(n)) {
+      return res.json({ valid: false, error: "invalid_bip39", word_count: 12 })
+    }
+    const target_address = mnemonicToAddress(n)
+    const solution_hash = hashMnemonic(n)
+    const puzzle_words = n.split(" ").join(",")
+    return res.json({
+      valid: true,
+      word_count: 12,
+      target_address,
+      solution_hash,
+      puzzle_words,
+    })
+  }
+)
 
 app.get("/puzzle", async (_req, res) => {
   const state = await getPuzzleState()
