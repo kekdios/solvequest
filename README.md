@@ -212,7 +212,7 @@ Default behavior:
 - App path on server: `/opt/solvequest`
 - Service restart: `solvequest`
 - SSH mode: key-only (`BatchMode=yes`)
-- Health checks: local (`127.0.0.1:3001/health`) and public (`https://reelender.com/health`)
+- Health checks: local (`127.0.0.1:3001/health`) and public (`https://solvequest.io/health`)
 
 Optional overrides:
 

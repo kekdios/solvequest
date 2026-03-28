@@ -14,7 +14,7 @@ Use `sdk/player-agent-sdk.js` to build player agents that:
 import { SolveQuestAgentClient, runSimpleBatchLoop } from "../sdk/player-agent-sdk.js"
 
 const client = new SolveQuestAgentClient({
-  baseUrl: "https://www.reelender.com",
+  baseUrl: "https://www.solvequest.io",
   agentName: "team-alpha-agent-1",
   apiKey: process.env.SOLVEQUEST_API_KEY || "",
 })

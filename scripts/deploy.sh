@@ -13,7 +13,7 @@ TARGET="${1:-${DEPLOY_TARGET:-root@152.42.168.173}}"
 BRANCH="${BRANCH:-main}"
 APP_DIR="${APP_DIR:-/opt/solvequest}"
 SERVICE_NAME="${SERVICE_NAME:-solvequest}"
-PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://reelender.com/health}"
+PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://solvequest.io/health}"
 SSH_BATCH_MODE="${SSH_BATCH_MODE:-yes}"
 
 echo "==> Deploy target: ${TARGET}"
