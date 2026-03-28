@@ -20,7 +20,14 @@ if [[ ! -d node_modules ]]; then
   npm install
 fi
 
-echo "[launch] Backend + frontend: http://127.0.0.1:${PORT:-3001}"
-echo "[launch] Arena: http://127.0.0.1:${PORT:-3001}/index.html"
-echo "[launch] Puzzle wizard: http://127.0.0.1:${PORT:-3001}/puzzle-wizard.html"
+# Same as server.js: env PORT wins; else .env; default 3001 (avoids wrong URLs when PORT is only in .env)
+effective_port="$(
+  node --input-type=module -e "import 'dotenv/config'; console.log(Number(process.env.PORT) || 3001)" 2>/dev/null || echo 3001
+)"
+
+echo "[launch] Backend + frontend: http://127.0.0.1:${effective_port}"
+echo "[launch] Arena: http://127.0.0.1:${effective_port}/index.html"
+echo "[launch] Developers: http://127.0.0.1:${effective_port}/developers"
+echo "[launch] Puzzle wizard: http://127.0.0.1:${effective_port}/puzzle-wizard.html"
+echo "[launch] Health: http://127.0.0.1:${effective_port}/health"
 exec node server.js
