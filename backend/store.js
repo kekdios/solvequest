@@ -28,6 +28,12 @@ const LEADERBOARD_MAX_INCR_PER_SEC = Math.min(
   500
 )
 
+/** Leaderboard points added when a wallet wins (dominates +1 near-miss increments). */
+const LEADERBOARD_WIN_POINTS = Math.max(
+  1,
+  Math.floor(Number(process.env.LEADERBOARD_WIN_POINTS) || 100_000)
+)
+
 /** 1 display credit = CREDITS_SCALE_UNITS integer (default 1000). */
 export const CREDITS_SCALE_UNITS = Math.max(
   1,
@@ -775,6 +781,22 @@ export async function recordLeaderboardAttempt(wallet) {
   return true
 }
 
+/**
+ * Add win bonus to leaderboard (same ZSET as near-misses; much larger delta).
+ * Not rate-limited; only called after atomic winner set succeeds.
+ */
+export async function recordLeaderboardWin(wallet) {
+  const key = wallet || "anonymous"
+  const delta = LEADERBOARD_WIN_POINTS
+  if (redis) {
+    await redis.zIncrBy(LEADERBOARD_ZSET, delta, key)
+    return true
+  }
+  const lb = mem().leaderboardZ
+  lb[key] = (lb[key] || 0) + delta
+  return true
+}
+
 /** Optional anti-spam: negative delta on constraint reject (set LEADERBOARD_CONSTRAINT_PENALTY). */
 export async function recordLeaderboardConstraintPenalty(wallet) {
   const delta = Number(process.env.LEADERBOARD_CONSTRAINT_PENALTY)
@@ -815,7 +837,7 @@ export async function getLeaderboardRank1Based(pubkey) {
   return idx >= 0 ? idx + 1 : null
 }
 
-/** Sorted by score (valid-checksum attempts). Highest first. */
+/** Sorted by score (near-miss +1 each, plus configurable win bonus). Highest first. */
 export async function getLeaderboard(limit = 20) {
   const lim = Math.min(Math.max(Number(limit) || 20, 1), 100)
   if (redis) {

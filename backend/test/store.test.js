@@ -4,6 +4,7 @@ import {
   initStore,
   closeStore,
   recordLeaderboardAttempt,
+  recordLeaderboardWin,
   getLeaderboardScore,
   getLeaderboardRank1Based,
   getLeaderboard,
@@ -50,6 +51,15 @@ test("getLeaderboard returns top array", async () => {
   assert.ok(rows.length >= 1)
   assert.ok("pubkey" in rows[0])
   assert.ok("score" in rows[0])
+})
+
+test("recordLeaderboardWin dominates near-miss score", async () => {
+  const w = "win_test_wallet"
+  await recordLeaderboardAttempt(w)
+  await recordLeaderboardWin(w)
+  const s = await getLeaderboardScore(w)
+  assert.ok(s >= 100_000)
+  assert.equal(await getLeaderboardRank1Based(w), 1)
 })
 
 test("consumeBatchCredits debits micro-units in memory", async () => {

@@ -262,6 +262,11 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Used by:** `backend/store.js`.
 - **Example:** `-0.5`.
 
+### `LEADERBOARD_WIN_POINTS` (optional, default `100000`)
+- **Purpose:** Score added to `GET /leaderboard` when a wallet wins via `POST /submit` or `POST /claim` (same sorted set as near-miss +1s, but much larger so winners appear at the top).
+- **Used by:** `backend/store.js` (`recordLeaderboardWin`).
+- **Note:** Not subject to `LEADERBOARD_MAX_INCR_PER_SEC` (wins are once per puzzle).
+
 ---
 
 ## Performance/cache settings

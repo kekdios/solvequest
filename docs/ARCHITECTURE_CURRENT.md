@@ -149,9 +149,10 @@ Tracked metrics include:
 
 ## Leaderboard
 - Redis ZSET key: `leaderboard:global`
-- Score increases on valid-checksum near misses (`valid_but_wrong`)
+- Large score bonus on a successful win (`POST /submit` or `POST /claim` after atomic winner set); default `LEADERBOARD_WIN_POINTS` (see `ENV_SETTINGS.md`)
+- Smaller +1 increments on valid-checksum near misses (`valid_but_wrong`)
 - Optional negative penalty on constraint violations (`LEADERBOARD_CONSTRAINT_PENALTY`)
-- Per-wallet per-second increment cap (`LEADERBOARD_MAX_INCR_PER_SEC`)
+- Per-wallet per-second increment cap applies to near-miss increments only (`LEADERBOARD_MAX_INCR_PER_SEC`)
 
 ## API credits (`/validate_batch`)
 - Cost formula: `BATCH_CREDIT_BASE + (n * BATCH_CREDIT_UNIT)` scaled by `CREDITS_SCALE_UNITS`

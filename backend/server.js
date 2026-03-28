@@ -34,6 +34,7 @@ import {
   trySetWinner,
   trySetWinnerAtomic,
   recordLeaderboardAttempt,
+  recordLeaderboardWin,
   getLeaderboard,
   acquireClaimLock,
   releaseClaimLock,
@@ -770,6 +771,9 @@ app.post("/claim", claimLimiter, async (req, res) => {
         return res.json(body)
       }
 
+      await recordLeaderboardWin(pubkey)
+      await broadcastLeaderboardRefresh()
+
       const body = { status: "win", winner: pubkey }
       await setCachedClaimResult(pubkey, mnemonicHash, body, 3600)
       broadcast({ type: "win", winner: pubkey, puzzle_id: PUZZLE.id })
@@ -849,6 +853,8 @@ app.post("/submit", submitLimiter, async (req, res) => {
         const s2 = await getPuzzleState()
         return res.json({ status: "already_solved", winner: s2.winner })
       }
+      await recordLeaderboardWin(wallet)
+      await broadcastLeaderboardRefresh()
       broadcast({ type: "win", winner: wallet, puzzle_id: PUZZLE.id })
       broadcast({
         type: "submit",
