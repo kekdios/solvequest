@@ -4,9 +4,8 @@ Competition backend with **Redis** (optional in-memory fallback), **atomic claim
 
 ## Arena terminology
 
-- **House Agent**: the platform-controlled agent process (formerly called worker).
-- **Player Agents**: user-run agents/bots competing to solve the same puzzle.
-- **Leaderboard score**: counts Player Agent valid-checksum near misses (`valid_but_wrong`).
+- **Player Agents**: user-run agents/bots competing to solve the same puzzle (run your own client against the HTTP API).
+- **Leaderboard score**: counts valid-checksum near misses (`valid_but_wrong`).
 
 ## Quick start
 
@@ -20,30 +19,9 @@ node server.js
 
 Set **`REDIS_URL`** for persistence and horizontal scaling. Without it, the process uses **in-memory** state (dev only).
 
-### House Agent resume (continue from last checkpoint)
-
-When Redis is enabled, the backend-spawned House Agent can resume exhaustive search after restarts.
-
-Recommended settings:
-
-```env
-REDIS_URL=redis://127.0.0.1:6379
-HOUSE_AGENT_STRATEGY=exhaustive
-HOUSE_AGENT_ID=house-default
-WORKER_CHECKPOINT_EVERY=10000
-```
-
-Fairness + control hardening:
-
-```env
-HOUSE_AGENT_START_DELAY_SEC=30
-HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC=200
-ADMIN_CONTROL_KEY=change-me
-```
-
 Notes:
 - In `NODE_ENV=production`, backend now fails fast if `REDIS_URL` is missing.
-- `POST /worker/start` and `POST /worker/stop` now require `x-admin-key: <ADMIN_CONTROL_KEY>`.
+- Set **`ADMIN_CONTROL_KEY`** for admin routes such as **`POST /payout/jobs/:jobId/attempt`** (`x-admin-key` header).
 
 Round automation (new):
 
@@ -66,9 +44,6 @@ PAYOUT_MAX_RETRIES=5
 API:
 - `GET /payout/jobs`
 - `POST /payout/jobs/:jobId/attempt` (admin key required)
-
-Checkpoint key format:
-- `house_agent:checkpoint:<HOUSE_AGENT_ID>:<PUZZLE_ID>`
 
 ## Create a new puzzle (step-by-step)
 
@@ -193,10 +168,9 @@ systemctl restart solvequest
 ```bash
 curl -sS https://your-domain/health
 curl -sS https://your-domain/puzzle
-curl -sS https://your-domain/worker/status
 ```
 
-You should see healthy API, expected puzzle metadata, and House Agent controls working.
+You should see healthy API and expected puzzle metadata.
 
 ## Deploy from local machine
 

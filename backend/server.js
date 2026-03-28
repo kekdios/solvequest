@@ -2,7 +2,6 @@ import "dotenv/config"
 import { readFileSync } from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
-import { spawn } from "child_process"
 import express from "express"
 import cors from "cors"
 import rateLimit from "express-rate-limit"
@@ -84,14 +83,8 @@ function setNoStore(res) {
   res.setHeader("Pragma", "no-cache")
 }
 let DISPLAY_WORDS = shuffle(PUZZLE.words)
-const WORKER_SCRIPT = path.join(__dirname, "../worker/worker.js")
 
 const sseClients = new Set()
-let workerProcess = null
-let workerStartedAtMs = null
-let workerStopping = false
-let workerStartTimer = null
-let workerStartAtMs = null
 
 const FREE_TIER_BATCH_MAX = Math.min(
   Math.max(Number(process.env.FREE_TIER_BATCH_MAX) || 50, 1),
@@ -146,14 +139,6 @@ const CLAIM_REQUIRE_ROUND_IN_MESSAGE =
   process.env.CLAIM_REQUIRE_ROUND_IN_MESSAGE === "true"
 const IS_PROD = process.env.NODE_ENV === "production"
 const ADMIN_CONTROL_KEY = process.env.ADMIN_CONTROL_KEY?.trim() || ""
-const HOUSE_AGENT_START_DELAY_SEC = Math.max(
-  0,
-  Math.floor(Number(process.env.HOUSE_AGENT_START_DELAY_SEC) || 0)
-)
-const HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC = Math.max(
-  0,
-  Number(process.env.HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC) || 0
-)
 const AUTO_ROTATE_ROUNDS =
   process.env.AUTO_ROTATE_ROUNDS === "1" || process.env.AUTO_ROTATE_ROUNDS === "true"
 const PAYOUT_AMOUNT_USDC = Number(process.env.PAYOUT_AMOUNT_USDC || 0)
@@ -202,88 +187,6 @@ function broadcast(event) {
   } else {
     localBroadcast(event)
   }
-}
-
-function getWorkerStatus() {
-  const running =
-    !!workerProcess && workerProcess.exitCode == null && workerProcess.killed !== true
-  const scheduled = !!workerStartTimer && !running
-  return {
-    running,
-    scheduled,
-    pid: running ? workerProcess.pid : null,
-    started_at_ms: running ? workerStartedAtMs : null,
-    scheduled_start_at_ms: scheduled ? workerStartAtMs : null,
-  }
-}
-
-function startWorkerProcess() {
-  if (getWorkerStatus().running) return getWorkerStatus()
-  const env = {
-    ...process.env,
-    SOLQUEST_API: process.env.SOLQUEST_API || `http://127.0.0.1:${PORT}`,
-    WORKER_STRATEGY:
-      process.env.HOUSE_AGENT_STRATEGY || process.env.WORKER_STRATEGY || "exhaustive",
-    HOUSE_AGENT_ID: process.env.HOUSE_AGENT_ID || "house-default",
-    HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC:
-      HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC > 0
-        ? String(HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC)
-        : process.env.HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC || "",
-  }
-  const p = spawn(process.execPath, [WORKER_SCRIPT], {
-    cwd: path.join(__dirname, "../worker"),
-    env,
-    stdio: "inherit",
-  })
-  workerProcess = p
-  workerStartedAtMs = Date.now()
-  workerStartAtMs = null
-  workerStartTimer = null
-  workerStopping = false
-
-  p.on("exit", (code, signal) => {
-    const wasStopping = workerStopping
-    workerProcess = null
-    workerStartedAtMs = null
-    workerStopping = false
-    broadcast({
-      type: "worker_status",
-      running: false,
-      code: code ?? null,
-      signal: signal ?? null,
-      reason: wasStopping ? "stopped" : "exited",
-    })
-  })
-
-  p.on("error", (err) => {
-    console.error("[worker]", err)
-  })
-
-  broadcast({ type: "worker_status", ...getWorkerStatus(), reason: "started" })
-  return getWorkerStatus()
-}
-
-function stopWorkerProcess() {
-  if (workerStartTimer) {
-    clearTimeout(workerStartTimer)
-    workerStartTimer = null
-    workerStartAtMs = null
-  }
-  if (!getWorkerStatus().running) return getWorkerStatus()
-  workerStopping = true
-  workerProcess.kill("SIGTERM")
-  return getWorkerStatus()
-}
-
-function scheduleWorkerStart(delaySec) {
-  if (getWorkerStatus().running) return getWorkerStatus()
-  if (workerStartTimer) return getWorkerStatus()
-  const delayMs = Math.max(0, delaySec * 1000)
-  workerStartAtMs = Date.now() + delayMs
-  workerStartTimer = setTimeout(() => {
-    startWorkerProcess()
-  }, delayMs)
-  return getWorkerStatus()
 }
 
 function requireAdminControl(req, res, next) {
@@ -383,7 +286,7 @@ async function evalAndRecord(raw) {
 async function mapWithConcurrency(items, limit, fn) {
   const results = new Array(items.length)
   let next = 0
-  async function worker() {
+  async function runSlot() {
     while (true) {
       const i = next++
       if (i >= items.length) return
@@ -391,7 +294,7 @@ async function mapWithConcurrency(items, limit, fn) {
     }
   }
   const n = Math.min(limit, items.length) || 1
-  await Promise.all(Array.from({ length: n }, () => worker()))
+  await Promise.all(Array.from({ length: n }, () => runSlot()))
   return results
 }
 
@@ -621,34 +524,6 @@ app.get("/prize/balances", async (_req, res) => {
     console.error("[prize/balances]", e)
     res.status(500).json({ error: "prize_balance_unavailable" })
   }
-})
-
-app.get("/worker/status", (_req, res) => {
-  res.json(getWorkerStatus())
-})
-
-app.post("/worker/start", requireAdminControl, (_req, res) => {
-  const status =
-    HOUSE_AGENT_START_DELAY_SEC > 0
-      ? scheduleWorkerStart(HOUSE_AGENT_START_DELAY_SEC)
-      : startWorkerProcess()
-  res.json({
-    status: status.running ? "started" : status.scheduled ? "scheduled" : "failed",
-    ...status,
-  })
-})
-
-app.post("/worker/stop", requireAdminControl, (_req, res) => {
-  const prev = getWorkerStatus()
-  const status = stopWorkerProcess()
-  res.json({
-    status: prev.running
-      ? "stopping"
-      : prev.scheduled
-        ? "cancelled_scheduled_start"
-        : "already_stopped",
-    ...status,
-  })
 })
 
 app.get("/payout/jobs", async (req, res) => {

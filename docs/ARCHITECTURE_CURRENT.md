@@ -1,7 +1,7 @@
 # SolveQuest Canonical Architecture (Current)
 
 This document is the single source of truth for the current implementation in this repository.
-It reflects code in `backend/`, `frontend/`, and `worker/` as of now.
+It reflects code in `backend/` and `frontend/` as of now.
 
 ## 1) Project Goal
 
@@ -51,13 +51,6 @@ The system supports:
 - Arena UI showing puzzle words, commitments, constraints, countdown, stats, leaderboard
 - Uses SSE (`GET /events`) for live updates
 - Submits via `POST /submit`
-
-## Worker (`worker/worker.js`)
-- Optional brute-force client
-- Strategies:
-  - `random` (default): randomized attempts + de-dup
-  - `exhaustive`: lexicographic permutation scan
-- Uses `POST /validate` as pre-filter, then `POST /submit` on candidate matches
 
 ## 3) Runtime Modes
 
@@ -212,9 +205,6 @@ solvequest/
 │   ├── index.html
 │   ├── main.js
 │   └── style.css
-├── worker/
-│   ├── worker.js
-│   └── package.json
 └── docs/
     └── ARCHITECTURE_CURRENT.md
 ```
@@ -222,7 +212,6 @@ solvequest/
 ## 10) Known Caveats (Current Code)
 
 - In-memory mode is not persistence-safe and not horizontally safe.
-- Worker is a demo brute-force client; not an efficient solver.
 - There is currently no automated on-chain USDC deposit -> API key crediting flow in this repo.
 - The batch credit error response path in `backend/server.js` references `cost` in one branch where only `costMicro` exists; that branch should be corrected before strict production rollout.
 
@@ -238,12 +227,4 @@ node server.js
 
 Open:
 - `http://localhost:3001/index.html`
-
-Optional worker:
-
-```bash
-cd worker
-npm install
-node worker.js
-```
 

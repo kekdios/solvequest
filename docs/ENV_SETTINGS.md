@@ -84,39 +84,11 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Purpose:** Cache TTL for RPC prize balance reads.
 - **Used by:** `backend/server.js`.
 
-### `SOLQUEST_API` (optional)
-- **Purpose:** API URL passed to internally spawned House Agent process.
-- **Used by:** `backend/server.js` worker spawn env.
-- **Default:** `http://127.0.0.1:${PORT}`.
-
-### `HOUSE_AGENT_STRATEGY` (optional, default `exhaustive` for House Agent)
-- **Purpose:** Strategy used by backend-spawned House Agent.
-- **Used by:** `backend/server.js` -> worker env (`WORKER_STRATEGY`).
-- **Values:** `exhaustive` or `random`.
-
-### `HOUSE_AGENT_ID` (optional, default `house-default`)
-- **Purpose:** Stable identifier used for House Agent checkpoint key namespace.
-- **Used by:** `backend/server.js` and `worker/worker.js`.
-
-### `WORKER_CHECKPOINT_EVERY` (optional, default `10000`)
-- **Purpose:** Save House Agent exhaustive checkpoint every N permutations.
-- **Used by:** `worker/worker.js`.
-- **Note:** Requires `REDIS_URL` and exhaustive strategy for persistent resume.
-
-### `HOUSE_AGENT_START_DELAY_SEC` (optional, default `0`)
-- **Purpose:** Delay House Agent start after start request (fairness/boss-fight timing).
-- **Used by:** `backend/server.js`.
-
-### `HOUSE_AGENT_MAX_ATTEMPTS_PER_SEC` (optional, default `0` = unlimited)
-- **Purpose:** Rate limit House Agent attempt loop for fairness perception.
-- **Used by:** passed from `backend/server.js` to `worker/worker.js`.
-
 ### `ADMIN_CONTROL_KEY` (recommended in all non-local environments)
-- **Purpose:** Protect House Agent control endpoints.
+- **Purpose:** Protect admin-only HTTP endpoints.
 - **Used by:** `backend/server.js`.
 - **How:** client must send `x-admin-key: <ADMIN_CONTROL_KEY>` for:
-  - `POST /worker/start`
-  - `POST /worker/stop`
+  - `POST /payout/jobs/:jobId/attempt`
 
 ### `API_KEY_REQUEST_URL` (optional)
 - **Purpose:** URL for “Request API key” on `/developers` (e.g. Google Form).

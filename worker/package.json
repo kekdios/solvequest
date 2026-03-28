@@ -1,8 +1,0 @@
-{
-  "name": "solvequest-worker",
-  "type": "module",
-  "dependencies": {
-    "bip39": "^3.1.0",
-    "redis": "^5.11.0"
-  }
-}

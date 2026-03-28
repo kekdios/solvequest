@@ -135,8 +135,6 @@ function renderRunnerSavedList() {
 
 let countdownTimer = null
 let lastTopSig = ""
-let workerRunning = false
-let workerScheduled = false
 
 function fmtShortPubkey(pk) {
   if (!pk || pk.length < 12) return pk || "—"
@@ -325,84 +323,8 @@ async function loadPrizeBalances() {
   }
 }
 
-function renderWorkerStatus(data) {
-  const statusEl = document.getElementById("worker-status")
-  const btnEl = document.getElementById("worker-toggle-btn")
-  const laneEl = document.querySelector(".race-lane")
-  workerRunning = !!data?.running
-  workerScheduled = !!data?.scheduled && !workerRunning
-  statusEl.textContent = workerRunning ? "running" : workerScheduled ? "scheduled" : "stopped"
-  statusEl.classList.toggle("is-running", workerRunning)
-  statusEl.classList.toggle("is-scheduled", workerScheduled)
-  statusEl.classList.toggle("is-stopped", !workerRunning && !workerScheduled)
-  btnEl.textContent = workerRunning || workerScheduled ? "Stop House" : "Start House"
-  laneEl?.classList.toggle("is-running", workerRunning)
-}
-
 function uiNotice(msg) {
   logSse(`[UI] ${msg}`)
-}
-
-async function loadWorkerStatus() {
-  try {
-    const res = await fetch(`${API}/worker/status`)
-    if (!res.ok) return
-    const data = await res.json()
-    renderWorkerStatus(data)
-  } catch {
-    /* ignore */
-  }
-}
-
-async function toggleWorker() {
-  const route = workerRunning || workerScheduled ? "/worker/stop" : "/worker/start"
-  const btnEl = document.getElementById("worker-toggle-btn")
-  const prevText = btnEl.textContent
-  const storedKey =
-    typeof localStorage !== "undefined"
-      ? localStorage.getItem("solvequest_admin_key") || ""
-      : ""
-  const adminKey =
-    storedKey ||
-    (typeof window !== "undefined"
-      ? window.prompt("Admin key required for House Agent control") || ""
-      : "")
-  if (!adminKey.trim()) {
-    uiNotice("House Agent toggle cancelled (missing admin key)")
-    return
-  }
-  if (typeof localStorage !== "undefined" && !storedKey) {
-    localStorage.setItem("solvequest_admin_key", adminKey.trim())
-  }
-  btnEl.disabled = true
-  btnEl.textContent =
-    workerRunning || workerScheduled ? "Stopping House..." : "Starting House..."
-  try {
-    const res = await fetch(`${API}${route}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-key": adminKey.trim(),
-      },
-    })
-    if (!res.ok) {
-      uiNotice(`House Agent toggle failed: ${res.status}`)
-      return
-    }
-    const data = await res.json()
-    renderWorkerStatus(data)
-  } catch {
-    uiNotice("House Agent toggle failed")
-  } finally {
-    btnEl.disabled = false
-    if (
-      btnEl.textContent === "Starting House..." ||
-      btnEl.textContent === "Stopping House..."
-    ) {
-      btnEl.textContent = prevText
-    }
-    loadWorkerStatus()
-  }
 }
 
 function renderYouVs(self) {
@@ -510,8 +432,6 @@ function connectEvents() {
   }
 }
 
-document.getElementById("worker-toggle-btn").addEventListener("click", toggleWorker)
-
 const runnerDlg = document.getElementById("runner-names-dialog")
 const runnerOpen = document.getElementById("runner-names-open")
 const runnerForm = document.getElementById("runner-form")
@@ -544,10 +464,8 @@ loadVersion()
 loadPuzzle()
 loadStats()
 loadPrizeBalances()
-loadWorkerStatus()
 loadLeaderboard()
 setInterval(loadStats, 1500)
 setInterval(loadPrizeBalances, 10000)
-setInterval(loadWorkerStatus, 2500)
 setInterval(loadLeaderboard, 8000)
 setInterval(loadPuzzle, 5000)

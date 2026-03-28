@@ -52,15 +52,6 @@ else
   npm install --omit=dev >/dev/null 2>&1 || npm install
 fi
 
-echo "==> Install worker dependencies (prefer npm ci)"
-cd "${APP_DIR}/worker"
-if npm ci --omit=dev >/dev/null 2>&1; then
-  echo "Worker dependencies installed via npm ci"
-else
-  echo "Worker npm ci failed, falling back to npm install"
-  npm install --omit=dev >/dev/null 2>&1 || npm install
-fi
-
 echo "==> Restart service"
 systemctl restart "${SERVICE_NAME}"
 systemctl is-active --quiet "${SERVICE_NAME}"
