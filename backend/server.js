@@ -77,6 +77,12 @@ const APP_VERSION = (() => {
 })()
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
+
+/** Avoid stale solved/winner in browsers and reverse proxies (GET must reflect Redis). */
+function setNoStore(res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate")
+  res.setHeader("Pragma", "no-cache")
+}
 let DISPLAY_WORDS = shuffle(PUZZLE.words)
 const WORKER_SCRIPT = path.join(__dirname, "../worker/worker.js")
 
@@ -496,6 +502,7 @@ app.get("/health", (_req, res) => {
 })
 
 app.get("/version", (_req, res) => {
+  setNoStore(res)
   res.json({ version: APP_VERSION })
 })
 
@@ -561,6 +568,7 @@ app.post("/public/wizard-derive", wizardDeriveLimiter, (req, res) => {
 )
 
 app.get("/puzzle", async (_req, res) => {
+  setNoStore(res)
   const state = await getPuzzleState()
   const round = await getRoundState()
   res.json({
@@ -586,6 +594,7 @@ app.get("/puzzle", async (_req, res) => {
 })
 
 app.get("/stats", async (_req, res) => {
+  setNoStore(res)
   const start = await getArenaStartMs()
   const state = await getPuzzleState()
   const extra = await getExtendedStats()
@@ -993,6 +1002,7 @@ app.post("/submit", submitLimiter, async (req, res) => {
 })
 
 app.get("/leaderboard", async (req, res) => {
+  setNoStore(res)
   const limit = req.query.limit
   const wallet = String(req.query.wallet || "").trim()
   const top = await getLeaderboard(limit)

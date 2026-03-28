@@ -144,12 +144,15 @@ function fmtShortPubkey(pk) {
 }
 
 async function loadPuzzle() {
-  const res = await fetch(`${API}/puzzle`)
+  const res = await fetch(`${API}/puzzle`, { cache: "no-store" })
   if (!res.ok) {
     uiNotice(`Failed to load puzzle: ${res.status}`)
     return
   }
   const data = await res.json()
+  /** Authoritative: API can keep round_active/phase "active" after a win — UI must not show "open" then. */
+  const isSolved = data.solved === true
+
   document.getElementById("puzzle").innerText = data.words.join(" ")
   document.getElementById("commitment-hash").textContent = data.solution_hash ?? "—"
   document.getElementById("commitment-addr").textContent = data.target_address ?? "—"
@@ -161,6 +164,23 @@ async function loadPuzzle() {
   const rid = data.round_id ?? "—"
   document.getElementById("badge-round").textContent = `round ${rid}`
 
+  const statusTicker = document.getElementById("ticker-puzzle-status")
+  const statusWrap = document.getElementById("ticker-puzzle-status-wrap")
+  const badgeOpen = document.getElementById("badge-open")
+  if (statusTicker) {
+    statusTicker.textContent = isSolved ? "SOLVED" : "NOT SOLVED"
+    statusTicker.classList.toggle("is-solved", isSolved)
+    statusTicker.classList.toggle("is-open", !isSolved)
+  }
+  if (statusWrap) {
+    statusWrap.classList.toggle("is-solved", isSolved)
+    statusWrap.classList.toggle("is-open", !isSolved)
+  }
+  if (badgeOpen) {
+    badgeOpen.hidden = isSolved
+    badgeOpen.textContent = "NOT SOLVED"
+  }
+
   if (countdownTimer) {
     clearInterval(countdownTimer)
     countdownTimer = null
@@ -171,6 +191,10 @@ async function loadPuzzle() {
 
   function tickCountdown() {
     const el = document.getElementById("countdown")
+    if (isSolved) {
+      el.textContent = "solved"
+      return
+    }
     if (phase === "settled") {
       el.textContent = "settled"
       return
@@ -198,7 +222,7 @@ async function loadPuzzle() {
         : `${m}m ${String(sec).padStart(2, "0")}s`
   }
   tickCountdown()
-  if (endMs && active && phase === "active") {
+  if (!isSolved && endMs && active && phase === "active") {
     countdownTimer = setInterval(tickCountdown, 1000)
   }
 
@@ -224,11 +248,36 @@ async function loadPuzzle() {
     envLine.textContent = ""
     sec.hidden = true
   }
+
+  const solvedPanel = document.getElementById("puzzle-solved-panel")
+  const solvedDetail = document.getElementById("puzzle-solved-detail")
+  const solvedBadge = document.getElementById("badge-solved")
+  const puzzleEl = document.getElementById("puzzle")
+  if (isSolved) {
+    if (solvedPanel) solvedPanel.hidden = false
+    if (solvedBadge) solvedBadge.hidden = false
+    if (solvedDetail) {
+      const wRaw = data.winner
+      const w = wRaw != null && String(wRaw).trim() !== "" ? String(wRaw).trim() : ""
+      if (w) {
+        const label = getRunnerLabel(w)
+        solvedDetail.textContent = label ? `Winner: ${label} (${w})` : `Winner: ${w}`
+      } else {
+        solvedDetail.textContent = "Puzzle solved."
+      }
+    }
+    if (puzzleEl) puzzleEl.classList.add("puzzle-words--solved")
+  } else {
+    if (solvedPanel) solvedPanel.hidden = true
+    if (solvedBadge) solvedBadge.hidden = true
+    if (solvedDetail) solvedDetail.textContent = ""
+    if (puzzleEl) puzzleEl.classList.remove("puzzle-words--solved")
+  }
 }
 
 async function loadStats() {
   try {
-    const res = await fetch(`${API}/stats`)
+    const res = await fetch(`${API}/stats`, { cache: "no-store" })
     if (!res.ok) return
     const s = await res.json()
     const aps = s.attempts_per_sec
@@ -248,7 +297,7 @@ async function loadStats() {
 
 async function loadVersion() {
   try {
-    const res = await fetch(`${API}/version`)
+    const res = await fetch(`${API}/version`, { cache: "no-store" })
     if (!res.ok) return
     const data = await res.json()
     const v = data?.version
@@ -375,7 +424,8 @@ function renderYouVs(self) {
 async function loadLeaderboard() {
   try {
     const res = await fetch(
-      `${API}/leaderboard?limit=10&wallet=${encodeURIComponent(MY_WALLET)}`
+      `${API}/leaderboard?limit=10&wallet=${encodeURIComponent(MY_WALLET)}`,
+      { cache: "no-store" }
     )
     if (!res.ok) return
     const data = await res.json()
@@ -438,6 +488,12 @@ function connectEvents() {
       ) {
         loadStats()
         loadLeaderboard()
+      }
+      if (
+        t === "win" ||
+        (t === "submit" && (payload.status === "win" || payload.status === "already_solved"))
+      ) {
+        loadPuzzle()
       }
       if (t === "round_end" || t === "round_settled" || t === "round_archived" || t === "round_rotated") {
         loadPuzzle()

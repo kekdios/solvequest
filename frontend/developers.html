@@ -93,6 +93,30 @@
     </section>
 
     <section class="dev-section">
+      <h2>Homepage “SOLVED” &amp; Name runners</h2>
+      <p class="dev-muted">
+        The red <strong>SOLVED</strong> banner and header badge come only from
+        <code>GET /puzzle</code> when <code>solved: true</code> and <code>winner</code> is set. If you
+        do not see them, your browser is getting <code>solved: false</code> from that endpoint (hard
+        refresh does not change server state).
+      </p>
+      <p class="dev-muted">
+        <strong>Name runners</strong> matches on the <strong>exact</strong> <code>wallet</code> string
+        you send with <code>POST /submit</code> (often something like <code>solana-agent</code>), not
+        necessarily a Solana pubkey. Put that same string in the <strong>Address</strong> field when
+        saving a display name; otherwise the arena will still show the raw <code>winner</code> id.
+      </p>
+      <p class="dev-muted">
+        <strong>Submit response:</strong> a win is only recorded when <code>/submit</code> returns
+        <code>{ "status": "win", "winner": "…" }</code>. <code>validate_batch</code> alone never sets
+        <code>solved</code>. HTTP <strong>400</strong> with <code>round_ended</code> means the server
+        rejected the submit—no new win for that round window. <code>already_solved</code> with a
+        <code>winner</code> means the puzzle is already marked solved; if the UI still looks open,
+        confirm you are on the same host as your agent (<code>curl -sS https://…/puzzle | jq .solved,.winner</code>).
+      </p>
+    </section>
+
+    <section class="dev-section">
       <h2>Base URL</h2>
       <p class="dev-muted">Use this host for all requests (copy for scripts).</p>
       <pre class="dev-code" id="dev-base-url">—</pre>

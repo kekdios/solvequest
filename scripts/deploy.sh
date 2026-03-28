@@ -16,6 +16,11 @@ SERVICE_NAME="${SERVICE_NAME:-solvequest}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://solvequest.io/health}"
 SSH_BATCH_MODE="${SSH_BATCH_MODE:-yes}"
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOCAL_VER="$(grep -m1 '"version"' "${ROOT}/backend/package.json" | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
+PUBLIC_BASE="${PUBLIC_HEALTH_URL%/health}"
+PUBLIC_BASE="${PUBLIC_BASE%/}"
+
 echo "==> Deploy target: ${TARGET}"
 echo "==> App dir: ${APP_DIR}"
 echo "==> Branch: ${BRANCH}"
@@ -34,6 +39,9 @@ git checkout "${BRANCH}"
 
 echo "==> Pull latest code"
 git pull --ff-only origin "${BRANCH}"
+
+echo "==> Server backend/package.json version (after pull)"
+grep -m1 '"version"' "${APP_DIR}/backend/package.json" || true
 
 echo "==> Install backend dependencies (prefer npm ci)"
 cd "${APP_DIR}/backend"
@@ -75,11 +83,26 @@ if [ "\$ok" -ne 1 ]; then
   exit 1
 fi
 
+echo "==> Local /version (after restart)"
+curl -fsS http://127.0.0.1:3001/version || true
+echo ""
+
 echo "Local health OK"
 EOF
 
 echo "==> Public health check: ${PUBLIC_HEALTH_URL}"
 curl -fsS "${PUBLIC_HEALTH_URL}" >/dev/null
 echo "Public health OK"
+
+echo "==> Public GET /version (what the arena footer uses)"
+PUB_VER="$(curl -fsS "${PUBLIC_BASE}/version")"
+echo "${PUB_VER}"
+echo "==> Local repo backend version (this machine): ${LOCAL_VER}"
+if echo "${PUB_VER}" | grep -q "\"version\":\"${LOCAL_VER}\""; then
+  echo "Public version matches local package.json — OK"
+else
+  echo "WARNING: Public /version does not match local package.json." >&2
+  echo "  Push commits to origin, redeploy, or fix APP_DIR / branch on the server." >&2
+fi
 
 echo "==> Deploy completed successfully."

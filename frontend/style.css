@@ -6,6 +6,9 @@
   --muted: #94a3b8;
   --accent: #34d399;
   --warn: #f59e0b;
+  /* Puzzle solved banner + word strip (high visibility) */
+  --solved: #f87171;
+  --solved-dim: color-mix(in srgb, #f87171 72%, var(--muted));
 }
 
 body {
@@ -100,6 +103,47 @@ body {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.badge-solved {
+  color: var(--solved) !important;
+  border-color: color-mix(in srgb, var(--solved) 50%, var(--border)) !important;
+  background: color-mix(in srgb, var(--solved) 12%, var(--panel)) !important;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.badge-open {
+  color: var(--accent) !important;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel)) !important;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.ticker-cell--puzzle-status {
+  border-width: 1px;
+}
+
+.ticker-cell--puzzle-status.is-solved {
+  border-color: color-mix(in srgb, var(--solved) 40%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--solved) 25%, transparent);
+}
+
+.ticker-cell--puzzle-status.is-open {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.ticker-puzzle-status.is-solved {
+  color: var(--solved);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.ticker-puzzle-status.is-open {
+  color: var(--accent);
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .badge {
@@ -654,12 +698,47 @@ body {
   word-break: break-all;
 }
 
+.puzzle-solved-panel {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--solved) 55%, var(--border));
+  background: color-mix(in srgb, var(--solved) 14%, var(--panel));
+  box-shadow: 0 0 24px color-mix(in srgb, var(--solved) 18%, transparent);
+}
+
+.puzzle-solved-title {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--solved);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.puzzle-solved-detail {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.puzzle-solved-detail strong {
+  color: var(--solved);
+  font-weight: 700;
+}
+
 #puzzle {
   margin: 12px 0 20px;
   font-weight: 600;
   line-height: 1.5;
   color: var(--accent);
   text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+#puzzle.puzzle-words--solved {
+  color: var(--solved-dim);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--solved) 40%, transparent);
 }
 
 .row {
