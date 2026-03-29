@@ -63,7 +63,7 @@ function computeDifficulty(wordCount, constraints) {
   return "hard"
 }
 
-function loadPuzzleFromEnv() {
+export function loadPuzzleFromEnv() {
   const target_address = process.env.TARGET_ADDRESS?.trim()
   const solution_hash = process.env.SOLUTION_HASH?.trim()
   const wordsRaw = process.env.PUZZLE_WORDS?.trim()

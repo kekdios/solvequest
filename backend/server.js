@@ -16,6 +16,7 @@ import {
   validationJson,
   parseSolveMessage,
   applyPuzzleRowFromVault,
+  loadPuzzleFromEnv,
 } from "./puzzle.js"
 import { parsePuzzleSource, PUZZLE_SOURCE_SQLITE } from "./puzzle-vault-env.js"
 import {
@@ -110,12 +111,16 @@ function loadPuzzleFromSqliteVault() {
     throw new Error("PUZZLE_SOURCE=sqlite but vault database did not open")
   }
   const row = getActiveUnsolvedPuzzle(puzzleVaultHandle.db)
-  if (!row) {
-    throw new Error(
-      "No unsolved puzzle in SQLite vault. From repo root run:\n  node scripts/vault-init.mjs bootstrap-from-env"
-    )
+  if (row) {
+    applyPuzzleRowFromVault(row)
+    refreshDisplayWords()
+    return
   }
-  applyPuzzleRowFromVault(row)
+  // Empty vault after migrate: keep process up for deploy/health checks; same env vars bootstrap-from-env will insert.
+  console.warn(
+    "[vault] No unsolved row in SQLite yet — using TARGET_ADDRESS / PUZZLE_WORDS from env. Run vault-init bootstrap-from-env then restart to read from the vault."
+  )
+  Object.assign(PUZZLE, loadPuzzleFromEnv())
   refreshDisplayWords()
 }
 

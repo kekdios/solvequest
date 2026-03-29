@@ -261,7 +261,9 @@ Override **`DEPLOY_TARGET`**, **`APP_DIR`**, **`SERVICE_NAME`**, **`PUBLIC_HEALT
 
 **`puzzles.puzzle_words_csv`:** 12 comma-separated words (normalized lowercase in DB) for display/evaluation; required for server load.
 
-Until **`PUZZLE_SOURCE=sqlite`** is wired into `puzzle.js` / `server.js`, leaving **`PUZZLE_SOURCE` unset or `env`** keeps today’s behavior (puzzle from **`TARGET_ADDRESS`** / **`PUZZLE_WORDS`** only).
+**Empty vault after migrate:** If there is no unsolved row yet, the server still starts and uses **`TARGET_ADDRESS`**, **`SOLUTION_HASH`**, **`PUZZLE_WORDS`** from `.env` (same values you will insert with **`bootstrap-from-env`**). After bootstrap, **restart** so the active puzzle is read from SQLite.
+
+Leaving **`PUZZLE_SOURCE` unset or `env`** keeps the classic model (puzzle from env only, no SQLite vault).
 
 **Backup policy:**
 - On **open** (`openPuzzleVaultDatabase`): if the DB file **already exists** and is **non-empty**, copy it to the backup dir (then prune) **before** attaching. First boot (no file) skips backup.

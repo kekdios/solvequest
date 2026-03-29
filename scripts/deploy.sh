@@ -61,7 +61,7 @@ echo "Service '${SERVICE_NAME}' is active."
 echo "==> Local health check (retry up to 30s)"
 ok=0
 for i in \$(seq 1 30); do
-  if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
+  if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
     ok=1
     break
   fi
