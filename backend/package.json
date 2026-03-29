@@ -1,6 +1,6 @@
 {
   "name": "solvequest-backend",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "type": "module",
   "scripts": {
     "start": "node server.js",
