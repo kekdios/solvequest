@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "gen-keypair": "node scripts/gen-solana-keypair.mjs",
     "test": "node --import ./test/setup-env.mjs --test test/*.test.js",
     "test:vault-puzzle": "node --import ./test/vault-sqlite-prelude.mjs --test test/vault-puzzle-load.node-test.js",
     "vault-init": "node ../scripts/vault-init.mjs"
   },
   "dependencies": {
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "better-sqlite3": "^11.10.0",
     "bip39": "^3.1.0",

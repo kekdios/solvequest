@@ -257,7 +257,7 @@ Override **`DEPLOY_TARGET`**, **`APP_DIR`**, **`SERVICE_NAME`**, **`PUBLIC_HEALT
 **CLI (repo root or `backend/`):** with **`PUZZLE_SOURCE=sqlite`**, **`SQLITE_PATH`**, and optional backup/HKDF vars, from **`backend/`** run:
 - `npm run vault-init -- migrate` — create/migrate DB file only.
 - `npm run vault-init -- status` — row counts + active unsolved row.
-- `npm run vault-init -- bootstrap-from-env` — insert one **`unsolved`** row from **`TARGET_ADDRESS`**, **`SOLUTION_HASH`**, **`PUZZLE_WORDS`** (and optional **`PUZZLE_CONSTRAINTS_JSON`**, **`PUZZLE_ID`**, **`ROUND_ID`**, **`PUZZLE_DIFFICULTY`**). Fails if an unsolved row already exists unless **`--force`**.
+- `npm run vault-init -- bootstrap-from-env` — insert one **`unsolved`** row from **`TARGET_ADDRESS`**, **`SOLUTION_HASH`**, **`PUZZLE_WORDS`** (and optional **`PUZZLE_CONSTRAINTS_JSON`**, **`PUZZLE_ID`**, **`ROUND_ID`**, **`PUZZLE_DIFFICULTY`**). Fails if an unsolved row already exists unless **`--force`**. If **`QUEST_AUTO_FUND=1`** and **`QUEST_OPERATOR_SECRET_KEY`**, **`QUEST_MINT`**, **`QUEST_FUND_AMOUNT_RAW`** are set, immediately sends QUEST from the operator wallet to the puzzle **`TARGET_ADDRESS`** (recipient ATA) and stores the signature in **`puzzles.quest_fund_tx`**.
 
 **`puzzles.puzzle_words_csv`:** 12 comma-separated words (normalized lowercase in DB) for display/evaluation; required for server load.
 
@@ -297,6 +297,15 @@ Leaving **`PUZZLE_SOURCE` unset or `env`** keeps the classic model (puzzle from 
 ### `QUEST_FUND_AMOUNT_RAW` (required with mint for QUEST flows; optional for migrate/bootstrap/serve)
 - **Purpose:** Positive integer string in **smallest token units** (no decimals) transferred to each new puzzle **`TARGET_ADDRESS`** when funding runs.
 - **Example:** `1000000` for 1.0 tokens if mint uses 6 decimals.
+
+### `QUEST_AUTO_FUND` (optional, default off)
+- **Purpose:** When **`1`** / **`true`**, **`vault-init bootstrap-from-env`** (after the row insert) sends QUEST via **`@solana/spl-token`** from **`QUEST_OPERATOR_SECRET_KEY`** to the new row’s **`target_address`** (creates the recipient ATA if needed; operator pays rent). Signature is written to **`puzzles.quest_fund_tx`**.
+- **Requires:** **`QUEST_OPERATOR_SECRET_KEY`**, **`QUEST_MINT`**, **`QUEST_FUND_AMOUNT_RAW`**, and **`SOLANA_RPC_URL`** (defaults to mainnet RPC if unset).
+- **Safety:** Off by default so dev/bootstrap cannot send mainnet tokens by accident.
+- **SAUSD / prize display:** Unrelated to QUEST. **`PRIZE_SPL_MINT`** (and **`TARGET_ADDRESS`**) still drive **`GET /prize/balances`** for the published commitment address.
+
+### `QUEST_OPERATOR_PUBLIC_KEY` (optional)
+- **Purpose:** If set, must equal the base58 pubkey derived from **`QUEST_OPERATOR_SECRET_KEY`**; otherwise the transfer throws (catch typos between secret and expected pubkey).
 
 ### `ENCRYPTION_HKDF_SALT_HEX` (optional)
 - **Purpose:** Extra HKDF salt as **hex** (minimum **16 hex characters** = 8 bytes if set). Strengthens key separation between deployments.

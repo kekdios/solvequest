@@ -21,10 +21,13 @@ SQLITE_PATH=${SQLITE_FILE}
 # SQLITE_BACKUP_DIR=${APP_DIR}/data/puzzle-vault/puzzle-vault-backups
 SQLITE_BACKUP_KEEP=7
 
-# QUEST (optional for step3 migrate + step4 bootstrap + serving; required before QUEST sign/fund features land)
+# QUEST (optional; set QUEST_AUTO_FUND=1 to send QUEST to TARGET_ADDRESS after bootstrap insert)
+# QUEST_AUTO_FUND=1
 # QUEST_OPERATOR_SECRET_KEY=<base58 or JSON secret — never commit>
-# QUEST_MINT=<SPL mint address>
+# QUEST_OPERATOR_PUBLIC_KEY=<optional; must match pubkey from secret>
+# QUEST_MINT=<SPL mint address (QUEST token; not SAUSD / PRIZE_SPL_MINT)>
 # QUEST_FUND_AMOUNT_RAW=<positive integer, smallest units>
+# SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
 
 # One-time bootstrap reads these (same as classic env puzzle) for the FIRST vault row only:
 TARGET_ADDRESS=<...>

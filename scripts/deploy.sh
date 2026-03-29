@@ -5,6 +5,7 @@ set -euo pipefail
 # Deploys backend + static frontend (arena, /developers, puzzle-wizard, openapi.json, etc.).
 # Runs from your Mac and executes safe deploy steps on the droplet over SSH.
 # Arena shows a red "Vault empty" banner when GET /puzzle returns vault_empty: true (sqlite, no unsolved row).
+# QUEST → TARGET_ADDRESS SPL transfer runs only during `vault-init bootstrap-from-env` when QUEST_AUTO_FUND=1 (see docs/ENV_SETTINGS.md).
 #
 # Usage:
 #   ./scripts/deploy.sh

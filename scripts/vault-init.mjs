@@ -8,7 +8,8 @@
  *   node scripts/vault-init.mjs bootstrap-from-env
  *   node scripts/vault-init.mjs bootstrap-from-env --force
  *
- * Requires PUZZLE_SOURCE=sqlite and SQLITE_PATH (see backend/.env.example). QUEST_* optional until funding/signing uses them.
+ * Requires PUZZLE_SOURCE=sqlite and SQLITE_PATH (see backend/.env.example).
+ * After bootstrap, optional QUEST transfer: QUEST_AUTO_FUND=1 + QUEST_OPERATOR_SECRET_KEY + QUEST_MINT + QUEST_FUND_AMOUNT_RAW.
  */
 
 import path from "node:path"
@@ -38,6 +39,7 @@ const {
   getActiveUnsolvedPuzzle,
   insertBootstrapPuzzleFromEnv,
 } = await loadBackend("puzzle-vault-db.js")
+const { tryQuestFundAfterBootstrap } = await loadBackend("quest-spl-fund.js")
 
 const [, , cmd, ...rest] = process.argv
 const force = rest.includes("--force")
@@ -81,6 +83,8 @@ async function cmdBootstrapFromEnv() {
   try {
     const id = insertBootstrapPuzzleFromEnv(h.db, h.vault, { force })
     console.log("bootstrap-from-env: inserted puzzle id", id)
+    const sig = await tryQuestFundAfterBootstrap(h.db, id)
+    if (sig) console.log("quest-fund: transfer confirmed, signature", sig)
   } finally {
     h.db.close()
   }
