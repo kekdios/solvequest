@@ -2,6 +2,7 @@ import crypto from "crypto"
 import { LRUCache } from "lru-cache"
 import bip39 from "bip39"
 import { mnemonicToAddressCached } from "./solana.js"
+import { parsePuzzleSource, PUZZLE_SOURCE_SQLITE } from "./puzzle-vault-env.js"
 
 const EVAL_CACHE_MAX = Math.min(
   Math.max(Number(process.env.EVAL_LRU_MAX) || 5000, 100),
@@ -33,14 +34,13 @@ export function hashMnemonic(m) {
   return crypto.createHash("sha256").update(n).digest("hex")
 }
 
-function parseConstraints() {
-  const raw = process.env.PUZZLE_CONSTRAINTS_JSON
-  if (!raw) return { fixed_positions: {} }
+export function parseConstraintsJson(raw) {
+  if (!raw || !String(raw).trim()) return { fixed_positions: {} }
   let j
   try {
-    j = JSON.parse(raw)
+    j = JSON.parse(String(raw).trim())
   } catch {
-    throw new Error("PUZZLE_CONSTRAINTS_JSON: invalid JSON")
+    throw new Error("constraints JSON: invalid JSON")
   }
   const fp = j.fixed_positions ?? {}
   const fixed_positions = {}
@@ -48,6 +48,10 @@ function parseConstraints() {
     fixed_positions[Number(k)] = String(v).trim().toLowerCase()
   }
   return { fixed_positions }
+}
+
+function parseConstraints() {
+  return parseConstraintsJson(process.env.PUZZLE_CONSTRAINTS_JSON)
 }
 
 function computeDifficulty(wordCount, constraints) {
@@ -59,7 +63,7 @@ function computeDifficulty(wordCount, constraints) {
   return "hard"
 }
 
-function loadPuzzle() {
+function loadPuzzleFromEnv() {
   const target_address = process.env.TARGET_ADDRESS?.trim()
   const solution_hash = process.env.SOLUTION_HASH?.trim()
   const wordsRaw = process.env.PUZZLE_WORDS?.trim()
@@ -97,7 +101,51 @@ function loadPuzzle() {
   }
 }
 
-export const PUZZLE = loadPuzzle()
+/** Mutable in-process puzzle; filled from env or from SQLite vault row. */
+export const PUZZLE = {
+  id: "001",
+  round_id: "default",
+  difficulty: "easy",
+  words: [],
+  solution_hash: "",
+  target_address: "",
+  constraints: { fixed_positions: {} },
+}
+
+if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE) {
+  Object.assign(PUZZLE, loadPuzzleFromEnv())
+}
+
+/**
+ * Apply active vault row to `PUZZLE` (must match `puzzles` table shape).
+ * @param {object} row - DB row with public_id, target_address, solution_hash, puzzle_words_csv, constraints_json?, round_id?, difficulty?
+ */
+export function applyPuzzleRowFromVault(row) {
+  const wordsRaw = row.puzzle_words_csv?.trim()
+  if (!wordsRaw) {
+    throw new Error("vault row missing puzzle_words_csv")
+  }
+  const words = wordsRaw
+    .split(",")
+    .map((w) => w.trim().toLowerCase())
+    .filter(Boolean)
+  if (words.length !== 12) {
+    throw new Error("vault puzzle_words_csv must contain exactly 12 comma-separated words")
+  }
+  const constraints = parseConstraintsJson(row.constraints_json || "{}")
+  const difficulty =
+    (row.difficulty && String(row.difficulty).trim().toLowerCase()) ||
+    computeDifficulty(words.length, constraints)
+  Object.assign(PUZZLE, {
+    id: String(row.public_id).trim(),
+    round_id: row.round_id?.trim() || "default",
+    difficulty,
+    words,
+    solution_hash: String(row.solution_hash).trim(),
+    target_address: String(row.target_address).trim(),
+    constraints,
+  })
+}
 
 /**
  * Parse signed claim messages.

@@ -19,6 +19,8 @@ node server.js
 
 Set **`REDIS_URL`** for persistence and horizontal scaling. Without it, the process uses **in-memory** state (dev only).
 
+**Optional SQLite puzzle vault:** set **`PUZZLE_SOURCE=sqlite`** plus vault env vars in `backend/.env.example`. Run `npm run vault-init -- migrate` then `npm run vault-init -- bootstrap-from-env` from **`backend/`** (uses the same **`TARGET_*` / `PUZZLE_WORDS`** as env mode for the first row). The server then loads the active **`unsolved`** puzzle from SQLite instead of static env fields. See **`docs/ENV_SETTINGS.md`** (Puzzle vault).
+
 Notes:
 - In `NODE_ENV=production`, backend now fails fast if `REDIS_URL` is missing.
 - Set **`ADMIN_CONTROL_KEY`** for admin routes (`x-admin-key` header): **`POST /payout/jobs/:jobId/attempt`**, **`POST /public/wizard-clear-solved`** (clears Redis winner state from the puzzle wizard).

@@ -1,6 +1,6 @@
 # SolveQuest Environment Settings Reference
 
-This file explains all environment variables currently used by the backend code.
+This file explains environment variables used by the backend code (including optional future-facing vault vars parsed in `puzzle-vault-env.js`).
 
 Use it alongside:
 - `backend/.env.example` (starter template)
@@ -232,6 +232,73 @@ Returned JSON (for **`/developers`** and **`puzzle-wizard.html`**):
 | `wizard_derive_enabled` | boolean | Whether **`POST /public/wizard-derive`** is allowed (production requires **`ALLOW_WIZARD_DERIVE`**) |
 
 There are **no** API keys, credits, or “request key” URLs in this response.
+
+---
+
+## Puzzle vault (SQLite automation)
+
+These variables configure **optional** automated puzzle rotation with **encrypted** solutions in **SQLite** and **QUEST** SPL funding.
+
+**Modules (backend):**
+- `puzzle-vault-env.js` — parses/validates env (`requireSqliteVaultEnv`, backup path helpers).
+- `puzzle-vault-backup.js` — copies the live DB before mutations; prunes to **`SQLITE_BACKUP_KEEP`** files matching `vault-*.db` in the backup dir.
+- `puzzle-vault-db.js` — when **`PUZZLE_SOURCE=sqlite`**, runs backup then opens SQLite via **`better-sqlite3`** and applies **`CREATE TABLE IF NOT EXISTS`** migrations only (no `DROP`, no delete of the file).
+
+**Droplet (SSH from your laptop, same vars as `deploy.sh`):** numbered helpers in `scripts/` — run **one at a time** and paste output if anything fails:
+- `droplet-vault-step0-env-hint.sh` (local only — prints `.env` template)
+- `droplet-vault-step1-deploy.sh` → `deploy.sh`
+- `droplet-vault-step2-mkdir.sh` — data dirs on server
+- `droplet-vault-step3-migrate.sh` — `vault-init migrate`
+- `droplet-vault-step4-bootstrap.sh` — `vault-init bootstrap-from-env`
+- `droplet-vault-step5-restart-check.sh` — `systemctl restart` + curl checks
+
+Override **`DEPLOY_TARGET`**, **`APP_DIR`**, **`SERVICE_NAME`**, **`PUBLIC_HEALTH_URL`** like `deploy.sh`.
+
+**CLI (repo root or `backend/`):** with `backend/.env` containing **`PUZZLE_SOURCE=sqlite`** and vault vars, from **`backend/`** run:
+- `npm run vault-init -- migrate` — create/migrate DB file only.
+- `npm run vault-init -- status` — row counts + active unsolved row.
+- `npm run vault-init -- bootstrap-from-env` — insert one **`unsolved`** row from **`TARGET_ADDRESS`**, **`SOLUTION_HASH`**, **`PUZZLE_WORDS`** (and optional **`PUZZLE_CONSTRAINTS_JSON`**, **`PUZZLE_ID`**, **`ROUND_ID`**, **`PUZZLE_DIFFICULTY`**). Fails if an unsolved row already exists unless **`--force`**.
+
+**`puzzles.puzzle_words_csv`:** 12 comma-separated words (normalized lowercase in DB) for display/evaluation; required for server load.
+
+Until **`PUZZLE_SOURCE=sqlite`** is wired into `puzzle.js` / `server.js`, leaving **`PUZZLE_SOURCE` unset or `env`** keeps today’s behavior (puzzle from **`TARGET_ADDRESS`** / **`PUZZLE_WORDS`** only).
+
+**Backup policy:**
+- On **open** (`openPuzzleVaultDatabase`): if the DB file **already exists** and is **non-empty**, copy it to the backup dir (then prune) **before** attaching. First boot (no file) skips backup.
+- Before **mutating** puzzle data (future rotation/insert/update), call **`backupPuzzleVaultBeforeWrite(vault)`** so each logical change is preceded by a file copy.
+- Schema uses **`IF NOT EXISTS`** only so migrations do not wipe existing tables.
+
+### `PUZZLE_SOURCE` (optional, default `env`)
+- **`env`** — Current model: puzzle from env at startup (`backend/puzzle.js`).
+- **`sqlite`** — Vault mode (requires all required vars below once enabled in code).
+
+### `SQLITE_PATH` (required when vault mode is active)
+- **Purpose:** Absolute or relative path to the SQLite database file.
+- **Used by:** vault module (later steps).
+
+### `SQLITE_BACKUP_DIR` (optional)
+- **Purpose:** Directory for timestamped file copies before mutations.
+- **Default:** `<parent of SQLITE_PATH>/puzzle-vault-backups` (resolved absolute).
+- **Used by:** backup helper (next step).
+
+### `SQLITE_BACKUP_KEEP` (optional, default `7`, max `50`)
+- **Purpose:** Retain at most this many backup files after each backup (oldest deleted first).
+- **Used by:** backup helper (next step).
+
+### `QUEST_OPERATOR_SECRET_KEY` (required when vault mode is active)
+- **Purpose:** Solana keypair secret (base58 or JSON byte array as elsewhere in Solana tooling). Used to **sign QUEST SPL transfers** to new puzzle addresses. The same material will feed **HKDF** for encrypting stored mnemonics (not raw key as AES key — see implementation plan).
+- **Security:** Never commit; restrict file permissions on `.env` and backup directory.
+
+### `QUEST_MINT` (required when vault mode is active)
+- **Purpose:** SPL token mint address for the QUEST token.
+
+### `QUEST_FUND_AMOUNT_RAW` (required when vault mode is active)
+- **Purpose:** Positive integer string in **smallest token units** (no decimals) transferred to each new puzzle **`TARGET_ADDRESS`** when funding runs.
+- **Example:** `1000000` for 1.0 tokens if mint uses 6 decimals.
+
+### `ENCRYPTION_HKDF_SALT_HEX` (optional)
+- **Purpose:** Extra HKDF salt as **hex** (minimum **16 hex characters** = 8 bytes if set). Strengthens key separation between deployments.
+- **If unset:** implementation uses a fixed application salt string (documented in code when encryption lands).
 
 ---
 

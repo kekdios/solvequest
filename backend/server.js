@@ -15,7 +15,13 @@ import {
   hashMnemonic,
   validationJson,
   parseSolveMessage,
+  applyPuzzleRowFromVault,
 } from "./puzzle.js"
+import { parsePuzzleSource, PUZZLE_SOURCE_SQLITE } from "./puzzle-vault-env.js"
+import {
+  openPuzzleVaultDatabase,
+  getActiveUnsolvedPuzzle,
+} from "./puzzle-vault-db.js"
 import { mnemonicToAddressCached, mnemonicToAddress } from "./solana.js"
 import { verifySolanaSignature } from "./verify.js"
 import {
@@ -80,7 +86,38 @@ function setNoStore(res) {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate")
   res.setHeader("Pragma", "no-cache")
 }
-let DISPLAY_WORDS = shuffle(PUZZLE.words)
+/** Shuffled display order; set in `refreshDisplayWords` after env or vault load. */
+let DISPLAY_WORDS = []
+
+function refreshDisplayWords() {
+  if (!PUZZLE.words?.length) {
+    throw new Error("PUZZLE.words is empty — set env puzzle or run vault bootstrap")
+  }
+  DISPLAY_WORDS = shuffle(PUZZLE.words)
+}
+
+if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE) {
+  refreshDisplayWords()
+}
+
+/** Open SQLite vault (PUZZLE_SOURCE=sqlite); kept open for future rotation. */
+export let puzzleVaultHandle = null
+
+function loadPuzzleFromSqliteVault() {
+  if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE) return
+  puzzleVaultHandle = openPuzzleVaultDatabase()
+  if (!puzzleVaultHandle) {
+    throw new Error("PUZZLE_SOURCE=sqlite but vault database did not open")
+  }
+  const row = getActiveUnsolvedPuzzle(puzzleVaultHandle.db)
+  if (!row) {
+    throw new Error(
+      "No unsolved puzzle in SQLite vault. From repo root run:\n  node scripts/vault-init.mjs bootstrap-from-env"
+    )
+  }
+  applyPuzzleRowFromVault(row)
+  refreshDisplayWords()
+}
 
 const sseClients = new Set()
 
@@ -962,6 +999,8 @@ async function main() {
   await initStore({
     onRedisBroadcast: localBroadcast,
   })
+
+  loadPuzzleFromSqliteVault()
 
   setInterval(() => {
     tickRoundLifecycle().catch(() => {})
