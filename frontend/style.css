@@ -222,15 +222,23 @@ body {
 }
 
 .puzzle-history {
-  margin-bottom: 1.1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
+  margin: 0 0 1.25rem;
+  padding: 12px 14px;
+  background: var(--panel);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.puzzle-history h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
 }
 
 .puzzle-history-hint {
-  margin-bottom: 8px;
-  font-size: 0.68rem;
-  line-height: 1.35;
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted);
 }
 
 .puzzle-history-body {
@@ -738,7 +746,7 @@ body {
 }
 
 #puzzle {
-  margin: 12px 0 20px;
+  margin: 12px 0 16px;
   font-weight: 600;
   line-height: 1.5;
   color: var(--accent);

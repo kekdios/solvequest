@@ -123,19 +123,19 @@
 
         <h2>Puzzle words</h2>
         <div id="puzzle" aria-live="polite"></div>
-      </div>
 
-      <aside class="arena-side" aria-label="Sidebar">
         <section class="puzzle-history" aria-labelledby="puzzle-history-title">
           <h2 id="puzzle-history-title">Recent puzzles</h2>
-          <p id="puzzle-history-hint" class="side-hint puzzle-history-hint">
+          <p id="puzzle-history-hint" class="puzzle-history-hint">
             Vault history (SQLite). Env-only servers have no list.
           </p>
           <div id="puzzle-history-body" class="puzzle-history-body" role="region" aria-live="polite">
             <p class="puzzle-history-placeholder">Loading…</p>
           </div>
         </section>
+      </div>
 
+      <aside class="arena-side" aria-label="Leaderboard">
         <div class="leaderboard-head">
           <h2>Leaderboard</h2>
           <button type="button" id="player-names-open" class="player-names-btn">
