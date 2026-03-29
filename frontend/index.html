@@ -34,12 +34,6 @@
           <span id="reward-usdc-text">— SAUSD</span>
         </span>
       </div>
-      <div class="arena-meta">
-        <span id="badge-open" class="badge badge-open">NOT SOLVED</span>
-        <span id="badge-solved" class="badge badge-solved" hidden>SOLVED</span>
-        <span id="badge-difficulty" class="badge">—</span>
-        <span id="badge-round" class="badge mono">round —</span>
-      </div>
     </header>
 
     <section class="arena-ticker" aria-live="polite">
@@ -181,8 +175,10 @@
       </dialog>
     </div>
 
-    <h3>Arena feed (SSE)</h3>
-    <div id="sse-logs"></div>
+    <details class="sse-feed">
+      <summary class="sse-feed-summary">Arena feed (SSE)</summary>
+      <div id="sse-logs"></div>
+    </details>
 
     <footer class="arena-footer">
       <p id="app-version" class="app-version" aria-live="polite">—</p>

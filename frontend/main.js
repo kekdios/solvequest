@@ -163,16 +163,8 @@ async function loadPuzzle() {
   document.getElementById("commitment-hash").textContent = data.solution_hash ?? "—"
   document.getElementById("commitment-addr").textContent = data.target_address ?? "—"
 
-  const diff = data.difficulty ?? "—"
-  document.getElementById("badge-difficulty").textContent =
-    typeof diff === "string" ? diff.toUpperCase() : String(diff)
-
-  const rid = data.round_id ?? "—"
-  document.getElementById("badge-round").textContent = `round ${rid}`
-
   const statusTicker = document.getElementById("ticker-puzzle-status")
   const statusWrap = document.getElementById("ticker-puzzle-status-wrap")
-  const badgeOpen = document.getElementById("badge-open")
   if (statusTicker) {
     statusTicker.textContent = isSolved ? "SOLVED" : "NOT SOLVED"
     statusTicker.classList.toggle("is-solved", isSolved)
@@ -181,10 +173,6 @@ async function loadPuzzle() {
   if (statusWrap) {
     statusWrap.classList.toggle("is-solved", isSolved)
     statusWrap.classList.toggle("is-open", !isSolved)
-  }
-  if (badgeOpen) {
-    badgeOpen.hidden = isSolved
-    badgeOpen.textContent = "NOT SOLVED"
   }
 
   if (countdownTimer) {
@@ -257,11 +245,9 @@ async function loadPuzzle() {
 
   const solvedPanel = document.getElementById("puzzle-solved-panel")
   const solvedDetail = document.getElementById("puzzle-solved-detail")
-  const solvedBadge = document.getElementById("badge-solved")
   const puzzleEl = document.getElementById("puzzle")
   if (isSolved) {
     if (solvedPanel) solvedPanel.hidden = false
-    if (solvedBadge) solvedBadge.hidden = false
     if (solvedDetail) {
       const wRaw = data.winner
       const w = wRaw != null && String(wRaw).trim() !== "" ? String(wRaw).trim() : ""
@@ -275,7 +261,6 @@ async function loadPuzzle() {
     if (puzzleEl) puzzleEl.classList.add("puzzle-words--solved")
   } else {
     if (solvedPanel) solvedPanel.hidden = true
-    if (solvedBadge) solvedBadge.hidden = true
     if (solvedDetail) solvedDetail.textContent = ""
     if (puzzleEl) puzzleEl.classList.remove("puzzle-words--solved")
   }
@@ -324,11 +309,17 @@ async function loadPrizeBalances() {
     const token =
       Number(p.prize_token_balance ?? p.usdc_balance)
     const sol = Number(p.sol_balance)
-    document.getElementById("prize-usdc-text").textContent = `SAUSD ${Number.isFinite(token) ? token.toFixed(2) : "—"}`
+    const sausdFmt = Number.isFinite(token)
+      ? Math.round(token).toLocaleString(undefined, {
+          maximumFractionDigits: 0,
+          minimumFractionDigits: 0,
+        })
+      : null
+    document.getElementById("prize-usdc-text").textContent =
+      sausdFmt != null ? `SAUSD ${sausdFmt}` : "SAUSD —"
     document.getElementById("prize-sol").textContent = `SOL ${Number.isFinite(sol) ? sol.toFixed(4) : "—"}`
-    document.getElementById("reward-usdc-text").textContent = Number.isFinite(token)
-      ? `${token.toLocaleString(undefined, { maximumFractionDigits: 2 })} SAUSD`
-      : "— SAUSD"
+    document.getElementById("reward-usdc-text").textContent =
+      sausdFmt != null ? `${sausdFmt} SAUSD` : "— SAUSD"
   } catch {
     /* ignore */
   }

@@ -116,28 +116,6 @@ body {
   }
 }
 
-.arena-meta {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.badge-solved {
-  color: var(--solved) !important;
-  border-color: color-mix(in srgb, var(--solved) 50%, var(--border)) !important;
-  background: color-mix(in srgb, var(--solved) 12%, var(--panel)) !important;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-
-.badge-open {
-  color: var(--accent) !important;
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important;
-  background: color-mix(in srgb, var(--accent) 14%, var(--panel)) !important;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-
 .ticker-cell--puzzle-status {
   border-width: 1px;
 }
@@ -161,24 +139,6 @@ body {
   color: var(--accent);
   font-weight: 800;
   letter-spacing: 0.04em;
-}
-
-.badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--muted);
-}
-
-#badge-difficulty {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
-  color: var(--accent);
 }
 
 .arena-ticker {
@@ -710,22 +670,52 @@ h3 {
   font-weight: 600;
 }
 
-#logs,
+.sse-feed {
+  margin-top: 1.5rem;
+}
+
+.sse-feed-summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1.05rem;
+  list-style: none;
+  user-select: none;
+  color: var(--text);
+}
+
+.sse-feed-summary::-webkit-details-marker {
+  display: none;
+}
+
+.sse-feed-summary::marker {
+  content: "";
+}
+
+.sse-feed-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.4em;
+  color: var(--muted);
+  font-size: 0.75em;
+  transform: translateY(-0.05em);
+}
+
+.sse-feed[open] .sse-feed-summary::before {
+  content: "▾";
+}
+
 #sse-logs {
+  margin-top: 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px;
   min-height: 100px;
   max-height: 220px;
   overflow-y: auto;
-  background: #0d0d0f;
-  font-family: ui-monospace, monospace;
-  font-size: 0.85rem;
-}
-
-#sse-logs {
   background: rgba(56, 189, 248, 0.05);
   border-color: rgba(56, 189, 248, 0.22);
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
 }
 
 .log-line {
