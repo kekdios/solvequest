@@ -1100,6 +1100,24 @@ a.api-pill {
   margin-bottom: 12px;
 }
 
+.new-puzzle-copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.new-puzzle-copy-feedback {
+  font-size: 0.82rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.new-puzzle-copy-feedback.is-error {
+  color: #f87171;
+}
+
 .new-puzzle-kv {
   margin-bottom: 12px;
 }

@@ -512,10 +512,92 @@ const newPuzzleDraftEl = document.getElementById("new-puzzle-draft")
 /** @type {null | Record<string, string | null>} */
 let newPuzzleDraft = null
 
+function buildNewPuzzleCopyBundleText(draft) {
+  if (!draft) return ""
+  const m = String(draft.mnemonic ?? "").trim()
+  const pid = String(draft.public_id ?? "").trim()
+  const ta = String(draft.target_address ?? "").trim()
+  const h = String(draft.solution_hash ?? "").trim()
+  const w = String(draft.puzzle_words ?? "").trim()
+  return [
+    `Mnemonic: ${m}`,
+    "",
+    `Public id: ${pid}`,
+    "",
+    `Target address: ${ta}`,
+    "",
+    `Solution hash: ${h}`,
+    "",
+    `12 words (CSV): ${w}`,
+  ].join("\n")
+}
+
+async function copyTextToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    try {
+      const ta = document.createElement("textarea")
+      ta.value = text
+      ta.setAttribute("readonly", "")
+      ta.style.position = "fixed"
+      ta.style.left = "-9999px"
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand("copy")
+      document.body.removeChild(ta)
+      return ok
+    } catch {
+      return false
+    }
+  }
+}
+
+function flashNewPuzzleCopyFeedback(ok) {
+  const el = document.getElementById("new-puzzle-copy-feedback")
+  if (!el) return
+  el.hidden = false
+  el.textContent = ok ? "Copied to clipboard" : "Copy failed — select fields above manually"
+  el.classList.toggle("is-error", !ok)
+  setTimeout(() => {
+    el.hidden = true
+    el.textContent = ""
+    el.classList.remove("is-error")
+  }, 2400)
+}
+
+async function copyNewPuzzleDraftBundle() {
+  const d = newPuzzleDraft
+  if (!d) {
+    setNewPuzzleError("Generate a draft first.")
+    return
+  }
+  const m = String(d.mnemonic ?? "").trim()
+  const pid = String(d.public_id ?? "").trim()
+  const ta = String(d.target_address ?? "").trim()
+  const h = String(d.solution_hash ?? "").trim()
+  const w = String(d.puzzle_words ?? "").trim()
+  if (!m || !pid || !ta || !h || !w) {
+    setNewPuzzleError("Draft is incomplete — regenerate.")
+    return
+  }
+  setNewPuzzleError("")
+  const text = buildNewPuzzleCopyBundleText(d)
+  const ok = await copyTextToClipboard(text)
+  flashNewPuzzleCopyFeedback(ok)
+}
+
 function resetNewPuzzleDialog() {
   newPuzzleDraft = null
   newPuzzleDraftEl?.setAttribute("hidden", "")
   if (newPuzzleAdminKey) newPuzzleAdminKey.value = ""
+  const fb = document.getElementById("new-puzzle-copy-feedback")
+  if (fb) {
+    fb.hidden = true
+    fb.textContent = ""
+    fb.classList.remove("is-error")
+  }
   const preIds = [
     "new-puzzle-show-mnemonic",
     "new-puzzle-show-public-id",
@@ -541,6 +623,12 @@ function setNewPuzzleError(msg) {
 }
 
 function showNewPuzzleDraft(draft) {
+  const fb = document.getElementById("new-puzzle-copy-feedback")
+  if (fb) {
+    fb.hidden = true
+    fb.textContent = ""
+    fb.classList.remove("is-error")
+  }
   newPuzzleDraft = draft
   const set = (id, text) => {
     const el = document.getElementById(id)
@@ -556,7 +644,12 @@ function showNewPuzzleDraft(draft) {
 }
 
 function setNewPuzzleBusy(busy) {
-  for (const id of ["new-puzzle-generate", "new-puzzle-regenerate", "new-puzzle-approve"]) {
+  for (const id of [
+    "new-puzzle-generate",
+    "new-puzzle-regenerate",
+    "new-puzzle-approve",
+    "new-puzzle-copy-bundle",
+  ]) {
     const b = document.getElementById(id)
     if (b) b.disabled = busy
   }
@@ -626,6 +719,9 @@ if (newPuzzleOpen && newPuzzleDlg) {
     newPuzzleDraftEl?.setAttribute("hidden", "")
     newPuzzleDraft = null
     fetchNewPuzzleDraft()
+  })
+  document.getElementById("new-puzzle-copy-bundle")?.addEventListener("click", () => {
+    void copyNewPuzzleDraftBundle()
   })
   document.getElementById("new-puzzle-approve")?.addEventListener("click", async () => {
     if (!newPuzzleErr || !newPuzzleAdminKey) return

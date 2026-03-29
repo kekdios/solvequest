@@ -277,6 +277,13 @@
       </div>
 
       <div id="verify-box" style="margin-top: 14px"></div>
+
+      <div class="row" style="margin-top: 18px">
+        <button type="button" class="primary" id="btn-copy-puzzle-bundle">
+          Copy all — Mnemonic, Public id, Target, Hash, 12 words (CSV)
+        </button>
+      </div>
+      <p id="copy-bundle-status" class="hint" style="margin-top: 8px; margin-bottom: 0"></p>
     </section>
 
     <section class="step">
@@ -614,6 +621,38 @@
       })
 
       document.getElementById("puzzle-id").addEventListener("input", updateEnvBlock)
+
+      document.getElementById("btn-copy-puzzle-bundle").addEventListener("click", async () => {
+        const statusEl = document.getElementById("copy-bundle-status")
+        const rawMn = document.getElementById("mnemonic").value.trim()
+        const pub = document.getElementById("puzzle-id").value.trim() || "001"
+        const target = document.getElementById("out-target").textContent.trim()
+        const hash = document.getElementById("out-hash").textContent.trim()
+        const words = document.getElementById("out-words").textContent.trim()
+        if (!rawMn || target === "—" || hash === "—" || words === "—") {
+          statusEl.innerHTML =
+            '<span class="bad">Enter a valid 12-word mnemonic and wait for derivation first.</span>'
+          return
+        }
+        const text = [
+          `Mnemonic: ${rawMn}`,
+          "",
+          `Public id: ${pub}`,
+          "",
+          `Target address: ${target}`,
+          "",
+          `Solution hash: ${hash}`,
+          "",
+          `12 words (CSV): ${words}`,
+        ].join("\n")
+        try {
+          await navigator.clipboard.writeText(text)
+          statusEl.innerHTML = '<span class="ok">Copied to clipboard.</span>'
+        } catch {
+          statusEl.innerHTML =
+            '<span class="bad">Clipboard failed — copy the fields in step 2 manually.</span>'
+        }
+      })
 
       document.getElementById("btn-clear-solved").addEventListener("click", async () => {
         const statusEl = document.getElementById("clear-solved-status")
