@@ -321,10 +321,10 @@ async function loadPrizeBalances() {
         })
       : null
     document.getElementById("prize-usdc-text").textContent =
-      sausdFmt != null ? `QUEST $${sausdFmt}` : "QUEST —"
+      sausdFmt != null ? `QUEST ${sausdFmt}` : "QUEST —"
     document.getElementById("prize-sol").textContent = `SOL ${Number.isFinite(sol) ? sol.toFixed(4) : "—"}`
     document.getElementById("reward-usdc-text").textContent =
-      sausdFmt != null ? `$${sausdFmt} QUEST` : "— QUEST"
+      sausdFmt != null ? `${sausdFmt} QUEST` : "— QUEST"
   } catch {
     /* ignore */
   }
