@@ -22,7 +22,17 @@
       </nav>
       <div class="arena-reward" aria-live="polite">
         <span class="reward-label">REWARD</span>
-        <span id="reward-usdc" class="reward-value">— SAUSD</span>
+        <span id="reward-usdc" class="reward-value sausd-with-icon">
+          <img
+            class="sausd-icon"
+            src="icon_sausd.png"
+            alt=""
+            width="36"
+            height="36"
+            aria-hidden="true"
+          />
+          <span id="reward-usdc-text">— SAUSD</span>
+        </span>
       </div>
       <div class="arena-meta">
         <span id="badge-open" class="badge badge-open">NOT SOLVED</span>
@@ -73,7 +83,17 @@
             <dd id="commitment-addr" class="mono"></dd>
             <dt>Prize wallet balances</dt>
             <dd class="prize-balances">
-              <span id="prize-usdc" class="prize-usdc">SAUSD —</span>
+              <span id="prize-usdc" class="prize-usdc sausd-with-icon">
+                <img
+                  class="sausd-icon"
+                  src="icon_sausd.png"
+                  alt=""
+                  width="22"
+                  height="22"
+                  aria-hidden="true"
+                />
+                <span id="prize-usdc-text">SAUSD —</span>
+              </span>
               <span id="prize-sol" class="prize-sol mono">SOL —</span>
             </dd>
           </dl>

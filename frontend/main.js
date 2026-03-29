@@ -324,11 +324,11 @@ async function loadPrizeBalances() {
     const token =
       Number(p.prize_token_balance ?? p.usdc_balance)
     const sol = Number(p.sol_balance)
-    document.getElementById("prize-usdc").textContent = `SAUSD ${Number.isFinite(token) ? token.toFixed(2) : "—"}`
+    document.getElementById("prize-usdc-text").textContent = `SAUSD ${Number.isFinite(token) ? token.toFixed(2) : "—"}`
     document.getElementById("prize-sol").textContent = `SOL ${Number.isFinite(sol) ? sol.toFixed(4) : "—"}`
-    document.getElementById("reward-usdc").textContent = Number.isFinite(token)
+    document.getElementById("reward-usdc-text").textContent = Number.isFinite(token)
       ? `${token.toLocaleString(undefined, { maximumFractionDigits: 2 })} SAUSD`
-      : "—"
+      : "— SAUSD"
   } catch {
     /* ignore */
   }

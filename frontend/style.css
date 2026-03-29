@@ -71,6 +71,23 @@ body {
   text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 65%, transparent);
 }
 
+.sausd-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sausd-icon {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.reward-value.sausd-with-icon .sausd-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
 .arena-title {
   display: flex;
   flex-direction: column;
@@ -557,11 +574,16 @@ body {
 }
 
 .prize-usdc {
-  display: inline-block;
+  display: inline-flex;
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--accent);
   text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.prize-usdc.sausd-with-icon .sausd-icon {
+  width: 1.35rem;
+  height: 1.35rem;
 }
 
 .prize-sol {
