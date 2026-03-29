@@ -85,7 +85,34 @@
             <dt>SHA-256 (normalized mnemonic)</dt>
             <dd id="commitment-hash" class="mono"></dd>
             <dt>Target Solana address (m/44&prime;/501&prime;/0&prime;/0&prime;)</dt>
-            <dd id="commitment-addr" class="mono"></dd>
+            <dd class="commitment-addr-wrap">
+              <span id="commitment-addr" class="mono commitment-addr-text"></span>
+              <a
+                id="commitment-solscan"
+                class="solscan-link"
+                href="https://solscan.io/"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="View on Solscan"
+                aria-label="View wallet on Solscan"
+                hidden
+              >
+                <svg
+                  class="solscan-link-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </a>
+            </dd>
             <dt>Prize wallet balances</dt>
             <dd class="prize-balances">
               <span id="prize-usdc" class="prize-usdc token-with-icon">

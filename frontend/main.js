@@ -150,6 +150,13 @@ function fmtShortPubkey(pk) {
   return `${pk.slice(0, 4)}…${pk.slice(-4)}`
 }
 
+/** Base58 Solana pubkey shape (explorer links only; not full cryptographic validation). */
+function isLikelySolanaPubkey(s) {
+  const t = String(s ?? "").trim()
+  if (t.length < 32 || t.length > 44) return false
+  return /^[1-9A-HJ-NP-Za-km-z]+$/.test(t)
+}
+
 async function loadPuzzle() {
   try {
     const res = await fetch(`${API}/puzzle`, { cache: "no-store" })
@@ -167,7 +174,18 @@ async function loadPuzzle() {
 
     document.getElementById("puzzle").innerText = data.words.join(" ")
     document.getElementById("commitment-hash").textContent = data.solution_hash ?? "—"
-    document.getElementById("commitment-addr").textContent = data.target_address ?? "—"
+    const addrText = data.target_address != null ? String(data.target_address).trim() : ""
+    document.getElementById("commitment-addr").textContent = addrText || "—"
+    const solscan = document.getElementById("commitment-solscan")
+    if (solscan) {
+      if (addrText && isLikelySolanaPubkey(addrText)) {
+        solscan.href = `https://solscan.io/account/${encodeURIComponent(addrText)}`
+        solscan.hidden = false
+      } else {
+        solscan.hidden = true
+        solscan.setAttribute("href", "https://solscan.io/")
+      }
+    }
 
     const statusTicker = document.getElementById("ticker-puzzle-status")
     const statusWrap = document.getElementById("ticker-puzzle-status-wrap")
