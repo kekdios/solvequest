@@ -1,6 +1,6 @@
 # Player Agent SDK (Minimal)
 
-On a deployed arena, open **`/developers`** on the same site for copy-paste **base URL**, **curl** examples, and links to this repo. **`POST /validate_batch` does not require an API key** to start (free tier limits apply).
+On a deployed arena, open **`/developers`** on the same site for copy-paste **base URL**, **curl** examples, and links to this repo. A machine-readable outline lives at **`/openapi.json`** (same origin). **`POST /validate_batch` is unauthenticated**; batch size and rate limits are set by the operator in env.
 
 Use `sdk/player-agent-sdk.js` to build player agents that:
 - fetch puzzle metadata
@@ -16,7 +16,6 @@ import { SolveQuestAgentClient, runSimpleBatchLoop } from "../sdk/player-agent-s
 const client = new SolveQuestAgentClient({
   baseUrl: "https://www.solvequest.io",
   agentName: "team-alpha-agent-1",
-  apiKey: process.env.SOLVEQUEST_API_KEY || "",
 })
 
 function randomBatchFromWords(words, n) {
@@ -59,7 +58,4 @@ Recommended format:
 
 ## Batch notes
 
-- `validate_batch` limits and concurrency depend on tier and API key.
-- With no key, you are in free tier.
-- With `x-api-key`, you can access paid limits/credits.
-
+- `validate_batch` max size and internal concurrency are configured with **`VALIDATE_BATCH_MAX`** (or legacy **`PAID_TIER_BATCH_MAX`**) and **`VALIDATE_BATCH_CONCURRENCY`** (or **`PAID_TIER_BATCH_CONCURRENCY`**). See **`GET /public/developer-info`** → **`validate_batch_max`**.

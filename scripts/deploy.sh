@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # Local deploy helper for SolveQuest.
+# Deploys backend + static frontend (arena, /developers, puzzle-wizard, openapi.json, etc.).
 # Runs from your Mac and executes safe deploy steps on the droplet over SSH.
 #
 # Usage:

@@ -1,6 +1,7 @@
 {
   "name": "solvequest-backend",
   "version": "0.1.10",
+  "description": "SolveQuest arena API (Express). Batch validation has no API keys; limits are env-driven.",
   "type": "module",
   "scripts": {
     "start": "node server.js",

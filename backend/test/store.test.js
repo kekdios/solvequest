@@ -8,8 +8,6 @@ import {
   getLeaderboardScore,
   getLeaderboardRank1Based,
   getLeaderboard,
-  consumeBatchCredits,
-  CREDITS_SCALE_UNITS,
 } from "../store.js"
 
 before(async () => {
@@ -18,11 +16,6 @@ before(async () => {
 
 after(async () => {
   await closeStore()
-})
-
-test("CREDITS_SCALE_UNITS is positive integer", () => {
-  assert.ok(Number.isInteger(CREDITS_SCALE_UNITS))
-  assert.ok(CREDITS_SCALE_UNITS >= 1)
 })
 
 test("getLeaderboardRank1Based order", async () => {
@@ -62,10 +55,3 @@ test("recordLeaderboardWin dominates near-miss score", async () => {
   assert.equal(await getLeaderboardRank1Based(w), 1)
 })
 
-test("consumeBatchCredits debits micro-units in memory", async () => {
-  const r = await consumeBatchCredits("sk_test_fixture", 1000)
-  assert.equal(r.ok, true)
-  const r2 = await consumeBatchCredits("sk_test_fixture", 999_000_000)
-  assert.equal(r2.ok, false)
-  assert.equal(r2.error, "insufficient_credits")
-})

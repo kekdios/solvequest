@@ -28,6 +28,7 @@ effective_port="$(
 echo "[launch] Backend + frontend: http://127.0.0.1:${effective_port}"
 echo "[launch] Arena: http://127.0.0.1:${effective_port}/index.html"
 echo "[launch] Developers: http://127.0.0.1:${effective_port}/developers"
+echo "[launch] OpenAPI: http://127.0.0.1:${effective_port}/openapi.json"
 echo "[launch] Puzzle wizard: http://127.0.0.1:${effective_port}/puzzle-wizard.html"
 echo "[launch] Health: http://127.0.0.1:${effective_port}/health"
 exec node server.js

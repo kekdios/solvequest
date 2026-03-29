@@ -43,7 +43,6 @@ import {
   setCachedClaimResult,
   publishArenaEvent,
   isRedisEnabled,
-  consumeBatchCredits,
   getExtendedStats,
   recordConstraintReject,
   recordInvalidMnemonic,
@@ -51,10 +50,7 @@ import {
   recordValidTargetMiss,
   consumeSignedMessageOnce,
   getRoundState,
-  getApiKeyTier,
-  isApiKeyValid,
   recordLeaderboardConstraintPenalty,
-  CREDITS_SCALE_UNITS,
   maybeSendRoundEndEvent,
   maybeSettleRound,
   maybeArchiveRound,
@@ -88,35 +84,24 @@ let DISPLAY_WORDS = shuffle(PUZZLE.words)
 
 const sseClients = new Set()
 
-const FREE_TIER_BATCH_MAX = Math.min(
-  Math.max(Number(process.env.FREE_TIER_BATCH_MAX) || 50, 1),
-  500
-)
-const PAID_TIER_BATCH_MAX = Math.min(
-  Math.max(Number(process.env.PAID_TIER_BATCH_MAX) || 1000, 1),
+const BATCH_MAX = Math.min(
+  Math.max(
+    Number(process.env.VALIDATE_BATCH_MAX) ||
+      Number(process.env.PAID_TIER_BATCH_MAX) ||
+      1000,
+    1
+  ),
   2000
 )
-const BATCH_MAX = Math.min(
-  Math.max(Number(process.env.VALIDATE_BATCH_MAX) || PAID_TIER_BATCH_MAX, 1),
-  PAID_TIER_BATCH_MAX
-)
-const FREE_TIER_BATCH_CONCURRENCY = Math.min(
-  Math.max(Number(process.env.FREE_TIER_BATCH_CONCURRENCY) || 8, 1),
+const BATCH_CONCURRENCY = Math.min(
+  Math.max(
+    Number(process.env.VALIDATE_BATCH_CONCURRENCY) ||
+      Number(process.env.PAID_TIER_BATCH_CONCURRENCY) ||
+      32,
+    1
+  ),
   128
 )
-const PAID_TIER_BATCH_CONCURRENCY = Math.min(
-  Math.max(Number(process.env.PAID_TIER_BATCH_CONCURRENCY) || 32, 1),
-  128
-)
-const BATCH_CONCURRENCY = PAID_TIER_BATCH_CONCURRENCY
-const BATCH_CREDIT_BASE =
-  process.env.BATCH_CREDIT_BASE != null && process.env.BATCH_CREDIT_BASE !== ""
-    ? Number(process.env.BATCH_CREDIT_BASE)
-    : 0
-const BATCH_CREDIT_UNIT =
-  process.env.BATCH_CREDIT_UNIT != null && process.env.BATCH_CREDIT_UNIT !== ""
-    ? Number(process.env.BATCH_CREDIT_UNIT)
-    : 1
 
 const CLAIM_WINDOW_SEC = Math.min(
   Math.max(Number(process.env.CLAIM_SIGNATURE_WINDOW_SEC) || 30, 5),
@@ -386,35 +371,6 @@ function buildWizardDerivationFromNormalizedPhrase(n) {
   }
 }
 
-async function batchCreditsMiddleware(req, res, next) {
-  const n = Array.isArray(req.body?.mnemonics) ? req.body.mnemonics.length : 0
-  const key = req.headers["x-api-key"]
-  if (key?.trim() && !(await isApiKeyValid(key))) {
-    return res.status(401).json({ error: "invalid_api_key" })
-  }
-  const tier = await getApiKeyTier(key)
-  const maxBatch = tier === "free" ? FREE_TIER_BATCH_MAX : PAID_TIER_BATCH_MAX
-  if (n > maxBatch) {
-    return res.status(400).json({
-      error: "batch_too_large",
-      max: maxBatch,
-      tier,
-    })
-  }
-  const costMicro = Math.round(
-    (BATCH_CREDIT_BASE + n * BATCH_CREDIT_UNIT) * CREDITS_SCALE_UNITS
-  )
-  req.batchTier = tier
-  req.batchConcurrency =
-    tier === "free" ? FREE_TIER_BATCH_CONCURRENCY : PAID_TIER_BATCH_CONCURRENCY
-  const r = await consumeBatchCredits(key, costMicro)
-  if (!r.ok) {
-    const code = r.error === "insufficient_credits" ? 402 : 401
-    return res.status(code).json({ error: r.error, cost })
-  }
-  next()
-}
-
 app.get("/health", (_req, res) => {
   res.json({ ok: true })
 })
@@ -424,13 +380,11 @@ app.get("/version", (_req, res) => {
   res.json({ version: APP_VERSION })
 })
 
-/** Public metadata for /developers (optional operator links + limits). */
+/** Public metadata for /developers (batch limits + rate caps + wizard flag). */
 app.get("/public/developer-info", (_req, res) => {
   res.setHeader("Cache-Control", "public, max-age=60")
   res.json({
-    api_key_request_url: process.env.API_KEY_REQUEST_URL?.trim() || "",
-    api_key_request_email: process.env.API_KEY_REQUEST_EMAIL?.trim() || "",
-    free_tier_batch_max: FREE_TIER_BATCH_MAX,
+    validate_batch_max: BATCH_MAX,
     rate_limit_validate_batch_per_sec:
       Number(process.env.RATE_LIMIT_VALIDATE_BATCH_MAX) || 20,
     wizard_derive_enabled: isWizardDeriveEnabled(),
@@ -584,40 +538,34 @@ app.post("/validate", validateLimiter, async (req, res) => {
   res.json(validationJson(ev))
 })
 
-app.post(
-  "/validate_batch",
-  validateBatchLimiter,
-  batchCreditsMiddleware,
-  async (req, res) => {
-    const { mnemonics } = req.body ?? {}
-    if (!Array.isArray(mnemonics)) {
-      return res.status(400).json({ error: "mnemonics must be an array" })
-    }
-    if (mnemonics.length > BATCH_MAX) {
-      return res.status(400).json({
-        error: `batch too large (max ${BATCH_MAX})`,
-      })
-    }
-
-    await recordBatchItems(mnemonics.length)
-
-    try {
-      const conc = req.batchConcurrency ?? BATCH_CONCURRENCY
-      const results = await mapWithConcurrency(
-        mnemonics,
-        conc,
-        async (m) => {
-          const ev = await evalAndRecord(m)
-          return validationJson(ev)
-        }
-      )
-      res.json(results)
-    } catch (e) {
-      console.error(e)
-      res.status(500).json({ error: "batch_failed" })
-    }
+app.post("/validate_batch", validateBatchLimiter, async (req, res) => {
+  const { mnemonics } = req.body ?? {}
+  if (!Array.isArray(mnemonics)) {
+    return res.status(400).json({ error: "mnemonics must be an array" })
   }
-)
+  if (mnemonics.length > BATCH_MAX) {
+    return res.status(400).json({
+      error: `batch too large (max ${BATCH_MAX})`,
+    })
+  }
+
+  await recordBatchItems(mnemonics.length)
+
+  try {
+    const results = await mapWithConcurrency(
+      mnemonics,
+      BATCH_CONCURRENCY,
+      async (m) => {
+        const ev = await evalAndRecord(m)
+        return validationJson(ev)
+      }
+    )
+    res.json(results)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: "batch_failed" })
+  }
+})
 
 app.get("/events", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream")

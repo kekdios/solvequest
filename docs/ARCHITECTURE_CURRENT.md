@@ -15,7 +15,7 @@ A submission is evaluated against:
 The system supports:
 - interactive browser gameplay (`/submit`)
 - signed-claim lane for stronger trust (`/claim`)
-- batch validation API with credits (`/validate_batch`)
+- batch validation API with no API keys (`/validate_batch`; limits from env)
 - realtime feed and leaderboard
 
 ## 2) System Components
@@ -44,12 +44,14 @@ The system supports:
 
 ## Store Layer (`backend/store.js`)
 - Redis + in-memory implementations behind one API
-- Tracks global stats, winner state, leaderboard ZSET, rounds, claim lock/idempotency, credits
+- Tracks global stats, winner state, leaderboard ZSET, rounds, claim lock/idempotency
 - Publishes/subscribes realtime events on Redis channel `arena:events` when Redis is enabled
 
-## Frontend (`frontend/index.html`, `frontend/main.js`)
-- Arena UI showing puzzle words, commitments, constraints, countdown, stats, leaderboard
-- Uses SSE (`GET /events`) for live updates
+## Frontend (`frontend/`)
+- **`index.html` + `main.js` + `style.css`**: arena UI (puzzle words, commitments, SAUSD display, countdown, stats, leaderboard, collapsible SSE log)
+- **`developers.html`**: agent documentation (same-origin `curl` examples; reads `GET /public/developer-info`)
+- **`puzzle-wizard.html`**: operator tool for deriving `.env` fields and clearing solved state (`wizard-derive`, `wizard-clear-solved` with admin key)
+- Uses SSE (`GET /events`) for live updates; `puzzle_cleared` events refresh solved UI
 - Submits via `POST /submit`
 
 ## 3) Runtime Modes
@@ -57,7 +59,7 @@ The system supports:
 ## Redis mode (recommended for deploy)
 Enabled when `REDIS_URL` is configured.
 - Shared winner state across instances
-- Shared leaderboard/stats/credits
+- Shared leaderboard/stats
 - Redis-backed claim lock and idempotency
 - Pub/sub fan-out for SSE across instances
 
@@ -119,8 +121,7 @@ Recommended production flags:
 
 - `POST /validate_batch`
   - body: `{ mnemonics: string[] }`
-  - supports free vs paid tier limits
-  - optional `x-api-key` for paid credits path
+  - max batch size and concurrency from env (`VALIDATE_BATCH_MAX`, `VALIDATE_BATCH_CONCURRENCY`; legacy `PAID_TIER_*` fallbacks)
   - concurrent processing with capped concurrency
 
 - `POST /submit`
@@ -136,9 +137,18 @@ Recommended production flags:
   - returns top list and optional self metrics (`rank`, `gap_to_leader`)
 
 - `GET /events` (SSE)
-  - realtime event stream (`hello`, `attempt`, `leaderboard_update`, `submit`, `claim`, `win`, `round_end`, `round_settled`)
+  - realtime event stream (`hello`, `attempt`, `leaderboard_update`, `submit`, `claim`, `win`, `puzzle_cleared`, `round_end`, `round_settled`, …)
 
-## 6) Stats, Leaderboard, and Economics
+- `GET /public/developer-info`
+  - `validate_batch_max`, `rate_limit_validate_batch_per_sec`, `wizard_derive_enabled`
+
+- `POST /public/wizard-derive` (operator; off in production unless `ALLOW_WIZARD_DERIVE`)
+  - derives target, hash, word lists for `puzzle-wizard.html`
+
+- `POST /public/wizard-clear-solved` (`x-admin-key` = `ADMIN_CONTROL_KEY`)
+  - deletes `puzzle:winner` and `puzzle:claim_lock` in Redis (or in-memory equivalents); emits `puzzle_cleared`
+
+## 6) Stats and Leaderboard
 
 ## Stats
 Tracked metrics include:
@@ -153,12 +163,6 @@ Tracked metrics include:
 - Smaller +1 increments on valid-checksum near misses (`valid_but_wrong`)
 - Optional negative penalty on constraint violations (`LEADERBOARD_CONSTRAINT_PENALTY`)
 - Per-wallet per-second increment cap applies to near-miss increments only (`LEADERBOARD_MAX_INCR_PER_SEC`)
-
-## API credits (`/validate_batch`)
-- Cost formula: `BATCH_CREDIT_BASE + (n * BATCH_CREDIT_UNIT)` scaled by `CREDITS_SCALE_UNITS`
-- Stored as integer `credits_micro` per API key
-- Free tier when no key; paid tier limits/concurrency for valid keys
-- Suggested USDC alignment: `CREDITS_SCALE_UNITS=1000000`
 
 ## 7) Round Lifecycle
 
@@ -205,16 +209,26 @@ solvequest/
 ├── frontend/
 │   ├── index.html
 │   ├── main.js
-│   └── style.css
+│   ├── style.css
+│   ├── developers.html
+│   ├── puzzle-wizard.html
+│   ├── openapi.json
+│   └── … (static assets)
+├── sdk/
+│   └── player-agent-sdk.js
+├── scripts/
+│   ├── deploy.sh
+│   └── launch.sh
 └── docs/
-    └── ARCHITECTURE_CURRENT.md
+    ├── ARCHITECTURE_CURRENT.md
+    ├── ENV_SETTINGS.md
+    └── PLAYER_AGENT_SDK.md
 ```
 
 ## 10) Known Caveats (Current Code)
 
 - In-memory mode is not persistence-safe and not horizontally safe.
-- There is currently no automated on-chain USDC deposit -> API key crediting flow in this repo.
-- The batch credit error response path in `backend/server.js` references `cost` in one branch where only `costMicro` exists; that branch should be corrected before strict production rollout.
+- `POST /validate_batch` is intentionally unauthenticated; abuse is mitigated with IP rate limits and batch size caps (tune via env).
 
 ## 11) Quick Start Commands
 

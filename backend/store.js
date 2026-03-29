@@ -34,35 +34,11 @@ const LEADERBOARD_WIN_POINTS = Math.max(
   Math.floor(Number(process.env.LEADERBOARD_WIN_POINTS) || 100_000)
 )
 
-/** 1 display credit = CREDITS_SCALE_UNITS integer (default 1000). */
-export const CREDITS_SCALE_UNITS = Math.max(
-  1,
-  Math.floor(Number(process.env.CREDITS_SCALE_UNITS) || 1000)
-)
-
 /** SET winner NX + DEL claim lock in one script */
 const LUA_WIN_AND_RELEASE_LOCK = `
 local ok = redis.call('SET', KEYS[1], ARGV[1], 'NX')
 if not ok then return 0 end
 redis.call('DEL', KEYS[2])
-return 1
-`
-
-/** Atomic credit deduction (integer micro-units); returns 1 ok, -1 insufficient, -2 missing key */
-const LUA_DEDUCT_CREDITS = `
-local key = KEYS[1]
-local cost = tonumber(ARGV[1])
-if not cost or cost < 0 then return redis.error_reply('BAD') end
-local micro = redis.call('HGET', key, 'credits_micro')
-if not micro then
-  local legacy = redis.call('HGET', key, 'credits')
-  if not legacy then return -2 end
-  micro = tostring(math.floor(tonumber(legacy) * 1000))
-  redis.call('HSET', key, 'credits_micro', micro)
-end
-local c = tonumber(micro)
-if not c or c < cost then return -1 end
-redis.call('HINCRBY', key, 'credits_micro', -cost)
 return 1
 `
 
@@ -90,7 +66,6 @@ function mem() {
       roundId: null,
       claimLock: false,
       claimResults: {},
-      apiKeys: {},
       roundSettledFor: null,
       roundEndEventSentFor: null,
       roundLeaderboardWinner: null,
@@ -150,26 +125,6 @@ export async function initStore(options = {}) {
     const dur = Number(process.env.ROUND_DURATION_SEC)
     if (Number.isFinite(dur) && dur > 0) {
       m0.roundEndMs = Date.now() + dur * 1000
-    }
-    const raw = process.env.API_KEYS_JSON?.trim()
-    if (raw) {
-      try {
-        const j = JSON.parse(raw)
-        for (const [k, v] of Object.entries(j)) {
-          const scale = CREDITS_SCALE_UNITS
-          const micro =
-            v.credits_micro != null
-              ? Math.floor(Number(v.credits_micro))
-              : Math.round(Math.max(0, Number(v.credits) || 0) * scale)
-          mem().apiKeys[k] = {
-            credits_micro: micro,
-            tier: v.tier || "paid",
-          }
-        }
-        console.log("[store] Loaded API_KEYS_JSON for in-memory keys")
-      } catch (e) {
-        console.error("[store] API_KEYS_JSON parse error", e)
-      }
     }
   }
 }
@@ -719,26 +674,6 @@ export async function startNewRound({
   return { round_id: rid, round_start_ms: startMs, round_end_ms: endMs }
 }
 
-export async function isApiKeyValid(apiKeyHeader) {
-  if (!apiKeyHeader?.trim()) return false
-  const key = apiKeyHeader.trim()
-  if (redis) {
-    return (await redis.exists(`apikey:${key}`)) === 1
-  }
-  return !!mem().apiKeys[key]
-}
-
-export async function getApiKeyTier(apiKeyHeader) {
-  if (!apiKeyHeader?.trim()) return "free"
-  const key = apiKeyHeader.trim()
-  if (redis) {
-    const t = await redis.hGet(`apikey:${key}`, "tier")
-    return t || "paid"
-  }
-  const info = mem().apiKeys[key]
-  return info?.tier || "paid"
-}
-
 export async function consumeSignedMessageOnce(pubkey, message) {
   const h = crypto.createHash("sha256").update(message, "utf8").digest("hex")
   const key = `claim:msg:${pubkey}:${h}`
@@ -872,44 +807,6 @@ export async function publishArenaEvent(event) {
   if (redis) {
     await redis.publish(CHANNEL_EVENTS, JSON.stringify(event))
   }
-}
-
-/** cost = integer micro-units (caller multiplies human credits by CREDITS_SCALE_UNITS). */
-export async function consumeBatchCredits(apiKeyHeader, costMicro) {
-  const c = Number(costMicro)
-  if (!Number.isFinite(c) || c <= 0) return { ok: true, tier: "free" }
-  if (!apiKeyHeader?.trim()) return { ok: true, tier: "free" }
-  const key = apiKeyHeader.trim()
-  const redisKey = `apikey:${key}`
-
-  if (redis) {
-    const r = await redis.eval(LUA_DEDUCT_CREDITS, {
-      keys: [redisKey],
-      arguments: [String(Math.floor(c))],
-    })
-    if (r === -2 || r === null) {
-      return { ok: false, error: "invalid_api_key" }
-    }
-    if (r === -1) {
-      return { ok: false, error: "insufficient_credits" }
-    }
-    const tier = (await redis.hGet(redisKey, "tier")) || "paid"
-    return { ok: true, tier }
-  }
-
-  const m = mem()
-  const info = m.apiKeys[key]
-  if (!info) return { ok: false, error: "invalid_api_key" }
-  let micro = Number(info.credits_micro)
-  if (!Number.isFinite(micro)) {
-    micro = Math.round(Math.max(0, Number(info.credits) || 0) * CREDITS_SCALE_UNITS)
-    info.credits_micro = micro
-  }
-  if (micro < c) {
-    return { ok: false, error: "insufficient_credits" }
-  }
-  info.credits_micro = micro - Math.floor(c)
-  return { ok: true, tier: info.tier || "paid" }
 }
 
 export async function getExtendedStats() {

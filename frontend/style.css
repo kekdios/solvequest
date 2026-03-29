@@ -734,6 +734,10 @@ h3 {
 /* Developer entry (arena) */
 .arena-nav {
   align-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
 .arena-nav a {
   color: var(--accent);
@@ -872,32 +876,6 @@ a.api-pill {
 }
 .dev-steps code {
   font-size: 0.88em;
-}
-
-.dev-key-request {
-  margin: 0.75rem 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.dev-btn {
-  display: inline-block;
-  padding: 10px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
-  font-size: 0.95rem;
-}
-.dev-btn:hover {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-}
-.dev-link {
-  color: var(--accent);
-  font-weight: 600;
 }
 
 .dev-example-note {

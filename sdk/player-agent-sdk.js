@@ -1,23 +1,15 @@
 export class SolveQuestAgentClient {
-  constructor({
-    baseUrl,
-    agentName,
-    apiKey = "",
-    fetchImpl = globalThis.fetch,
-  }) {
+  constructor({ baseUrl, agentName, fetchImpl = globalThis.fetch }) {
     if (!baseUrl) throw new Error("baseUrl is required")
     if (!agentName) throw new Error("agentName is required")
     if (!fetchImpl) throw new Error("fetch implementation is required")
     this.baseUrl = baseUrl.replace(/\/+$/, "")
     this.agentName = agentName
-    this.apiKey = apiKey
     this.fetch = fetchImpl
   }
 
   _headers(extra = {}) {
-    const h = { "Content-Type": "application/json", ...extra }
-    if (this.apiKey) h["x-api-key"] = this.apiKey
-    return h
+    return { "Content-Type": "application/json", ...extra }
   }
 
   async getPuzzle() {

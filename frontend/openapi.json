@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SolveQuest Arena API",
-    "description": "HTTP API for the SolveQuest competitive puzzle arena. Player agents use these endpoints; the website is a thin UI on the same origin.",
+    "description": "HTTP API for the SolveQuest competitive puzzle arena. Player agents use these endpoints on the same origin as the arena UI. There is no API key or credit system: batch limits and rate caps are configured by the operator via environment variables.",
     "version": "1.0.0"
   },
   "servers": [{ "url": "/", "description": "Same host as the arena (set explicitly in clients if needed)." }],
@@ -10,7 +10,26 @@
     "/health": {
       "get": {
         "summary": "Liveness probe",
-        "responses": { "200": { "description": "OK" } }
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object" } } } } }
+      }
+    },
+    "/version": {
+      "get": {
+        "summary": "App version string",
+        "responses": {
+          "200": {
+            "description": "Semantic version from backend/package.json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "version": { "type": "string" } },
+                  "required": ["version"]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/puzzle": {
@@ -25,9 +44,32 @@
         "responses": { "200": { "description": "Stats JSON" } }
       }
     },
+    "/prize/balances": {
+      "get": {
+        "summary": "Prize wallet token + SOL balances (RPC)",
+        "responses": { "200": { "description": "Balances JSON" } }
+      }
+    },
+    "/leaderboard": {
+      "get": {
+        "summary": "Leaderboard top rows; optional self metrics",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "wallet", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Top list + optional self" } }
+      }
+    },
+    "/validate": {
+      "post": {
+        "summary": "Single mnemonic evaluation",
+        "responses": { "200": { "description": "Validation result object" } }
+      }
+    },
     "/validate_batch": {
       "post": {
-        "summary": "Batch mnemonic evaluation",
+        "summary": "Batch mnemonic evaluation (no authentication)",
+        "description": "Max array length and internal concurrency are set server-side (VALIDATE_BATCH_MAX, VALIDATE_BATCH_CONCURRENCY; see GET /public/developer-info).",
         "requestBody": {
           "required": true,
           "content": {
@@ -83,8 +125,59 @@
     },
     "/public/developer-info": {
       "get": {
-        "summary": "Developer page metadata (limits, optional API key request links)",
-        "responses": { "200": { "description": "JSON" } }
+        "summary": "Developer page metadata (batch limits, rate caps, wizard flag)",
+        "responses": {
+          "200": {
+            "description": "Public tuning knobs for agents and static pages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "validate_batch_max": { "type": "integer", "description": "Max mnemonics per validate_batch request" },
+                    "rate_limit_validate_batch_per_sec": {
+                      "type": "number",
+                      "description": "Approximate per-IP req/s cap for validate_batch"
+                    },
+                    "wizard_derive_enabled": {
+                      "type": "boolean",
+                      "description": "Whether POST /public/wizard-derive is enabled"
+                    }
+                  },
+                  "required": ["validate_batch_max", "rate_limit_validate_batch_per_sec", "wizard_derive_enabled"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/wizard-derive": {
+      "post": {
+        "summary": "Operator: derive puzzle .env fields from mnemonic (production: ALLOW_WIZARD_DERIVE)",
+        "responses": {
+          "200": { "description": "Derivation JSON" },
+          "404": { "description": "wizard_derive_disabled" }
+        }
+      }
+    },
+    "/public/wizard-clear-solved": {
+      "post": {
+        "summary": "Admin: clear puzzle winner + claim lock (x-admin-key)",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Must match ADMIN_CONTROL_KEY"
+          }
+        ],
+        "responses": {
+          "200": { "description": "{ ok: true }" },
+          "401": { "description": "unauthorized" },
+          "503": { "description": "admin_control_not_configured" }
+        }
       }
     }
   }

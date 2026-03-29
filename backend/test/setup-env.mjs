@@ -13,6 +13,3 @@ process.env.PUZZLE_WORDS =
   "estate,refuse,glad,rare,only,faith,maximum,wide,army,hub,rent,wisdom"
 process.env.PUZZLE_ID = process.env.PUZZLE_ID || "001"
 delete process.env.REDIS_URL
-process.env.API_KEYS_JSON = JSON.stringify({
-  sk_test_fixture: { credits: 100, tier: "paid" },
-})

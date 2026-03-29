@@ -90,14 +90,7 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Used by:** `backend/server.js`.
 - **How:** client must send `x-admin-key: <ADMIN_CONTROL_KEY>` for:
   - `POST /payout/jobs/:jobId/attempt`
-
-### `API_KEY_REQUEST_URL` (optional)
-- **Purpose:** URL for “Request API key” on `/developers` (e.g. Google Form).
-- **Used by:** `backend/server.js` (`GET /public/developer-info`).
-
-### `API_KEY_REQUEST_EMAIL` (optional)
-- **Purpose:** Shown as mailto on `/developers` when operators prefer email over a form.
-- **Used by:** `backend/server.js` (`GET /public/developer-info`).
+  - `POST /public/wizard-clear-solved` (clear `puzzle:winner` + claim lock; used by `puzzle-wizard.html`)
 
 ### `ALLOW_WIZARD_DERIVE` (optional)
 - **Purpose:** In **`NODE_ENV=production`**, enables **`POST /public/wizard-derive`** used by **`puzzle-wizard.html`** (mnemonic in JSON body). In non-production, the endpoint is on by default unless set to a falsy value (`0`, `false`, `no`, `off`).
@@ -107,6 +100,10 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 
 ### `WIZARD_DERIVE_MAX_PER_MIN` (optional, default `40`)
 - **Purpose:** Rate limit for **`/public/wizard-derive`** per IP per minute (clamped 5–200).
+- **Used by:** `backend/server.js`.
+
+### `WIZARD_CLEAR_SOLVED_MAX_PER_MIN` (optional, default `20`)
+- **Purpose:** Rate limit for **`/public/wizard-clear-solved`** per IP per minute (clamped 3–100).
 - **Used by:** `backend/server.js`.
 
 ### `PAYOUT_AMOUNT_USDC` (optional, default `0`)
@@ -205,50 +202,36 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 
 ---
 
-## Batch validation / credits settings
+## Batch validation settings
 
-### `FREE_TIER_BATCH_MAX` (optional, default `50`, max `500`)
-- **Purpose:** Max batch size without API key.
+### `VALIDATE_BATCH_MAX` (optional, default `1000`, max `2000`)
+- **Purpose:** Max mnemonics per `POST /validate_batch` request.
+- **Used by:** `backend/server.js`.
+- **Note:** If unset, **`PAID_TIER_BATCH_MAX`** is still read as a fallback for existing deployments.
+
+### `VALIDATE_BATCH_CONCURRENCY` (optional, default `32`, max `128`)
+- **Purpose:** Parallel evaluation concurrency inside a batch handler.
+- **Used by:** `backend/server.js`.
+- **Note:** **`PAID_TIER_BATCH_CONCURRENCY`** is accepted as a fallback alias.
+
+### `PAID_TIER_BATCH_MAX` / `PAID_TIER_BATCH_CONCURRENCY` (optional, legacy aliases)
+- **Purpose:** Same as **`VALIDATE_BATCH_MAX`** / **`VALIDATE_BATCH_CONCURRENCY`** when the newer names are unset.
 - **Used by:** `backend/server.js`.
 
-### `PAID_TIER_BATCH_MAX` (optional, default `1000`, max `2000`)
-- **Purpose:** Max batch size with paid key.
-- **Used by:** `backend/server.js`.
+---
 
-### `VALIDATE_BATCH_MAX` (optional)
-- **Purpose:** Hard cap safety on batch size inside handler.
-- **Used by:** `backend/server.js`.
+## Public developer metadata
 
-### `FREE_TIER_BATCH_CONCURRENCY` (optional, default `8`, max `128`)
-- **Purpose:** Internal processing concurrency for free tier.
-- **Used by:** `backend/server.js`.
+### `GET /public/developer-info` (no env vars — response shape)
+Returned JSON (for **`/developers`** and **`puzzle-wizard.html`**):
 
-### `PAID_TIER_BATCH_CONCURRENCY` (optional, default `32`, max `128`)
-- **Purpose:** Internal processing concurrency for paid tier.
-- **Used by:** `backend/server.js`.
+| Field | Type | Meaning |
+|-------|------|--------|
+| `validate_batch_max` | number | Max mnemonics per `POST /validate_batch` |
+| `rate_limit_validate_batch_per_sec` | number | Express rate-limit ceiling for that route (see **`RATE_LIMIT_VALIDATE_BATCH_MAX`**) |
+| `wizard_derive_enabled` | boolean | Whether **`POST /public/wizard-derive`** is allowed (production requires **`ALLOW_WIZARD_DERIVE`**) |
 
-### `BATCH_CREDIT_BASE` (optional, default `0`)
-- **Purpose:** Fixed base credit charge per batch request.
-- **Used by:** `backend/server.js`.
-
-### `BATCH_CREDIT_UNIT` (optional, default `1`)
-- **Purpose:** Per-item credit charge in batch.
-- **Used by:** `backend/server.js`.
-
-### `CREDITS_SCALE_UNITS` (optional, default `1000`)
-- **Purpose:** Integer micro-unit scale for credits.
-- **Used by:** `backend/store.js`.
-- **Recommendation:** `1000000` for USDC-aligned accounting.
-
-### `API_KEYS_JSON` (optional, dev/in-memory mode)
-- **Purpose:** Seed API keys when Redis is not used.
-- **Used by:** `backend/store.js`.
-- **Format example:**
-  ```json
-  {
-    "sk_test_abc": { "credits_micro": 1000000, "tier": "paid" }
-  }
-  ```
+There are **no** API keys, credits, or “request key” URLs in this response.
 
 ---
 
@@ -292,5 +275,5 @@ For production, the key priorities are:
 1. set required puzzle values
 2. enable Redis
 3. enforce strong claim flags
-4. tune limits/pricing only as needed
+4. tune HTTP rate limits and batch size only as needed
 

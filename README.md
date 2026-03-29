@@ -1,6 +1,6 @@
 # SolveQuest PoC
 
-Competition backend with **Redis** (optional in-memory fallback), **atomic claims**, **Solana signatures**, **batch validation + credits**, and **SSE** (Redis pub/sub when Redis is enabled).
+Competition backend with **Redis** (optional in-memory fallback), **atomic claims**, **Solana signatures**, **batch validation** (no API keys), and **SSE** (Redis pub/sub when Redis is enabled).
 
 ## Arena terminology
 
@@ -21,7 +21,7 @@ Set **`REDIS_URL`** for persistence and horizontal scaling. Without it, the proc
 
 Notes:
 - In `NODE_ENV=production`, backend now fails fast if `REDIS_URL` is missing.
-- Set **`ADMIN_CONTROL_KEY`** for admin routes such as **`POST /payout/jobs/:jobId/attempt`** (`x-admin-key` header).
+- Set **`ADMIN_CONTROL_KEY`** for admin routes (`x-admin-key` header): **`POST /payout/jobs/:jobId/attempt`**, **`POST /public/wizard-clear-solved`** (clears Redis winner state from the puzzle wizard).
 
 Round automation (new):
 
@@ -42,6 +42,7 @@ PAYOUT_MAX_RETRIES=5
 ```
 
 API:
+- `GET /openapi.json` — machine-readable route outline (same origin as the arena)
 - `GET /payout/jobs`
 - `POST /payout/jobs/:jobId/attempt` (admin key required)
 
@@ -196,8 +197,8 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 
 ## Player agent SDK
 
-- **Live docs (same origin as the arena):** `/developers` — no-key first call, hello-world loop, optional key request links via `API_KEY_REQUEST_*` env
-- **OpenAPI outline:** `/openapi.json`
+- **Live docs (same origin as the arena):** `/developers` — hello-world loop, limits from `GET /public/developer-info`
+- **OpenAPI:** `/openapi.json` (batch limits, developer-info shape, wizard routes)
 - SDK file: `sdk/player-agent-sdk.js`
 - Guide: `docs/PLAYER_AGENT_SDK.md`
 
@@ -241,16 +242,11 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 - `valid_target_misses`
 - `address_mismatches` (claim: mnemonic valid but `pubkey` ≠ derived address)
 
-### API keys + batch credits
+### Batch validation (`POST /validate_batch`)
 
-**USDC mental model (Solana-only):** use **USDC** as the stable unit when you set prices — same **6 decimals** as SPL **USDC** on Solana (**1 USDC = 1_000_000** smallest units). Recommended: set **`CREDITS_SCALE_UNITS=1000000`** and treat **`credits_micro`** in Redis as **USDC base units**, so a confirmed on-chain USDC deposit can **`HINCRBY`** the same integer you see in a wallet explorer. **`BATCH_CREDIT_BASE`** / **`BATCH_CREDIT_UNIT`** are then **USDC amounts** (e.g. **`0.01`** = one cent per mnemonic when **`UNIT`** applies per item). The default **`CREDITS_SCALE_UNITS=1000`** in code is a generic “milli-credit” scale; switch to **`1000000`** when you want **1:1** parity with USDC micro-units.
-
-- Header **`x-api-key`** on **`POST /validate_batch`** (optional). Invalid key → **401** before batch size checks.
-- **Free (no key):** max batch **`FREE_TIER_BATCH_MAX`** (default **50**), concurrency **`FREE_TIER_BATCH_CONCURRENCY`** (default **8**).
-- **Paid key (`tier paid`):** **`PAID_TIER_BATCH_MAX`** (default **1000**), **`PAID_TIER_BATCH_CONCURRENCY`** (default **32**).
-- **Cost:** **`BATCH_CREDIT_BASE + n * BATCH_CREDIT_UNIT`** in *human* credits; billed as **integer micro-units** (**`CREDITS_SCALE_UNITS`**, default **1000** = 1.000 credits). Redis field **`credits_micro`** (**`HINCRBY`**); legacy **`credits`** (float) is migrated on first debit. Insufficient credits → **402**.
-- Without Redis: optional **`API_KEYS_JSON`**: use **`credits_micro`** or **`credits`** (converted × scale).
-- With Redis: **`HSET apikey:<key> credits_micro <n> tier paid`** (micro-units), or legacy **`credits`** for migration.
+- **No API keys or credits.** Max mnemonics per request: **`VALIDATE_BATCH_MAX`** (default **1000**, cap **2000**), or legacy **`PAID_TIER_BATCH_MAX`** if **`VALIDATE_BATCH_MAX`** is unset.
+- Internal concurrency: **`VALIDATE_BATCH_CONCURRENCY`** (default **32**), or **`PAID_TIER_BATCH_CONCURRENCY`** as fallback.
+- Per-IP rate limit: **`RATE_LIMIT_VALIDATE_BATCH_MAX`** (default **20** req/s).
 
 ### Puzzle metadata
 
@@ -261,7 +257,7 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 
 - With **Redis**: events are **`PUBLISH arena:events`**; each instance **subscribes** and pushes to its local SSE clients (no double delivery on the publishing node).
 - Without Redis: local broadcast only.
-- Structured types include **`attempt`**, **`leaderboard_update`** (with **`top`** preview), **`round_end`**, **`round_settled`** ( **`leaderboard_winner`**, **`puzzle_winner`** ), plus existing **`claim`** / **`submit`** / **`win`**.
+- Structured types include **`attempt`**, **`leaderboard_update`** (with **`top`** preview), **`round_end`**, **`round_settled`** ( **`leaderboard_winner`**, **`puzzle_winner`** ), **`puzzle_cleared`** (winner cleared for a new round), plus **`claim`** / **`submit`** / **`win`**.
 
 ---
 
@@ -269,11 +265,14 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 
 | Endpoint | Notes |
 |----------|--------|
+| `GET /version` | `{ version }` from `backend/package.json` (arena footer) |
+| `GET /public/developer-info` | `validate_batch_max`, `rate_limit_validate_batch_per_sec`, `wizard_derive_enabled` (for `/developers` + wizard UI) |
 | `POST /claim` | Body: `mnemonic`, `pubkey`, `signature` (base58), signed `message` (binding + optional round; see above) |
-| `POST /validate_batch` | Optional `x-api-key`; credits = `BATCH_CREDIT_BASE + n * BATCH_CREDIT_UNIT` |
+| `POST /validate_batch` | Body `{ mnemonics }`; no auth; size cap and concurrency from env (see Batch validation) |
 | `GET /stats` | Counters + `attempts_per_sec`, `valid_rate`, arena time |
 | `GET /leaderboard` | `?limit=&wallet=` → `{ top, self? }` |
-| Others | See earlier phases (`/validate`, `/submit`, `/puzzle`, …) |
+| `GET /prize/balances` | Prize wallet SAUSD + SOL balances (RPC) |
+| Others | `/validate`, `/submit`, `/puzzle`, `/events`, operator wizard routes under `/public/wizard-*` |
 
 ---
 
@@ -291,7 +290,6 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 | `puzzle:winner` | Winner id (`SET NX`) |
 | `puzzle:claim_lock` | Short TTL global lock for claim evaluation |
 | `claim:result:{pubkey}:{mnemonic_hash}` | Idempotency cache |
-| `apikey:{key}` | Credits + tier |
 | `arena:events` | Pub/sub channel for SSE fan-out |
 
 ---
@@ -299,4 +297,3 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 ## Operational notes
 
 - **Horizontal scaling**: require **Redis**; point all instances at the same **`REDIS_URL`**.
-- **Pricing (USDC):** tune **`BATCH_CREDIT_BASE`** / **`BATCH_CREDIT_UNIT`** in USDC; fund keys by incrementing **`credits_micro`** from on-chain USDC deposits (no fiat).
