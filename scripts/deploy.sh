@@ -4,6 +4,7 @@ set -euo pipefail
 # Local deploy helper for SolveQuest.
 # Deploys backend + static frontend (arena, /developers, puzzle-wizard, openapi.json, etc.).
 # Runs from your Mac and executes safe deploy steps on the droplet over SSH.
+# Arena shows a red "Vault empty" banner when GET /puzzle returns vault_empty: true (sqlite, no unsolved row).
 #
 # Usage:
 #   ./scripts/deploy.sh
@@ -95,6 +96,13 @@ if echo "${PUB_VER}" | grep -q "\"version\":\"${LOCAL_VER}\""; then
 else
   echo "WARNING: Public /version does not match local package.json." >&2
   echo "  Push commits to origin, redeploy, or fix APP_DIR / branch on the server." >&2
+fi
+
+echo "==> Public GET /puzzle (vault_empty — red arena banner when true)"
+if command -v python3 >/dev/null 2>&1; then
+  curl -fsS "${PUBLIC_BASE}/puzzle" | python3 -c "import sys, json; d=json.load(sys.stdin); print('vault_empty:', d.get('vault_empty', False))"
+else
+  curl -fsS "${PUBLIC_BASE}/puzzle" >/dev/null && echo "GET /puzzle OK (install python3 to print vault_empty in deploy log)"
 fi
 
 echo "==> Deploy completed successfully."

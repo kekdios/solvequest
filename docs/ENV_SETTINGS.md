@@ -261,7 +261,7 @@ Override **`DEPLOY_TARGET`**, **`APP_DIR`**, **`SERVICE_NAME`**, **`PUBLIC_HEALT
 
 **`puzzles.puzzle_words_csv`:** 12 comma-separated words (normalized lowercase in DB) for display/evaluation; required for server load.
 
-**Empty vault after migrate:** If there is no unsolved row yet, the server still starts and uses **`TARGET_ADDRESS`**, **`SOLUTION_HASH`**, **`PUZZLE_WORDS`** from `.env` (same values you will insert with **`bootstrap-from-env`**). After bootstrap, **restart** so the active puzzle is read from SQLite.
+**Empty vault after migrate:** If there is no unsolved row yet, the server still starts and uses **`TARGET_ADDRESS`**, **`SOLUTION_HASH`**, **`PUZZLE_WORDS`** from `.env` (same values you will insert with **`bootstrap-from-env`**). After bootstrap, **restart** so the active puzzle is read from SQLite. **`GET /puzzle`** includes **`vault_empty: true`** in that state; the arena shows a **red “Vault empty”** banner until the vault has an unsolved row and the process has been restarted.
 
 Leaving **`PUZZLE_SOURCE` unset or `env`** keeps the classic model (puzzle from env only, no SQLite vault).
 

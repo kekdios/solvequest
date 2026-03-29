@@ -159,6 +159,11 @@ async function loadPuzzle() {
   /** Authoritative: API can keep round_active/phase "active" after a win — UI must not show "open" then. */
   const isSolved = data.solved === true
 
+  const vaultBanner = document.getElementById("vault-empty-banner")
+  if (vaultBanner) {
+    vaultBanner.hidden = data.vault_empty !== true
+  }
+
   document.getElementById("puzzle").innerText = data.words.join(" ")
   document.getElementById("commitment-hash").textContent = data.solution_hash ?? "—"
   document.getElementById("commitment-addr").textContent = data.target_address ?? "—"

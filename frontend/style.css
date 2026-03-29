@@ -34,6 +34,30 @@ body {
   margin-left: 0;
 }
 
+.vault-empty-banner {
+  background: color-mix(in srgb, #dc2626 18%, var(--panel));
+  border: 1px solid #b91c1c;
+  border-radius: 8px;
+  color: #fecaca;
+  padding: 0.65rem 1rem;
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.vault-empty-banner strong {
+  color: #fee2e2;
+}
+
+.vault-empty-banner code {
+  font-size: 0.82em;
+  color: #fde68a;
+  background: color-mix(in srgb, #000 35%, transparent);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
 .arena-header {
   display: flex;
   flex-wrap: wrap;

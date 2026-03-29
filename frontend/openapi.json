@@ -35,7 +35,25 @@
     "/puzzle": {
       "get": {
         "summary": "Current puzzle and round metadata",
-        "responses": { "200": { "description": "Puzzle JSON" } }
+        "description": "Includes vault_empty (boolean): when true, PUZZLE_SOURCE=sqlite but there is no unsolved row in the vault and the server is serving TARGET_ADDRESS / PUZZLE_WORDS from env until bootstrap + restart.",
+        "responses": {
+          "200": {
+            "description": "Puzzle JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "vault_empty": {
+                      "type": "boolean",
+                      "description": "True if sqlite vault has no unsolved row (env fallback active)."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/stats": {

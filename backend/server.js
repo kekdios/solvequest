@@ -104,18 +104,26 @@ if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE) {
 /** Open SQLite vault (PUZZLE_SOURCE=sqlite); kept open for future rotation. */
 export let puzzleVaultHandle = null
 
+/** True when PUZZLE_SOURCE=sqlite but there is no unsolved row (puzzle served from env until bootstrap + restart). */
+export let puzzleVaultEmpty = false
+
 function loadPuzzleFromSqliteVault() {
-  if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE) return
+  if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE) {
+    puzzleVaultEmpty = false
+    return
+  }
   puzzleVaultHandle = openPuzzleVaultDatabase()
   if (!puzzleVaultHandle) {
     throw new Error("PUZZLE_SOURCE=sqlite but vault database did not open")
   }
   const row = getActiveUnsolvedPuzzle(puzzleVaultHandle.db)
   if (row) {
+    puzzleVaultEmpty = false
     applyPuzzleRowFromVault(row)
     refreshDisplayWords()
     return
   }
+  puzzleVaultEmpty = true
   // Empty vault after migrate: keep process up for deploy/health checks; same env vars bootstrap-from-env will insert.
   console.warn(
     "[vault] No unsolved row in SQLite yet — using TARGET_ADDRESS / PUZZLE_WORDS from env. Run vault-init bootstrap-from-env then restart to read from the vault."
@@ -510,6 +518,8 @@ app.get("/puzzle", async (_req, res) => {
     difficulty: PUZZLE.difficulty,
     words: DISPLAY_WORDS,
     solved: state.solved,
+    // True when sqlite vault has no unsolved row (env fallback); arena shows red operator banner.
+    vault_empty: puzzleVaultEmpty,
     solution_hash: PUZZLE.solution_hash,
     target_address: PUZZLE.target_address,
     constraints: PUZZLE.constraints,

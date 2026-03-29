@@ -37,6 +37,17 @@
       </div>
     </header>
 
+    <div
+      id="vault-empty-banner"
+      class="vault-empty-banner"
+      hidden
+      role="alert"
+    >
+      <strong>Vault empty</strong> — SQLite has no unsolved puzzle row. This page is using
+      <strong>env fallback</strong> (not the vault). Run
+      <code>vault-init bootstrap-from-env</code> on the server, then restart the backend.
+    </div>
+
     <section class="arena-ticker" aria-live="polite">
       <div class="ticker-cell ticker-cell--puzzle-status" id="ticker-puzzle-status-wrap">
         <span class="ticker-label">Solved?</span>
