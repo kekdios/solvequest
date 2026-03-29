@@ -307,6 +307,17 @@ export async function trySetWinnerAtomic(winnerId) {
   return true
 }
 
+/** Clear winner + claim lock (e.g. new round after deploy). Does not change loaded PUZZLE from .env. */
+export async function clearPuzzleWinnerState() {
+  if (redis) {
+    await redis.del(PUZZLE_WINNER_KEY, CLAIM_LOCK_KEY)
+    return
+  }
+  const m = mem()
+  m.winner = null
+  m.claimLock = false
+}
+
 const LOCK_TTL_SEC = Math.min(
   Math.max(Number(process.env.CLAIM_LOCK_TTL_SEC) || 5, 1),
   30

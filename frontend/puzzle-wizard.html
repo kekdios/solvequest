@@ -141,6 +141,10 @@
         color: #f87171;
         font-size: 0.85rem;
       }
+      .muted {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
       .env-block {
         white-space: pre-wrap;
         word-break: break-all;
@@ -305,6 +309,22 @@
         <li>Restart backend; run <code>curl</code> validate test from README.</li>
       </ul>
       <p class="hint"><a href="/developers">Developer API</a> · <a href="/">Arena</a></p>
+    </section>
+
+    <section class="step">
+      <h2>6) Clear SOLVED state (Redis / memory)</h2>
+      <p class="hint" style="margin: 0 0 12px">
+        After you update server <code>.env</code> and <strong>restart</strong> the backend, the arena can still show
+        <strong>SOLVED</strong> if <code>puzzle:winner</code> remained in Redis. This removes the winner and claim
+        lock only — it does <strong>not</strong> reload puzzle words from disk (that still requires restart with new
+        env).
+      </p>
+      <label for="admin-key-clear">ADMIN_CONTROL_KEY (header <code>x-admin-key</code>)</label>
+      <input type="password" id="admin-key-clear" autocomplete="off" placeholder="Same value as in backend .env" />
+      <div class="row">
+        <button type="button" class="primary" id="btn-clear-solved">Clear winner on server</button>
+      </div>
+      <p class="hint" id="clear-solved-status" style="margin-top: 10px; margin-bottom: 0"></p>
     </section>
 
     <script type="module">
@@ -599,6 +619,44 @@
 
       document.getElementById("puzzle-id").addEventListener("input", updateEnvBlock)
       document.getElementById("round-id").addEventListener("input", updateEnvBlock)
+
+      document.getElementById("btn-clear-solved").addEventListener("click", async () => {
+        const statusEl = document.getElementById("clear-solved-status")
+        const key = document.getElementById("admin-key-clear").value.trim()
+        if (!key) {
+          statusEl.innerHTML = '<span class="bad">Enter ADMIN_CONTROL_KEY.</span>'
+          return
+        }
+        statusEl.innerHTML = '<span class="muted">Clearing…</span>'
+        try {
+          const res = await fetch("/public/wizard-clear-solved", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-admin-key": key,
+            },
+            body: "{}",
+          })
+          const data = await res.json().catch(() => ({}))
+          if (res.status === 503 && data.error === "admin_control_not_configured") {
+            statusEl.innerHTML =
+              '<span class="bad">Server has no <code>ADMIN_CONTROL_KEY</code> set — add it to <code>backend/.env</code> and restart.</span>'
+            return
+          }
+          if (res.status === 401) {
+            statusEl.innerHTML = '<span class="bad">Wrong admin key.</span>'
+            return
+          }
+          if (!res.ok) {
+            statusEl.innerHTML = `<span class="bad">${data.error || res.status}</span>`
+            return
+          }
+          statusEl.innerHTML =
+            '<span class="ok">Cleared. Open the arena (or wait for SSE) — it should show unsolved if the running puzzle matches.</span>'
+        } catch (e) {
+          statusEl.innerHTML = `<span class="bad">${String(e.message || e)}</span>`
+        }
+      })
 
       document.querySelectorAll(".copy-btn").forEach((btn) => {
         if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML

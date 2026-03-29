@@ -424,6 +424,7 @@ function connectEvents() {
       }
       if (
         t === "win" ||
+        t === "puzzle_cleared" ||
         (t === "submit" && (payload.status === "win" || payload.status === "already_solved"))
       ) {
         loadPuzzle()

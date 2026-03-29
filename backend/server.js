@@ -33,6 +33,7 @@ import {
   getPuzzleState,
   trySetWinner,
   trySetWinnerAtomic,
+  clearPuzzleWinnerState,
   recordLeaderboardAttempt,
   recordLeaderboardWin,
   getLeaderboard,
@@ -359,6 +360,13 @@ const wizardDeriveLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const wizardClearSolvedLimiter = rateLimit({
+  windowMs: 60_000,
+  max: Math.min(Math.max(Number(process.env.WIZARD_CLEAR_SOLVED_MAX_PER_MIN) || 20, 3), 100),
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 /** Wizard: canonical + Fisher–Yates scrambled pool + fixed first/last for .env */
 function buildWizardDerivationFromNormalizedPhrase(n) {
   const wordArr = n.split(" ")
@@ -474,6 +482,25 @@ app.post("/public/wizard-derive", wizardDeriveLimiter, (req, res) => {
       word_count: 12,
       ...d,
     })
+  }
+)
+
+/**
+ * Clear Redis/in-memory puzzle winner + claim lock so the arena shows unsolved for the
+ * currently running process (same .env). Requires ADMIN_CONTROL_KEY via x-admin-key.
+ */
+app.post(
+  "/public/wizard-clear-solved",
+  wizardClearSolvedLimiter,
+  requireAdminControl,
+  async (_req, res) => {
+    try {
+      await clearPuzzleWinnerState()
+      broadcast({ type: "puzzle_cleared", puzzle_id: PUZZLE.id })
+      res.json({ ok: true })
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
   }
 )
 
