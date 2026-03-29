@@ -131,7 +131,7 @@ Also test a wrong permutation (same words, different order) and verify it does n
 
 Your prize wallet is the wallet controlled by the canonical mnemonic.
 
-- Send prize tokens (for example USDC) to `TARGET_ADDRESS`.
+- Send prize tokens (default **SAUSD** mint `CK9PodBifHymLBGeZujExFnpoLCsYxAw7t8c8LsDKLxG`, override with **`PRIZE_SPL_MINT`**) and SOL to `TARGET_ADDRESS`.
 - Also send enough **SOL** for transaction fees/rent.
 
 Typical operational minimum: keep at least ~`0.01` SOL available, and prefer a buffer (for example `0.02` to `0.05` SOL) to avoid payout operations failing due to fee starvation.

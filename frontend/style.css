@@ -225,7 +225,7 @@ body {
   font-size: 0.75rem;
 }
 
-.runner-names-hint {
+.player-names-hint {
   margin-top: -4px;
   font-size: 0.7rem;
   opacity: 0.9;
@@ -244,7 +244,7 @@ body {
   margin: 0;
 }
 
-.runner-names-btn {
+.player-names-btn {
   padding: 6px 12px;
   font-size: 0.8rem;
   border-radius: 8px;
@@ -255,11 +255,11 @@ body {
   cursor: pointer;
 }
 
-.runner-names-btn:hover {
+.player-names-btn:hover {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
-.runner-dialog {
+.player-dialog {
   max-width: min(26rem, 94vw);
   width: 100%;
   padding: 0;
@@ -270,40 +270,40 @@ body {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
 }
 
-.runner-dialog::backdrop {
+.player-dialog::backdrop {
   background: rgba(0, 0, 0, 0.55);
 }
 
-.runner-dialog-inner {
+.player-dialog-inner {
   padding: 18px 18px 14px;
   border-bottom: 1px solid var(--border);
 }
 
-.runner-dialog h3 {
+.player-dialog h3 {
   margin: 0 0 8px;
   font-size: 1.05rem;
 }
 
-.runner-dialog-desc {
+.player-dialog-desc {
   margin: 0 0 14px;
   font-size: 0.82rem;
   color: var(--muted);
   line-height: 1.45;
 }
 
-.runner-field {
+.player-field {
   display: block;
   margin-bottom: 12px;
 }
 
-.runner-field span {
+.player-field span {
   display: block;
   font-size: 0.75rem;
   color: var(--muted);
   margin-bottom: 4px;
 }
 
-.runner-field input {
+.player-field input {
   width: 100%;
   padding: 8px 10px;
   border-radius: 8px;
@@ -314,20 +314,20 @@ body {
   font-size: 0.82rem;
 }
 
-.runner-form-error {
+.player-form-error {
   margin: 0 0 10px;
   font-size: 0.82rem;
   color: #f87171;
 }
 
-.runner-dialog-actions {
+.player-dialog-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
 }
 
-.runner-btn {
+.player-btn {
   padding: 8px 14px;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -338,16 +338,16 @@ body {
   font-size: 0.88rem;
 }
 
-.runner-btn.primary {
+.player-btn.primary {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.runner-list-wrap {
+.player-list-wrap {
   padding: 14px 18px 18px;
 }
 
-.runner-list-title {
+.player-list-title {
   margin: 0 0 8px;
   font-size: 0.8rem;
   color: var(--muted);
@@ -355,7 +355,7 @@ body {
   letter-spacing: 0.06em;
 }
 
-.runner-saved-list {
+.player-saved-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -363,7 +363,7 @@ body {
   overflow-y: auto;
 }
 
-.runner-saved-list li {
+.player-saved-list li {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -373,21 +373,21 @@ body {
   font-size: 0.82rem;
 }
 
-.runner-saved-list li:last-child {
+.player-saved-list li:last-child {
   border-bottom: none;
 }
 
-.runner-saved-meta {
+.player-saved-meta {
   min-width: 0;
   flex: 1;
 }
 
-.runner-saved-name {
+.player-saved-name {
   font-weight: 600;
   color: var(--accent);
 }
 
-.runner-saved-addr {
+.player-saved-addr {
   display: block;
   font-family: ui-monospace, monospace;
   font-size: 0.72rem;
@@ -396,7 +396,7 @@ body {
   margin-top: 2px;
 }
 
-.runner-saved-remove {
+.player-saved-remove {
   flex-shrink: 0;
   padding: 4px 8px;
   font-size: 0.75rem;
@@ -407,7 +407,7 @@ body {
   cursor: pointer;
 }
 
-.runner-saved-remove:hover {
+.player-saved-remove:hover {
   color: #f87171;
   border-color: #f87171;
 }

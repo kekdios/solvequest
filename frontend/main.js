@@ -5,9 +5,10 @@ const MY_WALLET =
     ? localStorage.getItem("solvequest_wallet") || "user_ui"
     : "user_ui"
 
-const RUNNER_ROSTER_KEY = "solvequest_runner_roster_v1"
+const PLAYER_ROSTER_KEY = "solvequest_player_roster_v1"
+const LEGACY_RUNNER_ROSTER_KEY = "solvequest_runner_roster_v1"
 /** Display names: letter/digit first, then letters, numbers, space, - _ ' */
-const RUNNER_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9 _'\-]{0,31}$/
+const PLAYER_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9 _'\-]{0,31}$/
 
 function escapeHtml(s) {
   if (s == null) return ""
@@ -16,9 +17,16 @@ function escapeHtml(s) {
   return d.innerHTML
 }
 
-function loadRunnerRoster() {
+function loadPlayerRoster() {
   try {
-    const raw = localStorage.getItem(RUNNER_ROSTER_KEY)
+    let raw = localStorage.getItem(PLAYER_ROSTER_KEY)
+    if (raw == null || raw === "") {
+      raw = localStorage.getItem(LEGACY_RUNNER_ROSTER_KEY)
+      if (raw) {
+        localStorage.setItem(PLAYER_ROSTER_KEY, raw)
+        localStorage.removeItem(LEGACY_RUNNER_ROSTER_KEY)
+      }
+    }
     if (!raw) return []
     const j = JSON.parse(raw)
     return Array.isArray(j) ? j : []
@@ -27,38 +35,38 @@ function loadRunnerRoster() {
   }
 }
 
-function saveRunnerRoster(entries) {
-  localStorage.setItem(RUNNER_ROSTER_KEY, JSON.stringify(entries))
+function savePlayerRoster(entries) {
+  localStorage.setItem(PLAYER_ROSTER_KEY, JSON.stringify(entries))
 }
 
-function getRunnerLabel(address) {
+function getPlayerLabel(address) {
   if (address == null || address === "") return null
   const a = String(address).trim()
-  const hit = loadRunnerRoster().find((r) => r.address === a)
+  const hit = loadPlayerRoster().find((r) => r.address === a)
   return hit?.name ?? null
 }
 
-function validateRunnerName(raw) {
+function validatePlayerName(raw) {
   const t = String(raw ?? "").trim()
   if (t.length < 1) return { ok: false, error: "Enter a display name." }
   if (t.length > 32) return { ok: false, error: "Name max 32 characters." }
-  if (!RUNNER_NAME_RE.test(t)) return { ok: false, error: "Name uses invalid characters." }
+  if (!PLAYER_NAME_RE.test(t)) return { ok: false, error: "Name uses invalid characters." }
   return { ok: true, name: t }
 }
 
-function validateRunnerAddress(raw) {
+function validatePlayerAddress(raw) {
   const t = String(raw ?? "").trim()
   if (t.length < 2) return { ok: false, error: "Enter an address or wallet id." }
   if (t.length > 128) return { ok: false, error: "Address too long." }
   return { ok: true, address: t }
 }
 
-function addOrUpdateRunner(addressRaw, nameRaw) {
-  const va = validateRunnerAddress(addressRaw)
+function addOrUpdatePlayer(addressRaw, nameRaw) {
+  const va = validatePlayerAddress(addressRaw)
   if (!va.ok) return va
-  const vn = validateRunnerName(nameRaw)
+  const vn = validatePlayerName(nameRaw)
   if (!vn.ok) return vn
-  const roster = loadRunnerRoster()
+  const roster = loadPlayerRoster()
   const addr = va.address
   const nameLower = vn.name.toLowerCase()
   const idxAddr = roster.findIndex((r) => r.address === addr)
@@ -71,17 +79,17 @@ function addOrUpdateRunner(addressRaw, nameRaw) {
   } else {
     roster.push({ address: addr, name: vn.name })
   }
-  saveRunnerRoster(roster)
+  savePlayerRoster(roster)
   return { ok: true }
 }
 
-function removeRunner(address) {
+function removePlayer(address) {
   const a = String(address ?? "").trim()
-  saveRunnerRoster(loadRunnerRoster().filter((r) => r.address !== a))
+  savePlayerRoster(loadPlayerRoster().filter((r) => r.address !== a))
 }
 
-function setRunnerFormError(msg) {
-  const el = document.getElementById("runner-form-error")
+function setPlayerFormError(msg) {
+  const el = document.getElementById("player-form-error")
   if (!el) return
   if (!msg) {
     el.hidden = true
@@ -92,39 +100,39 @@ function setRunnerFormError(msg) {
   el.textContent = msg
 }
 
-function renderRunnerSavedList() {
-  const ul = document.getElementById("runner-saved-list")
+function renderPlayerSavedList() {
+  const ul = document.getElementById("player-saved-list")
   if (!ul) return
   ul.replaceChildren()
-  const roster = loadRunnerRoster()
+  const roster = loadPlayerRoster()
   if (roster.length === 0) {
     const li = document.createElement("li")
-    li.className = "runner-saved-empty"
+    li.className = "player-saved-empty"
     li.style.color = "var(--muted)"
     li.style.fontSize = "0.82rem"
-    li.textContent = "No saved names yet."
+    li.textContent = "No saved players yet."
     ul.appendChild(li)
     return
   }
   roster.forEach((r) => {
     const li = document.createElement("li")
     const meta = document.createElement("div")
-    meta.className = "runner-saved-meta"
+    meta.className = "player-saved-meta"
     const nm = document.createElement("span")
-    nm.className = "runner-saved-name"
+    nm.className = "player-saved-name"
     nm.textContent = r.name
     const ad = document.createElement("span")
-    ad.className = "runner-saved-addr"
+    ad.className = "player-saved-addr"
     ad.textContent = r.address
     meta.appendChild(nm)
     meta.appendChild(ad)
     const btn = document.createElement("button")
     btn.type = "button"
-    btn.className = "runner-saved-remove"
+    btn.className = "player-saved-remove"
     btn.textContent = "Remove"
     btn.addEventListener("click", () => {
-      removeRunner(r.address)
-      renderRunnerSavedList()
+      removePlayer(r.address)
+      renderPlayerSavedList()
       loadLeaderboard()
     })
     li.appendChild(meta)
@@ -258,7 +266,7 @@ async function loadPuzzle() {
       const wRaw = data.winner
       const w = wRaw != null && String(wRaw).trim() !== "" ? String(wRaw).trim() : ""
       if (w) {
-        const label = getRunnerLabel(w)
+        const label = getPlayerLabel(w)
         solvedDetail.textContent = label ? `Winner: ${label} (${w})` : `Winner: ${w}`
       } else {
         solvedDetail.textContent = "Puzzle solved."
@@ -313,11 +321,14 @@ async function loadPrizeBalances() {
     const res = await fetch(`${API}/prize/balances`)
     if (!res.ok) return
     const p = await res.json()
-    const usdc = Number(p.usdc_balance)
+    const token =
+      Number(p.prize_token_balance ?? p.usdc_balance)
     const sol = Number(p.sol_balance)
-    document.getElementById("prize-usdc").textContent = `USDC ${Number.isFinite(usdc) ? usdc.toFixed(2) : "—"}`
+    document.getElementById("prize-usdc").textContent = `SAUSD ${Number.isFinite(token) ? token.toFixed(2) : "—"}`
     document.getElementById("prize-sol").textContent = `SOL ${Number.isFinite(sol) ? sol.toFixed(4) : "—"}`
-    document.getElementById("reward-usdc").textContent = `$${Number.isFinite(usdc) ? Math.round(usdc).toLocaleString() : "—"}`
+    document.getElementById("reward-usdc").textContent = Number.isFinite(token)
+      ? `${token.toLocaleString(undefined, { maximumFractionDigits: 2 })} SAUSD`
+      : "—"
   } catch {
     /* ignore */
   }
@@ -334,11 +345,11 @@ function renderYouVs(self) {
     return
   }
   const pk = self.pubkey ?? MY_WALLET
-  const runner = getRunnerLabel(pk)
+  const displayName = getPlayerLabel(pk)
   const rank = self.rank != null ? `#${self.rank}` : "—"
   const ls = self.leader_score != null ? self.leader_score : self.gap_to_leader + self.score
-  const nickLine = runner
-    ? `<div class="you-vs-nick">${escapeHtml(runner)} <span class="mono you-vs-pk">${escapeHtml(fmtShortPubkey(pk))}</span></div>`
+  const nickLine = displayName
+    ? `<div class="you-vs-nick">${escapeHtml(displayName)} <span class="mono you-vs-pk">${escapeHtml(fmtShortPubkey(pk))}</span></div>`
     : ""
   el.innerHTML = `${nickLine}<div class="you-vs-grid"><span>Your score</span><strong class="mono">${Number(self.score).toFixed(self.score % 1 ? 2 : 0)}</strong><span>Leader</span><strong class="mono">${Number(ls).toFixed(2)}</strong><span>Gap</span><strong class="mono accent">${Number(self.gap_to_leader).toFixed(2)}</strong><span>Rank</span><strong class="mono">${rank}</strong></div>`
 }
@@ -375,7 +386,7 @@ async function loadLeaderboard() {
       const isYou = pk === MY_WALLET
       li.className = isYou ? "lb-you" : ""
       const short = fmtShortPubkey(pk)
-      const label = getRunnerLabel(pk)
+      const label = getPlayerLabel(pk)
       const mid = label
         ? `<span class="lb-id"><span class="lb-name">${escapeHtml(label)}</span> <span class="lb-pk-short mono">${escapeHtml(short)}</span></span>`
         : `<span class="mono">${escapeHtml(short)}</span>`
@@ -432,29 +443,29 @@ function connectEvents() {
   }
 }
 
-const runnerDlg = document.getElementById("runner-names-dialog")
-const runnerOpen = document.getElementById("runner-names-open")
-const runnerForm = document.getElementById("runner-form")
-if (runnerOpen && runnerDlg && runnerForm) {
-  runnerOpen.addEventListener("click", () => {
-    setRunnerFormError("")
-    renderRunnerSavedList()
-    runnerDlg.showModal()
+const playerDlg = document.getElementById("player-names-dialog")
+const playerOpen = document.getElementById("player-names-open")
+const playerForm = document.getElementById("player-form")
+if (playerOpen && playerDlg && playerForm) {
+  playerOpen.addEventListener("click", () => {
+    setPlayerFormError("")
+    renderPlayerSavedList()
+    playerDlg.showModal()
   })
-  document.getElementById("runner-btn-close")?.addEventListener("click", () => runnerDlg.close())
-  runnerForm.addEventListener("submit", (e) => {
+  document.getElementById("player-btn-close")?.addEventListener("click", () => playerDlg.close())
+  playerForm.addEventListener("submit", (e) => {
     e.preventDefault()
-    const addrEl = document.getElementById("runner-input-address")
-    const nameEl = document.getElementById("runner-input-name")
-    const r = addOrUpdateRunner(addrEl?.value, nameEl?.value)
+    const addrEl = document.getElementById("player-input-address")
+    const nameEl = document.getElementById("player-input-name")
+    const r = addOrUpdatePlayer(addrEl?.value, nameEl?.value)
     if (!r.ok) {
-      setRunnerFormError(r.error)
+      setPlayerFormError(r.error)
       return
     }
-    setRunnerFormError("")
+    setPlayerFormError("")
     if (addrEl) addrEl.value = ""
     if (nameEl) nameEl.value = ""
-    renderRunnerSavedList()
+    renderPlayerSavedList()
     loadLeaderboard()
   })
 }

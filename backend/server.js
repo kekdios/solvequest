@@ -150,8 +150,11 @@ let lastAutoRotatedRoundId = null
 
 const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
-const USDC_MINT =
-  process.env.USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+/** SPL mint for prize token balance on `TARGET_ADDRESS` (default SAUSD). */
+const PRIZE_SPL_MINT =
+  process.env.PRIZE_SPL_MINT?.trim() ||
+  process.env.USDC_MINT?.trim() ||
+  "CK9PodBifHymLBGeZujExFnpoLCsYxAw7t8c8LsDKLxG"
 const PRIZE_BALANCE_TTL_MS = Math.max(
   1000,
   Number(process.env.PRIZE_BALANCE_TTL_MS) || 10_000
@@ -240,22 +243,25 @@ async function fetchPrizeBalances() {
   const [lamports, tokenAccounts] = await Promise.all([
     solanaConn.getBalance(owner),
     solanaConn.getParsedTokenAccountsByOwner(owner, {
-      mint: new PublicKey(USDC_MINT),
+      mint: new PublicKey(PRIZE_SPL_MINT),
     }),
   ])
 
-  let usdc = 0
+  let tokenUi = 0
   for (const { account } of tokenAccounts.value) {
     const amount =
       account?.data?.parsed?.info?.tokenAmount?.uiAmount ??
       Number(account?.data?.parsed?.info?.tokenAmount?.uiAmountString ?? "0")
-    usdc += Number(amount) || 0
+    tokenUi += Number(amount) || 0
   }
 
   prizeBalanceCache = {
     address: PUZZLE.target_address,
-    usdc_mint: USDC_MINT,
-    usdc_balance: usdc,
+    prize_token_mint: PRIZE_SPL_MINT,
+    prize_token_balance: tokenUi,
+    // Legacy keys (same as prize_token_*); kept for older clients
+    usdc_mint: PRIZE_SPL_MINT,
+    usdc_balance: tokenUi,
     sol_balance: lamports / 1_000_000_000,
     fetched_at_ms: now,
   }

@@ -22,7 +22,7 @@
       </nav>
       <div class="arena-reward" aria-live="polite">
         <span class="reward-label">REWARD</span>
-        <span id="reward-usdc" class="reward-value">$—</span>
+        <span id="reward-usdc" class="reward-value">— SAUSD</span>
       </div>
       <div class="arena-meta">
         <span id="badge-open" class="badge badge-open">NOT SOLVED</span>
@@ -73,7 +73,7 @@
             <dd id="commitment-addr" class="mono"></dd>
             <dt>Prize wallet balances</dt>
             <dd class="prize-balances">
-              <span id="prize-usdc" class="prize-usdc">USDC —</span>
+              <span id="prize-usdc" class="prize-usdc">SAUSD —</span>
               <span id="prize-sol" class="prize-sol mono">SOL —</span>
             </dd>
           </dl>
@@ -104,15 +104,15 @@
       <aside class="arena-side" aria-label="Leaderboard">
         <div class="leaderboard-head">
           <h2>Leaderboard</h2>
-          <button type="button" id="runner-names-open" class="runner-names-btn">
-            Name runners
+          <button type="button" id="player-names-open" class="player-names-btn">
+            Players
           </button>
         </div>
         <p class="side-hint">
           Scores: big bonus when you <strong>win</strong> the puzzle; smaller +1 for each valid
           checksum near-miss (wrong target).
         </p>
-        <p class="side-hint runner-names-hint">
+        <p class="side-hint player-names-hint">
           Link a display name to the same <strong>wallet</strong> id your agent sends on
           <code>POST /submit</code> (e.g. <code>solana-agent</code>) — not necessarily a Solana
           pubkey. Saved in this browser only.
@@ -121,42 +121,42 @@
         <ol id="leaderboard-list" class="leaderboard"></ol>
       </aside>
 
-      <dialog id="runner-names-dialog" class="runner-dialog" aria-labelledby="runner-dialog-title">
-        <form id="runner-form" class="runner-dialog-inner">
-          <h3 id="runner-dialog-title">Name a runner</h3>
-          <p class="runner-dialog-desc">
+      <dialog id="player-names-dialog" class="player-dialog" aria-labelledby="player-dialog-title">
+        <form id="player-form" class="player-dialog-inner">
+          <h3 id="player-dialog-title">Name a player</h3>
+          <p class="player-dialog-desc">
             One name per address and one address per name. Letters, numbers, spaces,
             <code>-</code> <code>_</code> <code>'</code> · max 32 characters.
           </p>
-          <label class="runner-field">
+          <label class="player-field">
             <span>Address (full pubkey / wallet id)</span>
             <input
               type="text"
-              id="runner-input-address"
+              id="player-input-address"
               autocomplete="off"
               spellcheck="false"
               placeholder="e.g. team-alpha or Solana base58 pubkey"
             />
           </label>
-          <label class="runner-field">
+          <label class="player-field">
             <span>Display name</span>
             <input
               type="text"
-              id="runner-input-name"
+              id="player-input-name"
               maxlength="32"
               autocomplete="off"
               placeholder="e.g. Seabiscuit"
             />
           </label>
-          <p id="runner-form-error" class="runner-form-error" role="alert" hidden></p>
-          <div class="runner-dialog-actions">
-            <button type="submit" id="runner-btn-add" class="runner-btn primary">Add / update</button>
-            <button type="button" id="runner-btn-close" class="runner-btn">Close</button>
+          <p id="player-form-error" class="player-form-error" role="alert" hidden></p>
+          <div class="player-dialog-actions">
+            <button type="submit" id="player-btn-add" class="player-btn primary">Add / update</button>
+            <button type="button" id="player-btn-close" class="player-btn">Close</button>
           </div>
         </form>
-        <div class="runner-list-wrap">
-          <h4 class="runner-list-title">Saved names</h4>
-          <ul id="runner-saved-list" class="runner-saved-list"></ul>
+        <div class="player-list-wrap">
+          <h4 class="player-list-title">Saved players</h4>
+          <ul id="player-saved-list" class="player-saved-list"></ul>
         </div>
       </dialog>
     </div>

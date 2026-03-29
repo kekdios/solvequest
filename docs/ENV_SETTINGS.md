@@ -75,10 +75,11 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Purpose:** RPC endpoint for prize wallet balance reads (`/prize/balances`).
 - **Used by:** `backend/server.js`.
 
-### `USDC_MINT` (optional, default mainnet USDC mint)
-- **Purpose:** Token mint used for prize USDC balance lookup.
+### `PRIZE_SPL_MINT` (optional, default SAUSD)
+- **Purpose:** SPL token mint used for prize balance on `TARGET_ADDRESS` (`GET /prize/balances`).
 - **Used by:** `backend/server.js`.
-- **Default:** `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`.
+- **Default:** `CK9PodBifHymLBGeZujExFnpoLCsYxAw7t8c8LsDKLxG` (SAUSD).
+- **Legacy:** `USDC_MINT` is still read if `PRIZE_SPL_MINT` is unset (older `.env` files).
 
 ### `PRIZE_BALANCE_TTL_MS` (optional, default `10000`)
 - **Purpose:** Cache TTL for RPC prize balance reads.
