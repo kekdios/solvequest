@@ -1,4 +1,3 @@
-import crypto from "crypto"
 import { createClient } from "redis"
 
 let redis = null
@@ -11,7 +10,6 @@ const ARENA_START_KEY = "arena:start_time"
 /** @deprecated legacy hash; new scores use LEADERBOARD_ZSET */
 const LEADERBOARD_HASH = "stats:wallet"
 const LEADERBOARD_ZSET = "leaderboard:global"
-const CLAIM_LOCK_KEY = "puzzle:claim_lock"
 const CHANNEL_EVENTS = "arena:events"
 const ROUND_END_MS_KEY = "puzzle:round_end_ms"
 const ROUND_START_MS_KEY = "puzzle:round_start_ms"
@@ -34,14 +32,6 @@ const LEADERBOARD_WIN_POINTS = Math.max(
   Math.floor(Number(process.env.LEADERBOARD_WIN_POINTS) || 100_000)
 )
 
-/** SET winner NX + DEL claim lock in one script */
-const LUA_WIN_AND_RELEASE_LOCK = `
-local ok = redis.call('SET', KEYS[1], ARGV[1], 'NX')
-if not ok then return 0 end
-redis.call('DEL', KEYS[2])
-return 1
-`
-
 function mem() {
   if (!memory) {
     memory = {
@@ -50,12 +40,10 @@ function mem() {
         validations_single: 0,
         batch_items: 0,
         submits: 0,
-        claims: 0,
         valid_checksums: 0,
         constraint_rejects: 0,
         invalid_mnemonics: 0,
         valid_target_misses: 0,
-        address_mismatches: 0,
         attempts_after_constraints: 0,
         attempts_valid_checksum: 0,
       },
@@ -64,8 +52,6 @@ function mem() {
       roundEndMs: null,
       roundStartMs: null,
       roundId: null,
-      claimLock: false,
-      claimResults: {},
       roundSettledFor: null,
       roundEndEventSentFor: null,
       roundLeaderboardWinner: null,
@@ -150,10 +136,6 @@ export async function recordSubmit() {
   await hincr("submits", 1)
 }
 
-export async function recordClaim() {
-  await hincr("claims", 1)
-}
-
 export async function recordValidChecksum() {
   await hincr("valid_checksums", 1)
 }
@@ -168,10 +150,6 @@ export async function recordInvalidMnemonic() {
 
 export async function recordValidTargetMiss() {
   await hincr("valid_target_misses", 1)
-}
-
-export async function recordAddressMismatch() {
-  await hincr("address_mismatches", 1)
 }
 
 /** Per-evaluation signal: noise vs real work. */
@@ -203,13 +181,12 @@ async function getStat(field) {
 }
 
 export async function getAttemptsTotal() {
-  const [a, b, c, d] = await Promise.all([
+  const [a, b, c] = await Promise.all([
     getStat("validations_single"),
     getStat("batch_items"),
     getStat("submits"),
-    getStat("claims"),
   ])
-  return a + b + c + d
+  return a + b + c
 }
 
 export async function getValidChecksumsCount() {
@@ -244,97 +221,16 @@ export async function trySetWinner(winnerId) {
   return true
 }
 
-/**
- * Atomically set winner (NX) and release claim lock — avoids stale lock after success.
- */
-export async function trySetWinnerAtomic(winnerId) {
-  if (redis) {
-    const r = await redis.eval(LUA_WIN_AND_RELEASE_LOCK, {
-      keys: [PUZZLE_WINNER_KEY, CLAIM_LOCK_KEY],
-      arguments: [winnerId],
-    })
-    return Number(r) === 1
-  }
-  const m = mem()
-  if (m.winner) return false
-  m.winner = winnerId
-  m.claimLock = false
-  return true
-}
-
-/** Clear winner + claim lock (e.g. new round after deploy). Does not change loaded PUZZLE from .env. */
+/** Clear winner (e.g. new round after deploy). Does not change loaded PUZZLE from .env. */
 export async function clearPuzzleWinnerState() {
   if (redis) {
-    await redis.del(PUZZLE_WINNER_KEY, CLAIM_LOCK_KEY)
+    await redis.del(PUZZLE_WINNER_KEY)
     return
   }
   const m = mem()
   m.winner = null
-  m.claimLock = false
 }
 
-const LOCK_TTL_SEC = Math.min(
-  Math.max(Number(process.env.CLAIM_LOCK_TTL_SEC) || 5, 1),
-  30
-)
-
-export async function acquireClaimLock() {
-  if (redis) {
-    const r = await redis.set(CLAIM_LOCK_KEY, "1", { NX: true, EX: LOCK_TTL_SEC })
-    return r === "OK"
-  }
-  const m = mem()
-  if (m.claimLock) return false
-  m.claimLock = true
-  return true
-}
-
-export async function releaseClaimLock() {
-  if (redis) {
-    await redis.del(CLAIM_LOCK_KEY)
-    return
-  }
-  mem().claimLock = false
-}
-
-function claimResultKey(pubkey, mnemonicHash) {
-  return `claim:result:${pubkey}:${mnemonicHash}`
-}
-
-export async function getCachedClaimResult(pubkey, mnemonicHash) {
-  if (!mnemonicHash) return null
-  if (redis) {
-    const v = await redis.get(claimResultKey(pubkey, mnemonicHash))
-    if (!v) return null
-    try {
-      return JSON.parse(v)
-    } catch {
-      return null
-    }
-  }
-  const k = `${pubkey}:${mnemonicHash}`
-  return mem().claimResults[k] ?? null
-}
-
-export async function setCachedClaimResult(pubkey, mnemonicHash, obj, ttlSec = 300) {
-  if (!mnemonicHash) return
-  if (redis) {
-    await redis.set(claimResultKey(pubkey, mnemonicHash), JSON.stringify(obj), {
-      EX: ttlSec,
-    })
-    return
-  }
-  mem().claimResults[`${pubkey}:${mnemonicHash}`] = obj
-}
-
-const MESSAGE_DEDUP_TTL_SEC = Math.min(
-  Math.max(Number(process.env.SIGNED_MESSAGE_DEDUP_TTL_SEC) || 60, 10),
-  600
-)
-
-/**
- * One use per exact signed message (SHA-256 of UTF-8) per pubkey — stops replay inside the time window.
- */
 async function isRoundActiveInternal() {
   if (redis) {
     const [startMs, endMs] = await Promise.all([
@@ -674,24 +570,6 @@ export async function startNewRound({
   return { round_id: rid, round_start_ms: startMs, round_end_ms: endMs }
 }
 
-export async function consumeSignedMessageOnce(pubkey, message) {
-  const h = crypto.createHash("sha256").update(message, "utf8").digest("hex")
-  const key = `claim:msg:${pubkey}:${h}`
-  if (redis) {
-    const r = await redis.set(key, "1", { NX: true, EX: MESSAGE_DEDUP_TTL_SEC })
-    return r === "OK"
-  }
-  const m = mem()
-  if (!m.msgSeen) {
-    m.msgSeen = new Set()
-  }
-  const id = key
-  if (m.msgSeen.has(id)) return false
-  m.msgSeen.add(id)
-  if (m.msgSeen.size > 50_000) m.msgSeen.clear()
-  return true
-}
-
 async function leaderboardIncrAllowed(wallet) {
   const key = wallet || "anonymous"
   if (redis) {
@@ -814,7 +692,6 @@ export async function getExtendedStats() {
     "constraint_rejects",
     "invalid_mnemonics",
     "valid_target_misses",
-    "address_mismatches",
     "attempts_after_constraints",
     "attempts_valid_checksum",
   ]

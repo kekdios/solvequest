@@ -17,8 +17,6 @@ TARGET_ADDRESS=...
 SOLUTION_HASH=...
 PUZZLE_WORDS=word1,word2,word3,word4,word5,word6,word7,word8,word9,word10,word11,word12
 REDIS_URL=redis://127.0.0.1:6379
-CLAIM_REQUIRE_MNEMONIC_BINDING=1
-CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 ```
 
 ---
@@ -41,7 +39,7 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Notes:** Must contain exactly 12 words.
 
 ### `PUZZLE_ID` (optional, default `001`)
-- **Purpose:** Logical puzzle identifier for claim message binding.
+- **Purpose:** Logical puzzle identifier (exposed on `GET /puzzle` as `id`).
 - **Used by:** `backend/puzzle.js`.
 
 ### `PUZZLE_DIFFICULTY` (optional)
@@ -90,7 +88,8 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 - **Used by:** `backend/server.js`.
 - **How:** client must send `x-admin-key: <ADMIN_CONTROL_KEY>` for:
   - `POST /payout/jobs/:jobId/attempt`
-  - `POST /public/wizard-clear-solved` (clear `puzzle:winner` + claim lock; used by `puzzle-wizard.html`)
+  - `POST /public/wizard-clear-solved` (clear `puzzle:winner` in Redis/memory only)
+  - `POST /public/admin/new-puzzle` (**SQLite vault only** — retire current unsolved row, insert new puzzle JSON, reload arena, clear winner; arena **New Puzzle** button)
 
 ### `ALLOW_WIZARD_DERIVE` (optional)
 - **Purpose:** In **`NODE_ENV=production`**, enables **`POST /public/wizard-derive`** used by **`puzzle-wizard.html`** (mnemonic in JSON body). In non-production, the endpoint is on by default unless set to a falsy value (`0`, `false`, `no`, `off`).
@@ -104,6 +103,10 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 
 ### `WIZARD_CLEAR_SOLVED_MAX_PER_MIN` (optional, default `20`)
 - **Purpose:** Rate limit for **`/public/wizard-clear-solved`** per IP per minute (clamped 3–100).
+- **Used by:** `backend/server.js`.
+
+### `ADMIN_NEW_PUZZLE_MAX_PER_MIN` (optional, default `8`)
+- **Purpose:** Rate limit for **`POST /public/admin/new-puzzle`** per IP per minute (clamped 2–30).
 - **Used by:** `backend/server.js`.
 
 ### `PAYOUT_AMOUNT_USDC` (optional, default `0`)
@@ -149,39 +152,6 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 
 ---
 
-## Claim security settings
-
-### `CLAIM_REQUIRE_MNEMONIC_BINDING` (optional, recommended `1` in prod)
-- **Purpose:** Require claim messages to include mnemonic hash binding.
-- **Used by:** `backend/server.js`.
-
-### `CLAIM_REQUIRE_ROUND_IN_MESSAGE` (optional, recommended `1` when rounds enabled)
-- **Purpose:** Require round-bound claim message format.
-- **Used by:** `backend/server.js`, `backend/puzzle.js` parser.
-
-### `CLAIM_REQUIRE_NONCE` (optional)
-- **Purpose:** Require nonce in non-round message formats.
-- **Used by:** `backend/server.js`.
-
-### `ALLOW_LEGACY_SOLVE_MESSAGE` (optional, default off)
-- **Purpose:** Allow old weak claim message format.
-- **Used by:** `backend/server.js`.
-- **Recommendation:** leave disabled in production.
-
-### `CLAIM_SIGNATURE_WINDOW_SEC` (optional, default `30`, clamped `5..300`)
-- **Purpose:** Max timestamp skew for signed claim messages.
-- **Used by:** `backend/server.js`.
-
-### `CLAIM_LOCK_TTL_SEC` (optional, default `5`, clamped `1..30`)
-- **Purpose:** Claim lock TTL to reduce race conditions.
-- **Used by:** `backend/store.js`.
-
-### `SIGNED_MESSAGE_DEDUP_TTL_SEC` (optional, default `60`, clamped `10..600`)
-- **Purpose:** Replay dedup window for exact signed message.
-- **Used by:** `backend/store.js`.
-
----
-
 ## Rate limits (HTTP)
 
 ### `RATE_LIMIT_VALIDATE_MAX` (optional, default `120` req/s per IP)
@@ -194,10 +164,6 @@ CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 
 ### `RATE_LIMIT_SUBMIT_MAX` (optional, default `5` req/s per IP)
 - **Route:** `POST /submit`
-- **Used by:** `backend/server.js`.
-
-### `RATE_LIMIT_CLAIM_MAX` (optional, default `60` req/s per IP)
-- **Route:** `POST /claim`
 - **Used by:** `backend/server.js`.
 
 ---
@@ -325,7 +291,7 @@ Leaving **`PUZZLE_SOURCE` unset or `env`** keeps the classic model (puzzle from 
 - **Example:** `-0.5`.
 
 ### `LEADERBOARD_WIN_POINTS` (optional, default `100000`)
-- **Purpose:** Score added to `GET /leaderboard` when a wallet wins via `POST /submit` or `POST /claim` (same sorted set as near-miss +1s, but much larger so winners appear at the top).
+- **Purpose:** Score added to `GET /leaderboard` when a wallet wins via `POST /submit` (same sorted set as near-miss +1s, but much larger so winners appear at the top).
 - **Used by:** `backend/store.js` (`recordLeaderboardWin`).
 - **Note:** Not subject to `LEADERBOARD_MAX_INCR_PER_SEC` (wins are once per puzzle).
 
@@ -352,6 +318,5 @@ Only enable values you intentionally want to control. The app has built-in defau
 For production, the key priorities are:
 1. set required puzzle values
 2. enable Redis
-3. enforce strong claim flags
-4. tune HTTP rate limits and batch size only as needed
+3. tune HTTP rate limits and batch size only as needed
 

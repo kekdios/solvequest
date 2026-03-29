@@ -14,23 +14,24 @@ import {
   evaluateMnemonicCached,
   hashMnemonic,
   validationJson,
-  parseSolveMessage,
   applyPuzzleRowFromVault,
   loadPuzzleFromEnv,
+  parseConstraintsJson,
 } from "./puzzle.js"
 import { parsePuzzleSource, PUZZLE_SOURCE_SQLITE } from "./puzzle-vault-env.js"
 import {
   openPuzzleVaultDatabase,
   getActiveUnsolvedPuzzle,
+  retireAllUnsolvedPuzzles,
+  insertUnsolvedPuzzleRow,
 } from "./puzzle-vault-db.js"
-import { mnemonicToAddressCached, mnemonicToAddress } from "./solana.js"
-import { verifySolanaSignature } from "./verify.js"
+import { tryQuestFundAfterBootstrap } from "./quest-spl-fund.js"
+import { mnemonicToAddress } from "./solana.js"
 import {
   initStore,
   recordSingleValidation,
   recordBatchItems,
   recordSubmit,
-  recordClaim,
   recordValidChecksum,
   recordValidationOutcome,
   recordGranularEval,
@@ -39,23 +40,13 @@ import {
   getArenaStartMs,
   getPuzzleState,
   trySetWinner,
-  trySetWinnerAtomic,
   clearPuzzleWinnerState,
   recordLeaderboardAttempt,
   recordLeaderboardWin,
   getLeaderboard,
-  acquireClaimLock,
-  releaseClaimLock,
-  getCachedClaimResult,
-  setCachedClaimResult,
   publishArenaEvent,
   isRedisEnabled,
   getExtendedStats,
-  recordConstraintReject,
-  recordInvalidMnemonic,
-  recordAddressMismatch,
-  recordValidTargetMiss,
-  consumeSignedMessageOnce,
   getRoundState,
   recordLeaderboardConstraintPenalty,
   maybeSendRoundEndEvent,
@@ -153,27 +144,6 @@ const BATCH_CONCURRENCY = Math.min(
   128
 )
 
-const CLAIM_WINDOW_SEC = Math.min(
-  Math.max(Number(process.env.CLAIM_SIGNATURE_WINDOW_SEC) || 30, 5),
-  300
-)
-
-const ALLOW_LEGACY_MESSAGE =
-  process.env.ALLOW_LEGACY_SOLVE_MESSAGE === "1" ||
-  process.env.ALLOW_LEGACY_SOLVE_MESSAGE === "true"
-
-const CLAIM_REQUIRE_NONCE =
-  process.env.CLAIM_REQUIRE_NONCE === "1" ||
-  process.env.CLAIM_REQUIRE_NONCE === "true"
-
-/** When true, only `solve:{id}:{ts}:{nonce}:{mnemonic_hash}` is accepted (strongest). */
-const CLAIM_REQUIRE_MNEMONIC_BINDING =
-  process.env.CLAIM_REQUIRE_MNEMONIC_BINDING === "1" ||
-  process.env.CLAIM_REQUIRE_MNEMONIC_BINDING === "true"
-
-const CLAIM_REQUIRE_ROUND_IN_MESSAGE =
-  process.env.CLAIM_REQUIRE_ROUND_IN_MESSAGE === "1" ||
-  process.env.CLAIM_REQUIRE_ROUND_IN_MESSAGE === "true"
 const IS_PROD = process.env.NODE_ENV === "production"
 const ADMIN_CONTROL_KEY = process.env.ADMIN_CONTROL_KEY?.trim() || ""
 const AUTO_ROTATE_ROUNDS =
@@ -365,13 +335,6 @@ const submitLimiter = rateLimit({
   legacyHeaders: false,
 })
 
-const claimLimiter = rateLimit({
-  windowMs: 1000,
-  max: Number(process.env.RATE_LIMIT_CLAIM_MAX) || 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
 /** Same-origin puzzle wizard (no CDN). Off in production unless ALLOW_WIZARD_DERIVE is truthy. */
 function parseEnvTruthy(name) {
   const v = process.env[name]?.trim().toLowerCase()
@@ -401,6 +364,64 @@ const wizardClearSolvedLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 })
+
+const adminNewPuzzleLimiter = rateLimit({
+  windowMs: 60_000,
+  max: Math.min(Math.max(Number(process.env.ADMIN_NEW_PUZZLE_MAX_PER_MIN) || 8, 2), 30),
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+function parseAdminNewPuzzlePayload(body) {
+  const target_address = String(body?.target_address ?? "").trim()
+  const solution_hash = String(body?.solution_hash ?? "").trim()
+  const wordsRaw = String(body?.puzzle_words ?? body?.puzzle_words_csv ?? "").trim()
+  const public_id = String(body?.public_id ?? body?.puzzle_id ?? "").trim()
+  const round_id = String(body?.round_id ?? "default").trim() || "default"
+  let constraints_json = null
+  if (body?.constraints_json != null && String(body.constraints_json).trim() !== "") {
+    const cj = body.constraints_json
+    const s = typeof cj === "string" ? cj.trim() : JSON.stringify(cj)
+    parseConstraintsJson(s)
+    constraints_json = s
+  }
+  const difficulty =
+    body?.difficulty != null && String(body.difficulty).trim()
+      ? String(body.difficulty).trim().toLowerCase()
+      : null
+
+  if (!target_address) {
+    throw new Error("target_address is required")
+  }
+  try {
+    new PublicKey(target_address)
+  } catch {
+    throw new Error("target_address is not a valid Solana address")
+  }
+  if (!/^[0-9a-fA-F]{64}$/.test(solution_hash)) {
+    throw new Error("solution_hash must be 64 hex characters (SHA-256 commitment)")
+  }
+  const words = wordsRaw
+    .split(",")
+    .map((w) => w.trim().toLowerCase())
+    .filter(Boolean)
+  if (words.length !== 12) {
+    throw new Error("puzzle_words must be exactly 12 comma-separated BIP39 words")
+  }
+  if (!public_id || public_id.length > 64) {
+    throw new Error("public_id is required (unique puzzle id, max 64 characters)")
+  }
+
+  return {
+    public_id,
+    target_address,
+    solution_hash: solution_hash.toLowerCase(),
+    puzzle_words_csv: words.join(","),
+    constraints_json,
+    round_id,
+    difficulty,
+  }
+}
 
 /** Wizard: canonical + Fisher–Yates scrambled pool + fixed first/last for .env */
 function buildWizardDerivationFromNormalizedPhrase(n) {
@@ -490,7 +511,7 @@ app.post("/public/wizard-derive", wizardDeriveLimiter, (req, res) => {
 )
 
 /**
- * Clear Redis/in-memory puzzle winner + claim lock so the arena shows unsolved for the
+ * Clear Redis/in-memory puzzle winner so the arena shows unsolved for the
  * currently running process (same .env). Requires ADMIN_CONTROL_KEY via x-admin-key.
  */
 app.post(
@@ -504,6 +525,78 @@ app.post(
       res.json({ ok: true })
     } catch (e) {
       res.status(500).json({ error: String(e?.message || e) })
+    }
+  }
+)
+
+/**
+ * SQLite vault only: retire current unsolved row(s), insert a new puzzle, reload in-memory PUZZLE,
+ * clear Redis winner, optional QUEST auto-fund. Requires unique public_id (e.g. 002, 003).
+ */
+app.post(
+  "/public/admin/new-puzzle",
+  adminNewPuzzleLimiter,
+  requireAdminControl,
+  async (req, res) => {
+    try {
+      if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE || !puzzleVaultHandle?.db) {
+        return res.status(400).json({
+          error: "vault_only",
+          detail: "PUZZLE_SOURCE must be sqlite and the vault must be open",
+        })
+      }
+      const payload = parseAdminNewPuzzlePayload(req.body ?? {})
+      const { db, vault } = puzzleVaultHandle
+      retireAllUnsolvedPuzzles(db, vault)
+      const rowId = insertUnsolvedPuzzleRow(db, vault, payload)
+      const row = getActiveUnsolvedPuzzle(db)
+      if (!row) {
+        throw new Error("no active unsolved row after insert")
+      }
+      applyPuzzleRowFromVault(row)
+      puzzleVaultEmpty = false
+      refreshDisplayWords()
+      await clearPuzzleWinnerState()
+      prizeBalanceCache = null
+      prizeBalanceCacheAt = 0
+
+      let quest_fund_tx = null
+      let quest_fund_error = null
+      try {
+        quest_fund_tx = await tryQuestFundAfterBootstrap(db, rowId)
+      } catch (e) {
+        quest_fund_error = String(e?.message || e)
+        console.error("[admin new-puzzle] QUEST fund failed (puzzle is live):", e)
+      }
+
+      broadcast({
+        type: "new_puzzle",
+        puzzle_id: PUZZLE.id,
+        row_id: rowId,
+      })
+      res.json({
+        ok: true,
+        puzzle_id: PUZZLE.id,
+        row_id: rowId,
+        quest_fund_tx,
+        quest_fund_error,
+      })
+    } catch (e) {
+      const msg = String(e?.message || e)
+      if (msg.includes("public_id already")) {
+        return res.status(409).json({ error: "public_id_conflict", detail: msg })
+      }
+      if (
+        msg.includes("required") ||
+        msg.includes("must be") ||
+        msg.includes("valid") ||
+        msg.includes("constraints JSON") ||
+        msg.includes("invalid JSON")
+      ) {
+        return res.status(400).json({ error: "validation_error", detail: msg })
+      }
+      console.error("[admin new-puzzle]", e)
+      res.status(500).json({ error: "new_puzzle_failed", detail: msg })
     }
   }
 )
@@ -629,203 +722,6 @@ app.get("/events", (req, res) => {
   req.on("close", () => {
     sseClients.delete(res)
   })
-})
-
-/**
- * Order: parse → window → solved → verify signature → binding + round → idempotency / round freeze → lock → replay → eval.
- * Message: `solve:{round}:{id}:{ts}:{nonce}:{sha256_hex}` or `solve:{id}:{ts}:{nonce}:{sha256_hex}`; weaker formats if env allows.
- */
-app.post("/claim", claimLimiter, async (req, res) => {
-  try {
-    const { mnemonic, pubkey, signature, message } = req.body ?? {}
-
-    if (
-      typeof pubkey !== "string" ||
-      typeof signature !== "string" ||
-      !pubkey ||
-      !signature
-    ) {
-      return res.status(400).json({ error: "missing_pubkey_or_signature" })
-    }
-
-    const parsed = parseSolveMessage(
-      message,
-      PUZZLE.id,
-      ALLOW_LEGACY_MESSAGE,
-      CLAIM_REQUIRE_NONCE,
-      CLAIM_REQUIRE_MNEMONIC_BINDING,
-      CLAIM_REQUIRE_ROUND_IN_MESSAGE
-    )
-    if (!parsed) {
-      return res.status(400).json({
-        error: "bad_message",
-        expected: CLAIM_REQUIRE_ROUND_IN_MESSAGE
-          ? `solve:<round_id>:${PUZZLE.id}:<unix_ts>:<nonce>:<mnemonic_sha256_hex>`
-          : CLAIM_REQUIRE_MNEMONIC_BINDING
-            ? `solve:${PUZZLE.id}:<unix_ts>:<nonce>:<mnemonic_sha256_hex>`
-            : CLAIM_REQUIRE_NONCE
-              ? `solve:${PUZZLE.id}:<unix_ts>:<nonce>[:<mnemonic_sha256_hex>]`
-              : `solve:${PUZZLE.id}:<unix_ts>[:<nonce>[:<mnemonic_sha256_hex>]]`,
-        legacy_allowed: ALLOW_LEGACY_MESSAGE,
-        nonce_required: CLAIM_REQUIRE_NONCE,
-        mnemonic_binding_required: CLAIM_REQUIRE_MNEMONIC_BINDING,
-        round_in_message_required: CLAIM_REQUIRE_ROUND_IN_MESSAGE,
-      })
-    }
-
-    if (
-      parsed.mode === "timestamp" ||
-      parsed.mode === "timestamp_nonce" ||
-      parsed.mode === "timestamp_nonce_binding"
-    ) {
-      const now = Math.floor(Date.now() / 1000)
-      if (Math.abs(now - parsed.ts) > CLAIM_WINDOW_SEC) {
-        return res.status(400).json({
-          error: "signature_expired",
-          max_skew_sec: CLAIM_WINDOW_SEC,
-        })
-      }
-    }
-
-    if (parsed.roundId != null && parsed.roundId !== PUZZLE.round_id) {
-      return res.status(400).json({ status: "wrong_round" })
-    }
-
-    const state0 = await getPuzzleState()
-    if (state0.solved) {
-      const body = { status: "already_solved", winner: state0.winner }
-      return res.json(body)
-    }
-
-    if (!verifySolanaSignature(pubkey, message, signature)) {
-      return res.status(401).json({ error: "bad_signature" })
-    }
-
-    const mnemonicHash = hashMnemonic(mnemonic ?? "")
-
-    if (parsed.mode === "timestamp_nonce_binding") {
-      if (parsed.mnemonicHash !== mnemonicHash) {
-        return res.status(400).json({ status: "invalid_signature_binding" })
-      }
-    }
-
-    const rs = await getRoundState()
-    if (!rs.round_active) {
-      const cachedRound = await getCachedClaimResult(pubkey, mnemonicHash)
-      if (cachedRound) {
-        return res.json(cachedRound)
-      }
-      return res.status(400).json({
-        status: "round_ended",
-        round_id: rs.round_id,
-      })
-    }
-
-    const cached = await getCachedClaimResult(pubkey, mnemonicHash)
-    if (cached) {
-      return res.json(cached)
-    }
-
-    const locked = await acquireClaimLock()
-    if (!locked) {
-      return res.json({ status: "lost_race" })
-    }
-
-    try {
-      const stateLocked = await getPuzzleState()
-      if (stateLocked.solved) {
-        const body = { status: "already_solved", winner: stateLocked.winner }
-        await setCachedClaimResult(pubkey, mnemonicHash, body, 120)
-        return res.json(body)
-      }
-
-      const msgOnce = await consumeSignedMessageOnce(pubkey, message)
-      if (!msgOnce) {
-        return res.status(400).json({ error: "message_replay" })
-      }
-
-      await recordClaim()
-
-      const state = await getPuzzleState()
-      if (state.solved) {
-        const body = { status: "already_solved", winner: state.winner }
-        await setCachedClaimResult(pubkey, mnemonicHash, body, 120)
-        return res.json(body)
-      }
-
-      const ev = evaluateMnemonicCached(mnemonic)
-      if (ev.valid_checksum === true) {
-        await recordValidChecksum()
-      }
-      await recordGranularEval(ev)
-
-      if (ev.rejected_by_constraints) {
-        await recordConstraintReject()
-        const penalized = await recordLeaderboardConstraintPenalty(pubkey)
-        if (penalized) await broadcastLeaderboardRefresh()
-        const body = { status: "constraint_violation" }
-        await setCachedClaimResult(pubkey, mnemonicHash, body, 120)
-        return res.json(body)
-      }
-
-      if (ev.valid_checksum !== true) {
-        await recordInvalidMnemonic()
-        const body = { status: "invalid" }
-        await setCachedClaimResult(pubkey, mnemonicHash, body, 60)
-        return res.json(body)
-      }
-
-      const derived = mnemonicToAddressCached(ev.phrase)
-      if (derived !== pubkey) {
-        await recordAddressMismatch()
-        return res.status(400).json({ error: "pubkey_mismatch" })
-      }
-
-      if (!ev.matches_target) {
-        await recordValidTargetMiss()
-        const added = await recordLeaderboardAttempt(pubkey)
-        broadcast({
-          type: "claim",
-          status: "valid_but_wrong",
-          pubkey,
-          puzzle_id: PUZZLE.id,
-        })
-        if (added) await broadcastLeaderboardScoreEvents(pubkey)
-        const body = { status: "valid_but_wrong" }
-        await setCachedClaimResult(pubkey, mnemonicHash, body, 120)
-        return res.json(body)
-      }
-
-      const won = await trySetWinnerAtomic(pubkey)
-      if (!won) {
-        const s2 = await getPuzzleState()
-        const body = { status: "already_solved", winner: s2.winner }
-        await setCachedClaimResult(pubkey, mnemonicHash, body, 120)
-        return res.json(body)
-      }
-
-      await recordLeaderboardWin(pubkey)
-      await broadcastLeaderboardRefresh()
-
-      const body = { status: "win", winner: pubkey }
-      await setCachedClaimResult(pubkey, mnemonicHash, body, 3600)
-      broadcast({ type: "win", winner: pubkey, puzzle_id: PUZZLE.id })
-      broadcast({
-        type: "claim",
-        status: "win",
-        pubkey,
-        puzzle_id: PUZZLE.id,
-      })
-      return res.json(body)
-    } finally {
-      await releaseClaimLock()
-    }
-  } catch (e) {
-    console.error(e)
-    if (!res.headersSent) {
-      res.status(500).json({ status: "error", message: "internal_error" })
-    }
-  }
 })
 
 app.post("/submit", submitLimiter, async (req, res) => {

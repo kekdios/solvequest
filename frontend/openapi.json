@@ -124,12 +124,6 @@
         "responses": { "200": { "description": "Submit result" } }
       }
     },
-    "/claim": {
-      "post": {
-        "summary": "Signed claim (Solana pubkey + signature + message)",
-        "responses": { "200": { "description": "Claim result" } }
-      }
-    },
     "/events": {
       "get": {
         "summary": "Server-Sent Events stream",
@@ -181,7 +175,7 @@
     },
     "/public/wizard-clear-solved": {
       "post": {
-        "summary": "Admin: clear puzzle winner + claim lock (x-admin-key)",
+        "summary": "Admin: clear puzzle winner in Redis/memory (x-admin-key)",
         "parameters": [
           {
             "name": "x-admin-key",

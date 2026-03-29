@@ -14,7 +14,6 @@ A submission is evaluated against:
 
 The system supports:
 - interactive browser gameplay (`/submit`)
-- signed-claim lane for stronger trust (`/claim`)
 - batch validation API with no API keys (`/validate_batch`; limits from env)
 - realtime feed and leaderboard
 
@@ -23,7 +22,7 @@ The system supports:
 ## Backend (`backend/server.js`)
 - Express API server (default `PORT=3001`)
 - Serves static frontend from `frontend/`
-- Handles validation, claims, leaderboard, stats, rounds, and SSE
+- Handles validation, submits, leaderboard, stats, rounds, and SSE
 - Uses Redis when `REDIS_URL` is set; otherwise falls back to in-memory store
 
 ## Puzzle/Evaluation (`backend/puzzle.js`)
@@ -36,15 +35,13 @@ The system supports:
   - constraints pass/fail
   - BIP39 checksum validity
   - derived address match (`mnemonicToAddressCached`) to target
-- Provides solve-message parser for signed claims
-
 ## Solana Helpers
 - `backend/solana.js`: mnemonic -> Solana pubkey derivation (`m/44'/501'/0'/0'`) with LRU cache
-- `backend/verify.js`: Ed25519 signature verification for base58 pubkey/signature
+- `backend/verify.js`: Ed25519 signature verification (unit tests; not used on the main win path)
 
 ## Store Layer (`backend/store.js`)
 - Redis + in-memory implementations behind one API
-- Tracks global stats, winner state, leaderboard ZSET, rounds, claim lock/idempotency
+- Tracks global stats, winner state, leaderboard ZSET, rounds
 - Publishes/subscribes realtime events on Redis channel `arena:events` when Redis is enabled
 
 ## Frontend (`frontend/`)
@@ -60,7 +57,6 @@ The system supports:
 Enabled when `REDIS_URL` is configured.
 - Shared winner state across instances
 - Shared leaderboard/stats
-- Redis-backed claim lock and idempotency
 - Pub/sub fan-out for SSE across instances
 
 ## In-memory mode (dev only)
@@ -69,7 +65,7 @@ Used when `REDIS_URL` is missing.
 - No persistence across restart
 - Not safe for horizontal scaling
 
-## 4) Core Game and Claim Semantics
+## 4) Core Game Semantics
 
 ## Puzzle Metadata
 `GET /puzzle` returns:
@@ -80,29 +76,7 @@ Used when `REDIS_URL` is missing.
 - round timing/phase fields
 
 ## Win Conditions
-- `POST /submit`: win if evaluation says `matches_target=true`; winner set if not already solved
-- `POST /claim`: requires signature verification and claim checks, then win if:
-  - mnemonic is valid + passes constraints
-  - derived address equals provided `pubkey`
-  - derived address matches configured target
-  - winner is atomically set
-
-## Solve Message Formats (`/claim`)
-Supported by parser (gated by env flags):
-- strong round-bound: `solve:{round_id}:{puzzle_id}:{ts}:{nonce}:{mnemonic_sha256_hex}`
-- strong puzzle-bound: `solve:{puzzle_id}:{ts}:{nonce}:{mnemonic_sha256_hex}`
-- weaker legacy forms may be allowed by env
-
-Recommended production flags:
-- `CLAIM_REQUIRE_MNEMONIC_BINDING=1`
-- `CLAIM_REQUIRE_ROUND_IN_MESSAGE=1` (when rounds are used)
-
-## Replay/Race Protections
-- Signature time window (`CLAIM_SIGNATURE_WINDOW_SEC`)
-- Signed-message one-time consume (`consumeSignedMessageOnce`)
-- Claim idempotency cache keyed by `pubkey + mnemonic_hash`
-- Claim lock (`puzzle:claim_lock`)
-- Atomic winner set + lock release in Redis script (`trySetWinnerAtomic`)
+- `POST /submit`: win if evaluation says `matches_target=true`; winner set with `SET puzzle:winner NX` if not already solved
 
 ## 5) API Surface (Current)
 
@@ -128,16 +102,12 @@ Recommended production flags:
   - body: `{ phrase | mnemonic, wallet }`
   - browser-friendly submit lane
 
-- `POST /claim`
-  - body: `{ mnemonic, pubkey, signature, message }`
-  - signed, trust-hardened claim lane
-
 - `GET /leaderboard`
   - supports `?limit=` and `?wallet=`
   - returns top list and optional self metrics (`rank`, `gap_to_leader`)
 
 - `GET /events` (SSE)
-  - realtime event stream (`hello`, `attempt`, `leaderboard_update`, `submit`, `claim`, `win`, `puzzle_cleared`, `round_end`, `round_settled`, …)
+  - realtime event stream (`hello`, `attempt`, `leaderboard_update`, `submit`, `win`, `puzzle_cleared`, `round_end`, `round_settled`, …)
 
 - `GET /public/developer-info`
   - `validate_batch_max`, `rate_limit_validate_batch_per_sec`, `wizard_derive_enabled`
@@ -146,20 +116,20 @@ Recommended production flags:
   - derives target, hash, word lists for `puzzle-wizard.html`
 
 - `POST /public/wizard-clear-solved` (`x-admin-key` = `ADMIN_CONTROL_KEY`)
-  - deletes `puzzle:winner` and `puzzle:claim_lock` in Redis (or in-memory equivalents); emits `puzzle_cleared`
+  - deletes `puzzle:winner` in Redis (or in-memory equivalent); emits `puzzle_cleared`
 
 ## 6) Stats and Leaderboard
 
 ## Stats
 Tracked metrics include:
-- attempts (`validations_single`, `batch_items`, `submits`, `claims`)
+- attempts (`validations_single`, `batch_items`, `submits`)
 - `valid_checksums`
-- `constraint_rejects`, `invalid_mnemonics`, `valid_target_misses`, `address_mismatches`
+- `constraint_rejects`, `invalid_mnemonics`, `valid_target_misses`
 - computed `attempts_per_sec`, `time_elapsed`, `valid_rate`
 
 ## Leaderboard
 - Redis ZSET key: `leaderboard:global`
-- Large score bonus on a successful win (`POST /submit` or `POST /claim` after atomic winner set); default `LEADERBOARD_WIN_POINTS` (see `ENV_SETTINGS.md`)
+- Large score bonus on a successful win (`POST /submit` after winner set); default `LEADERBOARD_WIN_POINTS` (see `ENV_SETTINGS.md`)
 - Smaller +1 increments on valid-checksum near misses (`valid_but_wrong`)
 - Optional negative penalty on constraint violations (`LEADERBOARD_CONSTRAINT_PENALTY`)
 - Per-wallet per-second increment cap applies to near-miss increments only (`LEADERBOARD_MAX_INCR_PER_SEC`)
@@ -173,7 +143,6 @@ Tracked metrics include:
   - `settled`
 - During non-active rounds:
   - `/submit` returns `round_ended`
-  - `/claim` returns cached idempotent result or `round_ended`
 - Background tick:
   - emits `round_end`
   - settles round after grace (`ROUND_SETTLE_GRACE_SEC`)
@@ -185,7 +154,7 @@ Tracked metrics include:
 - Run backend as long-lived service (systemd/PM2/container)
 - Put HTTPS reverse proxy in front (e.g. Nginx)
 - Set `REDIS_URL` for persistence and multi-instance safety
-- Configure strict env flags for claim security
+- Tune rate limits and batch sizes for your traffic
 - Restrict CORS to your website origin(s)
 
 ## Website integration options

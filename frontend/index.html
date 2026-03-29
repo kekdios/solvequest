@@ -190,6 +190,126 @@
       <div id="sse-logs"></div>
     </details>
 
+    <div class="operator-bar" aria-label="Operator">
+      <button type="button" id="new-puzzle-open" class="new-puzzle-btn">
+        New Puzzle
+      </button>
+    </div>
+
+    <dialog
+      id="new-puzzle-dialog"
+      class="player-dialog new-puzzle-dialog"
+      aria-labelledby="new-puzzle-title"
+    >
+      <div class="player-dialog-inner">
+        <h3 id="new-puzzle-title">New Puzzle</h3>
+
+        <div id="new-puzzle-step1" class="new-puzzle-step">
+          <p class="player-dialog-desc">
+            Creates a <strong>new</strong> puzzle in the SQLite vault: the current
+            <strong>unsolved</strong> row is retired, a new row is inserted, the arena loads the new
+            words and commitments, and the winner state is cleared. Requires
+            <code>PUZZLE_SOURCE=sqlite</code>. Use a <strong>new</strong>
+            <code>public_id</code> (e.g. <code>002</code>) — ids cannot be reused.
+          </p>
+          <div class="player-dialog-actions">
+            <button type="button" class="player-btn" id="new-puzzle-step1-cancel">
+              Cancel
+            </button>
+            <button type="button" class="player-btn primary" id="new-puzzle-step1-next">
+              Continue
+            </button>
+          </div>
+        </div>
+
+        <div id="new-puzzle-step2" class="new-puzzle-step" hidden>
+          <div class="new-puzzle-form-scroll">
+            <p class="player-dialog-desc">
+              <code>x-admin-key</code> is sent once; not stored. Optional QUEST send runs if
+              <code>QUEST_AUTO_FUND=1</code> is set on the server.
+            </p>
+            <label class="player-field">
+              <span>Admin key</span>
+              <input
+                type="password"
+                id="new-puzzle-admin-key"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+            <label class="player-field">
+              <span>Public id (unique, e.g. 002)</span>
+              <input
+                type="text"
+                id="new-puzzle-public-id"
+                autocomplete="off"
+                spellcheck="false"
+                maxlength="64"
+              />
+            </label>
+            <label class="player-field">
+              <span>Target address (base58)</span>
+              <input
+                type="text"
+                id="new-puzzle-target"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+            <label class="player-field">
+              <span>Solution hash (64 hex)</span>
+              <input
+                type="text"
+                id="new-puzzle-hash"
+                autocomplete="off"
+                spellcheck="false"
+                maxlength="64"
+              />
+            </label>
+            <label class="player-field">
+              <span>12 words (comma-separated)</span>
+              <textarea
+                id="new-puzzle-words"
+                rows="3"
+                autocomplete="off"
+                spellcheck="false"
+              ></textarea>
+            </label>
+            <label class="player-field">
+              <span>Round id (optional)</span>
+              <input
+                type="text"
+                id="new-puzzle-round-id"
+                autocomplete="off"
+                value="default"
+              />
+            </label>
+            <label class="player-field">
+              <span>PUZZLE_CONSTRAINTS_JSON (optional)</span>
+              <textarea
+                id="new-puzzle-constraints"
+                rows="2"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder='{"fixed_positions":{"0":"word","11":"word"}}'
+              ></textarea>
+            </label>
+            <label class="player-field">
+              <span>Difficulty (optional: easy / medium / hard)</span>
+              <input type="text" id="new-puzzle-difficulty" autocomplete="off" />
+            </label>
+          </div>
+          <p id="new-puzzle-error" class="player-form-error" role="alert" hidden></p>
+          <div class="player-dialog-actions">
+            <button type="button" class="player-btn" id="new-puzzle-step2-back">Back</button>
+            <button type="button" class="player-btn primary" id="new-puzzle-submit">
+              Create new puzzle
+            </button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
     <footer class="arena-footer">
       <p id="app-version" class="app-version" aria-live="polite">—</p>
     </footer>

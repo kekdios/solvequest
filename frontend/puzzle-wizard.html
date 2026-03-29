@@ -305,7 +305,7 @@
       <h2>5) Next (manual)</h2>
       <ul class="hint" style="margin: 0; padding-left: 1.2rem">
         <li>Fund <strong>TARGET_ADDRESS</strong> with prize SAUSD (or your configured SPL mint) and SOL for fees.</li>
-        <li>Merge the block above into <code>backend/.env</code> (with <code>REDIS_URL</code>, claim flags, etc.).</li>
+        <li>Merge the block above into <code>backend/.env</code> (with <code>REDIS_URL</code>, etc.).</li>
         <li>Restart backend; run <code>curl</code> validate test from README.</li>
       </ul>
       <p class="hint">
@@ -318,8 +318,8 @@
       <h2>6) Clear SOLVED state (Redis / memory)</h2>
       <p class="hint" style="margin: 0 0 12px">
         After you update server <code>.env</code> and <strong>restart</strong> the backend, the arena can still show
-        <strong>SOLVED</strong> if <code>puzzle:winner</code> remained in Redis. This removes the winner and claim
-        lock only — it does <strong>not</strong> reload puzzle words from disk (that still requires restart with new
+        <strong>SOLVED</strong> if <code>puzzle:winner</code> remained in Redis. This clears the winner only — it does
+        <strong>not</strong> reload puzzle words from disk (that still requires restart with new
         env).
       </p>
       <label for="admin-key-clear">ADMIN_CONTROL_KEY (header <code>x-admin-key</code>)</label>

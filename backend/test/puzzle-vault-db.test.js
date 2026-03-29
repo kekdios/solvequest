@@ -3,7 +3,12 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import os from "node:os"
-import { openPuzzleVaultDatabase } from "../puzzle-vault-db.js"
+import {
+  openPuzzleVaultDatabase,
+  retireAllUnsolvedPuzzles,
+  insertUnsolvedPuzzleRow,
+  getActiveUnsolvedPuzzle,
+} from "../puzzle-vault-db.js"
 
 const keys = [
   "PUZZLE_SOURCE",
@@ -99,4 +104,57 @@ test("openPuzzleVaultDatabase creates DB and preserves rows across reopen", () =
   assert.equal(n2, 1)
   const backups = fs.readdirSync(process.env.SQLITE_BACKUP_DIR).filter((f) => f.endsWith(".db"))
   assert.ok(backups.length >= 1, "should have at least one backup after second open")
+})
+
+test("retireAllUnsolvedPuzzles then insertUnsolvedPuzzleRow", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pv-rot-"))
+  const dbfile = path.join(root, "vault.db")
+  process.env.PUZZLE_SOURCE = "sqlite"
+  process.env.SQLITE_PATH = dbfile
+  process.env.SQLITE_BACKUP_KEEP = "7"
+  delete process.env.QUEST_OPERATOR_SECRET_KEY
+  delete process.env.QUEST_MINT
+  delete process.env.QUEST_FUND_AMOUNT_RAW
+
+  const h = openPuzzleVaultDatabase()
+  assert.ok(h)
+  lastDb = h.db
+  const hash64 = "a".repeat(64)
+  h.db
+    .prepare(
+      `INSERT INTO puzzles (public_id, status, target_address, solution_hash, puzzle_words_csv) VALUES (?,?,?,?,?)`
+    )
+    .run("p001", "unsolved", "T1", hash64, "a,b,c,d,e,f,g,h,i,j,k,l")
+
+  const n = retireAllUnsolvedPuzzles(h.db, h.vault)
+  assert.equal(n, 1)
+  const old = h.db.prepare(`SELECT status, winner_id FROM puzzles WHERE public_id = 'p001'`).get()
+  assert.equal(old.status, "solved")
+  assert.equal(old.winner_id, "operator_retired")
+
+  const rowId = insertUnsolvedPuzzleRow(h.db, h.vault, {
+    public_id: "p002",
+    target_address: "T2",
+    solution_hash: hash64,
+    puzzle_words_csv: "z,y,x,w,v,u,t,s,r,q,p,o",
+    round_id: "default",
+    difficulty: null,
+  })
+  assert.ok(rowId > 0)
+  const active = getActiveUnsolvedPuzzle(h.db)
+  assert.equal(active.public_id, "p002")
+  assert.equal(active.target_address, "T2")
+
+  assert.throws(
+    () =>
+      insertUnsolvedPuzzleRow(h.db, h.vault, {
+        public_id: "p002",
+        target_address: "T3",
+        solution_hash: hash64,
+        puzzle_words_csv: "a,b,c,d,e,f,g,h,i,j,k,l",
+        round_id: "default",
+        difficulty: null,
+      }),
+    /public_id already/
+  )
 })

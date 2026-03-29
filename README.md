@@ -1,6 +1,6 @@
 # SolveQuest PoC
 
-Competition backend with **Redis** (optional in-memory fallback), **atomic claims**, **Solana signatures**, **batch validation** (no API keys), and **SSE** (Redis pub/sub when Redis is enabled).
+Competition backend with **Redis** (optional in-memory fallback), **batch validation** (no API keys), and **SSE** (Redis pub/sub when Redis is enabled).
 
 ## Arena terminology
 
@@ -148,8 +148,6 @@ TARGET_ADDRESS=<from step 2>
 SOLUTION_HASH=<from step 3>
 PUZZLE_WORDS=<comma-separated 12 words from step 4>
 REDIS_URL=redis://127.0.0.1:6379
-CLAIM_REQUIRE_MNEMONIC_BINDING=1
-CLAIM_REQUIRE_ROUND_IN_MESSAGE=1
 ```
 
 Optional round controls:
@@ -208,24 +206,18 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 
 ## Phase 5: abuse resistance + performance
 
-### Claim lane (`POST /claim`)
+### Win path (`POST /submit`)
 
-1. **Signed message** (recommended): **`solve:{PUZZLE_ID}:{unix_ts}:{nonce}:{mnemonic_sha256_hex}`** (or **`solve:{ROUND_ID}:{PUZZLE_ID}:{unix_ts}:{nonce}:{mnemonic_sha256_hex}`** to bind a round). The hash is **`SHA-256(normalized mnemonic)`** (hex). **Order:** parse message → time window → **verify Ed25519 signature** → compare hash to body mnemonic → idempotency / round checks → lock → eval.  
-   Set **`CLAIM_REQUIRE_MNEMONIC_BINDING=1`** to **only** accept binding formats. **`CLAIM_REQUIRE_ROUND_IN_MESSAGE=1`** requires the **6-part** message with **`ROUND_ID`** (see **`GET /puzzle`** → **`round_id`**).  
-   **`CLAIM_SIGNATURE_WINDOW_SEC`** (default **30**) limits stale timestamps.
+Wins are registered when evaluation finds a valid mnemonic that matches **`TARGET_ADDRESS`**. **`SET puzzle:winner NX`** ensures only one winner per puzzle in Redis (or equivalent in-memory flag).
 
-2. **Idempotency** — **`claim:result:{pubkey}:{mnemonic_hash}`** (short TTL) so retries return stable JSON without double work.
-
-3. **Global claim lock** — **`SET puzzle:claim_lock NX EX`** (`CLAIM_LOCK_TTL_SEC`, default **5**). If acquisition fails → **`{ "status": "lost_race" }`** so only one request at a time runs the expensive path.
-
-4. **Derivation cache** — SHA-256 of normalized mnemonic → address LRU (**`DERIVATION_CACHE_MAX`**, default **5000**).
+**Derivation cache:** normalized mnemonic → address LRU (**`DERIVATION_CACHE_MAX`**, default **5000**).
 
 ### Timed rounds
 
 - **`ROUND_DURATION_SEC`** — on first Redis boot, sets **`puzzle:round_end_ms`** (NX) to `now + duration`. Omit to leave the round open-ended (in-memory dev: set on process start).
 - **`ROUND_ID`** — stored as **`puzzle:round_id`** (NX); echoed on **`GET /puzzle`**.
 - **`ROUND_SETTLE_GRACE_SEC`** (default **3**) — after **`round_end_ms`**, a short grace, then **`puzzle:round_settled`** is set and **`puzzle:round_leaderboard_winner`** = top of **`leaderboard:global`**. SSE: **`round_end`**, **`round_settled`**.
-- After **`round_end`**: **`POST /claim`** and **`POST /submit`** return **`{ "status": "round_ended" }`** (cached claim results from idempotency still succeed). Leaderboard **ZSET** stops accepting new increments.
+- After **`round_end`**: **`POST /submit`** returns **`{ "status": "round_ended" }`**. Leaderboard **ZSET** stops accepting new increments.
 - **`GET /puzzle`** includes **`round_phase`** (`active` \| `grace` \| `settled`), **`round_settle_at_ms`**, **`round_settled`**, **`round_leaderboard_winner`**.
 
 ### Leaderboard (game score)
@@ -233,7 +225,7 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 - Redis **`leaderboard:global`** sorted set: score = **valid checksum + wrong target** attempts (not raw spam).
 - **Rate limit:** at most **`LEADERBOARD_MAX_INCR_PER_SEC`** (default **20**) score changes per wallet per second (incl. constraint penalty).
 - **`GET /leaderboard?limit=20`** — **`{ "top": [ { "pubkey", "score" } ] }`**. With **`&wallet=<pubkey>`**, adds **`self`**: **`score`**, **`rank`**, **`leader_score`**, **`gap_to_leader`**.
-- Optional **`LEADERBOARD_CONSTRAINT_PENALTY`** (e.g. **`-0.5`**) applied on constraint rejects (submit + claim).
+- Optional **`LEADERBOARD_CONSTRAINT_PENALTY`** (e.g. **`-0.5`**) applied on constraint rejects (`POST /submit`).
 
 ### Stats (extended)
 
@@ -242,7 +234,6 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 - `constraint_rejects`
 - `invalid_mnemonics`
 - `valid_target_misses`
-- `address_mismatches` (claim: mnemonic valid but `pubkey` ≠ derived address)
 
 ### Batch validation (`POST /validate_batch`)
 
@@ -259,7 +250,7 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 
 - With **Redis**: events are **`PUBLISH arena:events`**; each instance **subscribes** and pushes to its local SSE clients (no double delivery on the publishing node).
 - Without Redis: local broadcast only.
-- Structured types include **`attempt`**, **`leaderboard_update`** (with **`top`** preview), **`round_end`**, **`round_settled`** ( **`leaderboard_winner`**, **`puzzle_winner`** ), **`puzzle_cleared`** (winner cleared for a new round), plus **`claim`** / **`submit`** / **`win`**.
+- Structured types include **`attempt`**, **`leaderboard_update`** (with **`top`** preview), **`round_end`**, **`round_settled`** ( **`leaderboard_winner`**, **`puzzle_winner`** ), **`puzzle_cleared`** (winner cleared for a new round), plus **`submit`** / **`win`**.
 
 ---
 
@@ -269,7 +260,6 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 |----------|--------|
 | `GET /version` | `{ version }` from `backend/package.json` (arena footer) |
 | `GET /public/developer-info` | `validate_batch_max`, `rate_limit_validate_batch_per_sec`, `wizard_derive_enabled` (for `/developers` + wizard UI) |
-| `POST /claim` | Body: `mnemonic`, `pubkey`, `signature` (base58), signed `message` (binding + optional round; see above) |
 | `POST /validate_batch` | Body `{ mnemonics }`; no auth; size cap and concurrency from env (see Batch validation) |
 | `GET /stats` | Counters + `attempts_per_sec`, `valid_rate`, arena time |
 | `GET /leaderboard` | `?limit=&wallet=` → `{ top, self? }` |
@@ -290,8 +280,6 @@ DEPLOY_TARGET=root@your-server-ip BRANCH=main APP_DIR=/opt/solvequest SERVICE_NA
 | `puzzle:round_leaderboard_winner` | Top ZSET pubkey at settlement |
 | `arena:round_end_event:{round_id}` | NX flag for one `round_end` broadcast |
 | `puzzle:winner` | Winner id (`SET NX`) |
-| `puzzle:claim_lock` | Short TTL global lock for claim evaluation |
-| `claim:result:{pubkey}:{mnemonic_hash}` | Idempotency cache |
 | `arena:events` | Pub/sub channel for SSE fan-out |
 
 ---

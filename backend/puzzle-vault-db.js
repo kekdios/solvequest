@@ -38,12 +38,92 @@ function ensureVaultColumns(db) {
   }
 }
 
+/**
+ * One-time: replace CHECK that allowed `claimed` with `unsolved` | `solved` only; map rows
+ * `claimed` → `solved` (preserve timestamps).
+ */
+function migratePuzzlesDropClaimedStatus(db) {
+  const row = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='puzzles'`)
+    .get()
+  if (!row?.sql || typeof row.sql !== "string") return
+  if (!row.sql.includes("'claimed'")) return
+
+  db.exec("PRAGMA foreign_keys = OFF")
+  db.exec("BEGIN IMMEDIATE")
+  try {
+    db.exec(`DROP TABLE IF EXISTS puzzles__status_mig`)
+    db.exec(`
+      CREATE TABLE puzzles__status_mig (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        public_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('unsolved', 'solved')),
+        target_address TEXT NOT NULL,
+        solution_hash TEXT NOT NULL,
+        ciphertext BLOB,
+        cipher_nonce BLOB,
+        constraints_json TEXT,
+        puzzle_words_csv TEXT,
+        difficulty TEXT,
+        winner_id TEXT,
+        solved_at TEXT,
+        claimed_at TEXT,
+        quest_fund_tx TEXT,
+        round_id TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `)
+    db.exec(`
+      INSERT INTO puzzles__status_mig (
+        id, public_id, status, target_address, solution_hash,
+        ciphertext, cipher_nonce, constraints_json, puzzle_words_csv, difficulty,
+        winner_id, solved_at, claimed_at, quest_fund_tx, round_id, created_at
+      )
+      SELECT
+        id,
+        public_id,
+        CASE WHEN status = 'claimed' THEN 'solved' ELSE status END,
+        target_address,
+        solution_hash,
+        ciphertext,
+        cipher_nonce,
+        constraints_json,
+        puzzle_words_csv,
+        difficulty,
+        winner_id,
+        CASE
+          WHEN status = 'claimed' THEN COALESCE(solved_at, claimed_at, datetime('now'))
+          ELSE solved_at
+        END,
+        claimed_at,
+        quest_fund_tx,
+        round_id,
+        created_at
+      FROM puzzles
+    `)
+    db.exec(`DROP TABLE puzzles`)
+    db.exec(`ALTER TABLE puzzles__status_mig RENAME TO puzzles`)
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_puzzles_public_id ON puzzles (public_id)`)
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_puzzles_status ON puzzles (status)`)
+    db.exec(`COMMIT`)
+  } catch (e) {
+    try {
+      db.exec(`ROLLBACK`)
+    } catch {
+      /* ignore */
+    }
+    throw e
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON")
+  }
+}
+
 export function runVaultMigrations(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS puzzles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       public_id TEXT NOT NULL,
-      status TEXT NOT NULL CHECK (status IN ('unsolved', 'solved', 'claimed')),
+      status TEXT NOT NULL CHECK (status IN ('unsolved', 'solved')),
       target_address TEXT NOT NULL,
       solution_hash TEXT NOT NULL,
       ciphertext BLOB,
@@ -62,6 +142,7 @@ export function runVaultMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_puzzles_status ON puzzles (status);
   `)
   ensureVaultColumns(db)
+  migratePuzzlesDropClaimedStatus(db)
 }
 
 /** Latest unsolved puzzle row (highest id). */
@@ -119,6 +200,63 @@ export function insertBootstrapPuzzleFromEnv(db, vault, { force = false } = {}) 
       target_address,
       solution_hash,
       normalizedWordCsv,
+      constraints_json,
+      round_id,
+      difficulty
+    )
+  return Number(info.lastInsertRowid)
+}
+
+/**
+ * Mark every `unsolved` row as `solved` (operator retirement) so a new unsolved row can use a fresh `public_id`.
+ * @returns {number} rows updated
+ */
+export function retireAllUnsolvedPuzzles(db, vault) {
+  const n = db.prepare(`SELECT COUNT(*) AS c FROM puzzles WHERE status = 'unsolved'`).get().c
+  if (n === 0) return 0
+  backupPuzzleVaultBeforeWrite(vault)
+  const r = db
+    .prepare(
+      `UPDATE puzzles SET status = 'solved', winner_id = 'operator_retired', solved_at = datetime('now') WHERE status = 'unsolved'`
+    )
+    .run()
+  return r.changes
+}
+
+/**
+ * Insert one unsolved puzzle row (validated fields). Caller must ensure `public_id` is unused.
+ * @returns {number} inserted row id
+ */
+export function insertUnsolvedPuzzleRow(
+  db,
+  vault,
+  {
+    public_id,
+    target_address,
+    solution_hash,
+    puzzle_words_csv,
+    constraints_json = null,
+    round_id = "default",
+    difficulty = null,
+  }
+) {
+  const dup = db.prepare(`SELECT 1 FROM puzzles WHERE public_id = ?`).get(public_id)
+  if (dup) {
+    throw new Error(`public_id already in use: ${public_id}`)
+  }
+  backupPuzzleVaultBeforeWrite(vault)
+  const info = db
+    .prepare(
+      `INSERT INTO puzzles (
+        public_id, status, target_address, solution_hash, puzzle_words_csv,
+        constraints_json, round_id, difficulty
+      ) VALUES (?, 'unsolved', ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      public_id,
+      target_address,
+      solution_hash,
+      puzzle_words_csv,
       constraints_json,
       round_id,
       difficulty
