@@ -624,7 +624,8 @@
         const statusEl = document.getElementById("clear-solved-status")
         const key = document.getElementById("admin-key-clear").value.trim()
         if (!key) {
-          statusEl.innerHTML = '<span class="bad">Enter ADMIN_CONTROL_KEY.</span>'
+          statusEl.innerHTML =
+            '<span class="bad">Enter the <strong>value</strong> of <code>ADMIN_CONTROL_KEY</code> from <code>backend/.env</code> (the part after <code>=</code>), not the variable name.</span>'
           return
         }
         statusEl.innerHTML = '<span class="muted">Clearing…</span>'
