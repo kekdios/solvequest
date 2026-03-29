@@ -7,7 +7,7 @@ import fs from "node:fs"
 import Database from "better-sqlite3"
 import {
   parsePuzzleSource,
-  requireSqliteVaultEnv,
+  requireSqliteStorageEnv,
   PUZZLE_SOURCE_SQLITE,
 } from "./puzzle-vault-env.js"
 import { backupSqliteBeforeChange } from "./puzzle-vault-backup.js"
@@ -15,7 +15,7 @@ import { backupSqliteBeforeChange } from "./puzzle-vault-backup.js"
 /**
  * Call immediately before any vault write that mutates puzzle rows (insert/update/delete),
  * if the DB file already exists and is non-empty.
- * @param {ReturnType<typeof requireSqliteVaultEnv>} vault
+ * @param {ReturnType<typeof requireSqliteStorageEnv>} vault
  */
 export function backupPuzzleVaultBeforeWrite(vault) {
   return backupSqliteBeforeChange(vault.sqlitePath, {
@@ -129,13 +129,13 @@ export function insertBootstrapPuzzleFromEnv(db, vault, { force = false } = {}) 
 /**
  * When PUZZLE_SOURCE is not sqlite, returns null.
  * Otherwise backs up existing non-empty DB, opens/creates file, runs idempotent migrations.
- * @returns {{ db: import("better-sqlite3").Database, vault: ReturnType<typeof requireSqliteVaultEnv> } | null}
+ * @returns {{ db: import("better-sqlite3").Database, vault: ReturnType<typeof requireSqliteStorageEnv> } | null}
  */
 export function openPuzzleVaultDatabase() {
   if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE) {
     return null
   }
-  const vault = requireSqliteVaultEnv()
+  const vault = requireSqliteStorageEnv()
   const p = vault.sqlitePath
   try {
     const st = fs.statSync(p)

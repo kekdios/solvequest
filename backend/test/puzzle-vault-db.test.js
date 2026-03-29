@@ -41,6 +41,26 @@ test("openPuzzleVaultDatabase returns null when PUZZLE_SOURCE=env", () => {
   assert.equal(openPuzzleVaultDatabase(), null)
 })
 
+test("openPuzzleVaultDatabase works without QUEST_* (storage env only)", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pv-db-nq-"))
+  const dbfile = path.join(root, "vault.db")
+  process.env.PUZZLE_SOURCE = "sqlite"
+  process.env.SQLITE_PATH = dbfile
+  process.env.SQLITE_BACKUP_KEEP = "7"
+  delete process.env.QUEST_OPERATOR_SECRET_KEY
+  delete process.env.QUEST_MINT
+  delete process.env.QUEST_FUND_AMOUNT_RAW
+  delete process.env.ENCRYPTION_HKDF_SALT_HEX
+
+  const h = openPuzzleVaultDatabase()
+  assert.ok(h)
+  lastDb = h.db
+  const n = h.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='puzzles'`).get()
+  assert.ok(n)
+  h.db.close()
+  lastDb = null
+})
+
 test("openPuzzleVaultDatabase creates DB and preserves rows across reopen", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pv-db-"))
   const dbfile = path.join(root, "vault.db")

@@ -21,10 +21,10 @@ SQLITE_PATH=${SQLITE_FILE}
 # SQLITE_BACKUP_DIR=${APP_DIR}/data/puzzle-vault/puzzle-vault-backups
 SQLITE_BACKUP_KEEP=7
 
-# Operator wallet: will sign QUEST transfers later; HKDF input for encryption later
-QUEST_OPERATOR_SECRET_KEY=<paste base58 or JSON secret — never commit>
-QUEST_MINT=<QUEST SPL mint address>
-QUEST_FUND_AMOUNT_RAW=<positive integer, smallest units>
+# QUEST (optional for step3 migrate + step4 bootstrap + serving; required before QUEST sign/fund features land)
+# QUEST_OPERATOR_SECRET_KEY=<base58 or JSON secret — never commit>
+# QUEST_MINT=<SPL mint address>
+# QUEST_FUND_AMOUNT_RAW=<positive integer, smallest units>
 
 # One-time bootstrap reads these (same as classic env puzzle) for the FIRST vault row only:
 TARGET_ADDRESS=<...>

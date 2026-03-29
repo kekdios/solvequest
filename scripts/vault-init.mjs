@@ -8,7 +8,7 @@
  *   node scripts/vault-init.mjs bootstrap-from-env
  *   node scripts/vault-init.mjs bootstrap-from-env --force
  *
- * Requires PUZZLE_SOURCE=sqlite and full vault env (see backend/.env.example).
+ * Requires PUZZLE_SOURCE=sqlite and SQLITE_PATH (see backend/.env.example). QUEST_* optional until funding/signing uses them.
  */
 
 import path from "node:path"
@@ -27,8 +27,12 @@ async function loadBackend(spec) {
   return import(pathToFileURL(path.join(backendRoot, spec)).href)
 }
 
-const { parsePuzzleSource, PUZZLE_SOURCE_SQLITE, requireSqliteVaultEnv, puzzleVaultEnvSummary } =
-  await loadBackend("puzzle-vault-env.js")
+const {
+  parsePuzzleSource,
+  PUZZLE_SOURCE_SQLITE,
+  requireSqliteStorageEnv,
+  puzzleVaultEnvSummary,
+} = await loadBackend("puzzle-vault-env.js")
 const {
   openPuzzleVaultDatabase,
   getActiveUnsolvedPuzzle,
@@ -54,7 +58,7 @@ async function cmdMigrate() {
     process.exit(1)
   }
   h.db.close()
-  console.log("migrate: OK (schema ready at", requireSqliteVaultEnv().sqlitePath + ")")
+  console.log("migrate: OK (schema ready at", requireSqliteStorageEnv().sqlitePath + ")")
 }
 
 async function cmdStatus() {

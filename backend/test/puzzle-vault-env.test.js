@@ -5,7 +5,9 @@ import {
   parsePuzzleSource,
   parseSqliteBackupKeep,
   resolveSqliteBackupDir,
+  requireSqliteStorageEnv,
   requireSqliteVaultEnv,
+  puzzleVaultEnvSummary,
   PUZZLE_SOURCE_ENV,
   PUZZLE_SOURCE_SQLITE,
 } from "../puzzle-vault-env.js"
@@ -74,6 +76,27 @@ test("resolveSqliteBackupDir explicit vs default", () => {
   assert.equal(derived, path.join(path.dirname(base), "puzzle-vault-backups"))
   process.env.SQLITE_BACKUP_DIR = "/var/backups/sq"
   assert.equal(resolveSqliteBackupDir(base), path.resolve("/var/backups/sq"))
+})
+
+test("requireSqliteStorageEnv needs path only (no QUEST)", () => {
+  process.env.PUZZLE_SOURCE = "sqlite"
+  process.env.SQLITE_PATH = "/tmp/storage-only.db"
+  delete process.env.QUEST_OPERATOR_SECRET_KEY
+  delete process.env.QUEST_MINT
+  delete process.env.QUEST_FUND_AMOUNT_RAW
+  delete process.env.ENCRYPTION_HKDF_SALT_HEX
+  const s = requireSqliteStorageEnv()
+  assert.equal(s.sqlitePath, path.resolve("/tmp/storage-only.db"))
+})
+
+test("puzzleVaultEnvSummary shows quest_env_pending when QUEST missing", () => {
+  process.env.PUZZLE_SOURCE = "sqlite"
+  process.env.SQLITE_PATH = "/tmp/x.db"
+  delete process.env.QUEST_OPERATOR_SECRET_KEY
+  const sum = puzzleVaultEnvSummary()
+  assert.equal(sum.puzzle_source, PUZZLE_SOURCE_SQLITE)
+  assert.equal(sum.quest_operator_key_configured, false)
+  assert.match(String(sum.quest_env_pending), /QUEST_OPERATOR_SECRET_KEY/)
 })
 
 test("requireSqliteVaultEnv throws when sqlite but incomplete", () => {
