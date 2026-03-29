@@ -468,27 +468,29 @@ if (playerOpen && playerDlg && playerForm) {
 
 const newPuzzleDlg = document.getElementById("new-puzzle-dialog")
 const newPuzzleOpen = document.getElementById("new-puzzle-open")
-const newPuzzleStep1 = document.getElementById("new-puzzle-step1")
-const newPuzzleStep2 = document.getElementById("new-puzzle-step2")
 const newPuzzleAdminKey = document.getElementById("new-puzzle-admin-key")
 const newPuzzleErr = document.getElementById("new-puzzle-error")
+const newPuzzleDraftEl = document.getElementById("new-puzzle-draft")
+
+/** @type {null | Record<string, string | null>} */
+let newPuzzleDraft = null
 
 function resetNewPuzzleDialog() {
-  newPuzzleStep1?.removeAttribute("hidden")
-  newPuzzleStep2?.setAttribute("hidden", "")
-  const fields = [
-    ["new-puzzle-admin-key", ""],
-    ["new-puzzle-public-id", ""],
-    ["new-puzzle-target", ""],
-    ["new-puzzle-hash", ""],
-    ["new-puzzle-words", ""],
-    ["new-puzzle-round-id", "default"],
-    ["new-puzzle-constraints", ""],
-    ["new-puzzle-difficulty", ""],
+  newPuzzleDraft = null
+  newPuzzleDraftEl?.setAttribute("hidden", "")
+  if (newPuzzleAdminKey) newPuzzleAdminKey.value = ""
+  const preIds = [
+    "new-puzzle-show-mnemonic",
+    "new-puzzle-show-public-id",
+    "new-puzzle-show-target",
+    "new-puzzle-show-hash",
+    "new-puzzle-show-words",
+    "new-puzzle-show-constraints",
+    "new-puzzle-show-round",
   ]
-  for (const [id, val] of fields) {
+  for (const id of preIds) {
     const el = document.getElementById(id)
-    if (el) el.value = val
+    if (el) el.textContent = ""
   }
   if (newPuzzleErr) {
     newPuzzleErr.hidden = true
@@ -496,94 +498,128 @@ function resetNewPuzzleDialog() {
   }
 }
 
-function showNewPuzzleStep2() {
-  newPuzzleStep1?.setAttribute("hidden", "")
-  newPuzzleStep2?.removeAttribute("hidden")
-  newPuzzleAdminKey?.focus()
+function setNewPuzzleError(msg) {
+  if (!newPuzzleErr) return
+  newPuzzleErr.textContent = msg
+  newPuzzleErr.hidden = !msg
+}
+
+function showNewPuzzleDraft(draft) {
+  newPuzzleDraft = draft
+  const set = (id, text) => {
+    const el = document.getElementById(id)
+    if (el) el.textContent = text ?? ""
+  }
+  set("new-puzzle-show-mnemonic", draft.mnemonic)
+  set("new-puzzle-show-public-id", draft.public_id)
+  set("new-puzzle-show-target", draft.target_address)
+  set("new-puzzle-show-hash", draft.solution_hash)
+  set("new-puzzle-show-words", draft.puzzle_words)
+  set("new-puzzle-show-constraints", draft.constraints_json ?? "")
+  set("new-puzzle-show-round", draft.round_id ?? "default")
+  newPuzzleDraftEl?.removeAttribute("hidden")
+}
+
+function setNewPuzzleBusy(busy) {
+  for (const id of ["new-puzzle-generate", "new-puzzle-regenerate", "new-puzzle-approve"]) {
+    const b = document.getElementById(id)
+    if (b) b.disabled = busy
+  }
+}
+
+async function fetchNewPuzzleDraft() {
+  if (!newPuzzleAdminKey) return
+  const key = newPuzzleAdminKey.value.trim()
+  setNewPuzzleError("")
+  if (!key) {
+    setNewPuzzleError("Enter the admin key.")
+    return
+  }
+  setNewPuzzleBusy(true)
+  try {
+    const res = await fetch(`${API}/public/admin/new-puzzle-draft`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-key": key,
+      },
+      body: JSON.stringify({}),
+    })
+    let j = null
+    try {
+      j = await res.json()
+    } catch {
+      j = null
+    }
+    if (res.ok && j?.ok && j.draft) {
+      showNewPuzzleDraft(j.draft)
+      return
+    }
+    if (res.status === 401) {
+      setNewPuzzleError("Wrong admin key or not allowed.")
+    } else if (res.status === 503) {
+      setNewPuzzleError("Admin control is not configured on this server.")
+    } else if (res.status === 429) {
+      setNewPuzzleError("Too many requests. Wait a minute and try again.")
+    } else if (res.status === 400 && j?.error === "vault_only") {
+      setNewPuzzleError(
+        "Server must use PUZZLE_SOURCE=sqlite with an open vault (use CLI bootstrap first)."
+      )
+    } else {
+      setNewPuzzleError(j?.detail || j?.error || res.statusText || `Failed (${res.status})`)
+    }
+  } catch {
+    setNewPuzzleError("Network error — try again.")
+  } finally {
+    setNewPuzzleBusy(false)
+  }
 }
 
 if (newPuzzleOpen && newPuzzleDlg) {
   newPuzzleOpen.addEventListener("click", () => {
     resetNewPuzzleDialog()
     newPuzzleDlg.showModal()
+    newPuzzleAdminKey?.focus()
   })
-  document.getElementById("new-puzzle-step1-cancel")?.addEventListener("click", () => {
+  document.getElementById("new-puzzle-cancel")?.addEventListener("click", () => {
     newPuzzleDlg.close()
   })
-  document.getElementById("new-puzzle-step1-next")?.addEventListener("click", () => {
-    if (newPuzzleErr) {
-      newPuzzleErr.hidden = true
-      newPuzzleErr.textContent = ""
-    }
-    showNewPuzzleStep2()
+  document.getElementById("new-puzzle-generate")?.addEventListener("click", () => {
+    fetchNewPuzzleDraft()
   })
-  document.getElementById("new-puzzle-step2-back")?.addEventListener("click", () => {
-    resetNewPuzzleDialog()
+  document.getElementById("new-puzzle-regenerate")?.addEventListener("click", () => {
+    newPuzzleDraftEl?.setAttribute("hidden", "")
+    newPuzzleDraft = null
+    fetchNewPuzzleDraft()
   })
-  document.getElementById("new-puzzle-submit")?.addEventListener("click", async () => {
+  document.getElementById("new-puzzle-approve")?.addEventListener("click", async () => {
     if (!newPuzzleErr || !newPuzzleAdminKey) return
-    newPuzzleErr.hidden = true
-    newPuzzleErr.textContent = ""
     const key = newPuzzleAdminKey.value.trim()
-    const publicId = document.getElementById("new-puzzle-public-id")?.value.trim() ?? ""
-    const target = document.getElementById("new-puzzle-target")?.value.trim() ?? ""
-    const hash = document.getElementById("new-puzzle-hash")?.value.trim() ?? ""
-    const words = document.getElementById("new-puzzle-words")?.value.trim() ?? ""
-    const roundId = document.getElementById("new-puzzle-round-id")?.value.trim() ?? "default"
-    const constraintsRaw = document.getElementById("new-puzzle-constraints")?.value.trim() ?? ""
-    const diffRaw = document.getElementById("new-puzzle-difficulty")?.value.trim() ?? ""
-
+    const d = newPuzzleDraft
+    setNewPuzzleError("")
     if (!key) {
-      newPuzzleErr.textContent = "Enter the admin key."
-      newPuzzleErr.hidden = false
+      setNewPuzzleError("Enter the admin key.")
       return
     }
-    if (!publicId) {
-      newPuzzleErr.textContent = "Enter a unique public id (e.g. 002)."
-      newPuzzleErr.hidden = false
+    if (!d?.public_id || !d.target_address || !d.solution_hash || !d.puzzle_words) {
+      setNewPuzzleError("Generate a draft first.")
       return
     }
-    if (!target || !hash || !words) {
-      newPuzzleErr.textContent = "Target address, solution hash, and 12 words are required."
-      newPuzzleErr.hidden = false
-      return
-    }
-    const wordList = words
-      .split(",")
-      .map((w) => w.trim().toLowerCase())
-      .filter(Boolean)
-    if (wordList.length !== 12) {
-      newPuzzleErr.textContent = "Enter exactly 12 comma-separated words."
-      newPuzzleErr.hidden = false
-      return
-    }
-    if (!/^[0-9a-fA-F]{64}$/.test(hash)) {
-      newPuzzleErr.textContent = "Solution hash must be 64 hex characters."
-      newPuzzleErr.hidden = false
-      return
-    }
-
     const body = {
-      public_id: publicId,
-      target_address: target,
-      solution_hash: hash.toLowerCase(),
-      puzzle_words: wordList.join(","),
-      round_id: roundId || "default",
+      public_id: d.public_id,
+      target_address: d.target_address,
+      solution_hash: String(d.solution_hash).toLowerCase(),
+      puzzle_words: d.puzzle_words,
+      round_id: d.round_id || "default",
     }
-    if (constraintsRaw) {
-      try {
-        JSON.parse(constraintsRaw)
-        body.constraints_json = constraintsRaw
-      } catch {
-        newPuzzleErr.textContent = "Constraints must be valid JSON."
-        newPuzzleErr.hidden = false
-        return
-      }
+    if (d.constraints_json && String(d.constraints_json).trim()) {
+      body.constraints_json = d.constraints_json
     }
-    if (diffRaw) body.difficulty = diffRaw.toLowerCase()
-
-    const submitBtn = document.getElementById("new-puzzle-submit")
-    if (submitBtn) submitBtn.disabled = true
+    if (d.difficulty && String(d.difficulty).trim()) {
+      body.difficulty = String(d.difficulty).trim().toLowerCase()
+    }
+    const approveBtn = document.getElementById("new-puzzle-approve")
+    setNewPuzzleBusy(true)
     try {
       const res = await fetch(`${API}/public/admin/new-puzzle`, {
         method: "POST",
@@ -612,27 +648,24 @@ if (newPuzzleOpen && newPuzzleDlg) {
         return
       }
       if (res.status === 401) {
-        newPuzzleErr.textContent = "Wrong admin key or not allowed."
+        setNewPuzzleError("Wrong admin key or not allowed.")
       } else if (res.status === 503) {
-        newPuzzleErr.textContent = "Admin control is not configured on this server."
+        setNewPuzzleError("Admin control is not configured on this server.")
       } else if (res.status === 429) {
-        newPuzzleErr.textContent = "Too many attempts. Wait a minute and try again."
+        setNewPuzzleError("Too many attempts. Wait a minute and try again.")
       } else if (res.status === 400 && j?.error === "vault_only") {
-        newPuzzleErr.textContent =
+        setNewPuzzleError(
           "Server must use PUZZLE_SOURCE=sqlite with an open vault (use CLI bootstrap first)."
+        )
       } else if (res.status === 409) {
-        newPuzzleErr.textContent =
-          j?.detail || "That public_id already exists — pick a new id."
+        setNewPuzzleError(j?.detail || "That public_id already exists — regenerate a new draft.")
       } else {
-        newPuzzleErr.textContent =
-          j?.detail || j?.error || res.statusText || `Failed (${res.status})`
+        setNewPuzzleError(j?.detail || j?.error || res.statusText || `Failed (${res.status})`)
       }
-      newPuzzleErr.hidden = false
     } catch {
-      newPuzzleErr.textContent = "Network error — try again."
-      newPuzzleErr.hidden = false
+      setNewPuzzleError("Network error — try again.")
     } finally {
-      if (submitBtn) submitBtn.disabled = false
+      setNewPuzzleBusy(false)
     }
   })
 }

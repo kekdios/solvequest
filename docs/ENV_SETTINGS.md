@@ -89,7 +89,8 @@ REDIS_URL=redis://127.0.0.1:6379
 - **How:** client must send `x-admin-key: <ADMIN_CONTROL_KEY>` for:
   - `POST /payout/jobs/:jobId/attempt`
   - `POST /public/wizard-clear-solved` (clear `puzzle:winner` in Redis/memory only)
-  - `POST /public/admin/new-puzzle` (**SQLite vault only** — retire current unsolved row, insert new puzzle JSON, reload arena, clear winner; arena **New Puzzle** button)
+  - `POST /public/admin/new-puzzle-draft` (**SQLite vault only** — random mnemonic + derived fields for review; arena **New Puzzle** flow)
+  - `POST /public/admin/new-puzzle` (**SQLite vault only** — retire current unsolved row, insert puzzle from approved payload, reload arena, clear winner)
 
 ### `ALLOW_WIZARD_DERIVE` (optional)
 - **Purpose:** In **`NODE_ENV=production`**, enables **`POST /public/wizard-derive`** used by **`puzzle-wizard.html`** (mnemonic in JSON body). In non-production, the endpoint is on by default unless set to a falsy value (`0`, `false`, `no`, `off`).
@@ -107,6 +108,10 @@ REDIS_URL=redis://127.0.0.1:6379
 
 ### `ADMIN_NEW_PUZZLE_MAX_PER_MIN` (optional, default `8`)
 - **Purpose:** Rate limit for **`POST /public/admin/new-puzzle`** per IP per minute (clamped 2–30).
+- **Used by:** `backend/server.js`.
+
+### `ADMIN_NEW_PUZZLE_DRAFT_MAX_PER_MIN` (optional, default `20`)
+- **Purpose:** Rate limit for **`POST /public/admin/new-puzzle-draft`** (generate mnemonic + derived fields; no DB write) per IP per minute (clamped 5–60).
 - **Used by:** `backend/server.js`.
 
 ### `PAYOUT_AMOUNT_USDC` (optional, default `0`)

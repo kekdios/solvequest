@@ -173,6 +173,25 @@
         }
       }
     },
+    "/public/admin/new-puzzle-draft": {
+      "post": {
+        "summary": "Admin: generate random puzzle draft (mnemonic + derived fields); sqlite vault only",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Must match ADMIN_CONTROL_KEY"
+          }
+        ],
+        "responses": {
+          "200": { "description": "{ ok, draft: { mnemonic, public_id, target_address, ... } }" },
+          "401": { "description": "unauthorized" },
+          "400": { "description": "vault_only" }
+        }
+      }
+    },
     "/public/wizard-clear-solved": {
       "post": {
         "summary": "Admin: clear puzzle winner in Redis/memory (x-admin-key)",

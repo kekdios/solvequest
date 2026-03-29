@@ -973,6 +973,64 @@ a.api-pill {
   box-sizing: border-box;
 }
 
+.new-puzzle-actions-top {
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.new-puzzle-draft {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.new-puzzle-warning {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
+  background: color-mix(in srgb, var(--warn) 10%, var(--panel));
+  color: #fde68a;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.new-puzzle-draft-scroll {
+  max-height: min(48vh, 20rem);
+  margin-bottom: 12px;
+}
+
+.new-puzzle-kv {
+  margin-bottom: 12px;
+}
+
+.new-puzzle-kv:last-child {
+  margin-bottom: 0;
+}
+
+.new-puzzle-k {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.new-puzzle-v {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0d0d0f;
+  color: var(--text);
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 .arena-footer {
   text-align: center;
   margin-top: 0.75rem;

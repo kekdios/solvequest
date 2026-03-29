@@ -118,6 +118,12 @@ Used when `REDIS_URL` is missing.
 - `POST /public/wizard-clear-solved` (`x-admin-key` = `ADMIN_CONTROL_KEY`)
   - deletes `puzzle:winner` in Redis (or in-memory equivalent); emits `puzzle_cleared`
 
+- `POST /public/admin/new-puzzle-draft` (`x-admin-key`, sqlite vault open)
+  - generates a BIP39 mnemonic and derived target/hash/words/constraints (same as wizard); returns a draft for operator review (no vault write)
+
+- `POST /public/admin/new-puzzle` (`x-admin-key`, sqlite vault open)
+  - retires unsolved row(s), inserts row from JSON body, reloads arena, clears winner, optional QUEST fund
+
 ## 6) Stats and Leaderboard
 
 ## Stats

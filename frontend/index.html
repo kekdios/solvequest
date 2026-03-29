@@ -204,109 +204,76 @@
       <div class="player-dialog-inner">
         <h3 id="new-puzzle-title">New Puzzle</h3>
 
-        <div id="new-puzzle-step1" class="new-puzzle-step">
-          <p class="player-dialog-desc">
-            Creates a <strong>new</strong> puzzle in the SQLite vault: the current
-            <strong>unsolved</strong> row is retired, a new row is inserted, the arena loads the new
-            words and commitments, and the winner state is cleared. Requires
-            <code>PUZZLE_SOURCE=sqlite</code>. Use a <strong>new</strong>
-            <code>public_id</code> (e.g. <code>002</code>) — ids cannot be reused.
+        <p class="player-dialog-desc">
+          <strong>SQLite vault only.</strong> Enter your admin key, generate a draft (random
+          mnemonic + derived fields), review everything, then approve to retire the current
+          unsolved row, insert the new puzzle, clear the winner, and optionally run QUEST funding.
+          <code>x-admin-key</code> is sent with each request and is not stored.
+        </p>
+
+        <label class="player-field">
+          <span>Admin key</span>
+          <input
+            type="password"
+            id="new-puzzle-admin-key"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+
+        <div class="player-dialog-actions new-puzzle-actions-top">
+          <button type="button" class="player-btn" id="new-puzzle-cancel">Close</button>
+          <button type="button" class="player-btn primary" id="new-puzzle-generate">
+            Generate draft
+          </button>
+        </div>
+
+        <div id="new-puzzle-draft" class="new-puzzle-draft" hidden>
+          <p class="new-puzzle-warning" role="alert">
+            <strong>Save the mnemonic offline</strong> before approving — it is the only solution.
+            This dialog does not keep a copy after you close it.
           </p>
+          <div class="new-puzzle-form-scroll new-puzzle-draft-scroll">
+            <div class="new-puzzle-kv">
+              <span class="new-puzzle-k">Mnemonic</span>
+              <pre class="new-puzzle-v" id="new-puzzle-show-mnemonic"></pre>
+            </div>
+            <div class="new-puzzle-kv">
+              <span class="new-puzzle-k">Public id</span>
+              <pre class="new-puzzle-v" id="new-puzzle-show-public-id"></pre>
+            </div>
+            <div class="new-puzzle-kv">
+              <span class="new-puzzle-k">Target address</span>
+              <pre class="new-puzzle-v" id="new-puzzle-show-target"></pre>
+            </div>
+            <div class="new-puzzle-kv">
+              <span class="new-puzzle-k">Solution hash</span>
+              <pre class="new-puzzle-v" id="new-puzzle-show-hash"></pre>
+            </div>
+            <div class="new-puzzle-kv">
+              <span class="new-puzzle-k">12 words (CSV)</span>
+              <pre class="new-puzzle-v" id="new-puzzle-show-words"></pre>
+            </div>
+            <div class="new-puzzle-kv">
+              <span class="new-puzzle-k">Constraints JSON</span>
+              <pre class="new-puzzle-v" id="new-puzzle-show-constraints"></pre>
+            </div>
+            <div class="new-puzzle-kv">
+              <span class="new-puzzle-k">Round id</span>
+              <pre class="new-puzzle-v" id="new-puzzle-show-round"></pre>
+            </div>
+          </div>
           <div class="player-dialog-actions">
-            <button type="button" class="player-btn" id="new-puzzle-step1-cancel">
-              Cancel
+            <button type="button" class="player-btn" id="new-puzzle-regenerate">
+              Regenerate draft
             </button>
-            <button type="button" class="player-btn primary" id="new-puzzle-step1-next">
-              Continue
+            <button type="button" class="player-btn primary" id="new-puzzle-approve">
+              Approve — create puzzle
             </button>
           </div>
         </div>
 
-        <div id="new-puzzle-step2" class="new-puzzle-step" hidden>
-          <div class="new-puzzle-form-scroll">
-            <p class="player-dialog-desc">
-              <code>x-admin-key</code> is sent once; not stored. Optional QUEST send runs if
-              <code>QUEST_AUTO_FUND=1</code> is set on the server.
-            </p>
-            <label class="player-field">
-              <span>Admin key</span>
-              <input
-                type="password"
-                id="new-puzzle-admin-key"
-                autocomplete="off"
-                spellcheck="false"
-              />
-            </label>
-            <label class="player-field">
-              <span>Public id (unique, e.g. 002)</span>
-              <input
-                type="text"
-                id="new-puzzle-public-id"
-                autocomplete="off"
-                spellcheck="false"
-                maxlength="64"
-              />
-            </label>
-            <label class="player-field">
-              <span>Target address (base58)</span>
-              <input
-                type="text"
-                id="new-puzzle-target"
-                autocomplete="off"
-                spellcheck="false"
-              />
-            </label>
-            <label class="player-field">
-              <span>Solution hash (64 hex)</span>
-              <input
-                type="text"
-                id="new-puzzle-hash"
-                autocomplete="off"
-                spellcheck="false"
-                maxlength="64"
-              />
-            </label>
-            <label class="player-field">
-              <span>12 words (comma-separated)</span>
-              <textarea
-                id="new-puzzle-words"
-                rows="3"
-                autocomplete="off"
-                spellcheck="false"
-              ></textarea>
-            </label>
-            <label class="player-field">
-              <span>Round id (optional)</span>
-              <input
-                type="text"
-                id="new-puzzle-round-id"
-                autocomplete="off"
-                value="default"
-              />
-            </label>
-            <label class="player-field">
-              <span>PUZZLE_CONSTRAINTS_JSON (optional)</span>
-              <textarea
-                id="new-puzzle-constraints"
-                rows="2"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder='{"fixed_positions":{"0":"word","11":"word"}}'
-              ></textarea>
-            </label>
-            <label class="player-field">
-              <span>Difficulty (optional: easy / medium / hard)</span>
-              <input type="text" id="new-puzzle-difficulty" autocomplete="off" />
-            </label>
-          </div>
-          <p id="new-puzzle-error" class="player-form-error" role="alert" hidden></p>
-          <div class="player-dialog-actions">
-            <button type="button" class="player-btn" id="new-puzzle-step2-back">Back</button>
-            <button type="button" class="player-btn primary" id="new-puzzle-submit">
-              Create new puzzle
-            </button>
-          </div>
-        </div>
+        <p id="new-puzzle-error" class="player-form-error" role="alert" hidden></p>
       </div>
     </dialog>
 

@@ -1,5 +1,6 @@
 import "dotenv/config"
 import { readFileSync } from "fs"
+import { randomBytes } from "crypto"
 import path from "path"
 import { fileURLToPath } from "url"
 import express from "express"
@@ -372,6 +373,14 @@ const adminNewPuzzleLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+/** Draft generation (no DB write); separate cap so operators can regenerate without burning create quota. */
+const adminNewPuzzleDraftLimiter = rateLimit({
+  windowMs: 60_000,
+  max: Math.min(Math.max(Number(process.env.ADMIN_NEW_PUZZLE_DRAFT_MAX_PER_MIN) || 20, 5), 60),
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 function parseAdminNewPuzzlePayload(body) {
   const target_address = String(body?.target_address ?? "").trim()
   const solution_hash = String(body?.solution_hash ?? "").trim()
@@ -525,6 +534,47 @@ app.post(
       res.json({ ok: true })
     } catch (e) {
       res.status(500).json({ error: String(e?.message || e) })
+    }
+  }
+)
+
+/**
+ * SQLite vault only: generate a random mnemonic and derived puzzle row fields (same rules as
+ * wizard-derive). Does not write the vault — operator reviews then POST /public/admin/new-puzzle.
+ */
+app.post(
+  "/public/admin/new-puzzle-draft",
+  adminNewPuzzleDraftLimiter,
+  requireAdminControl,
+  async (req, res) => {
+    try {
+      if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE || !puzzleVaultHandle?.db) {
+        return res.status(400).json({
+          error: "vault_only",
+          detail: "PUZZLE_SOURCE must be sqlite and the vault must be open",
+        })
+      }
+      const round_id = String(req.body?.round_id ?? "default").trim() || "default"
+      const mnemonic = bip39.generateMnemonic(128)
+      const n = normalizePhrase(mnemonic)
+      const d = buildWizardDerivationFromNormalizedPhrase(n)
+      const public_id = `p${Date.now()}-${randomBytes(2).toString("hex")}`
+      res.json({
+        ok: true,
+        draft: {
+          mnemonic,
+          public_id,
+          target_address: d.target_address,
+          solution_hash: d.solution_hash,
+          puzzle_words: d.puzzle_words,
+          constraints_json: d.puzzle_constraints_json,
+          round_id,
+          difficulty: null,
+        },
+      })
+    } catch (e) {
+      console.error("[admin new-puzzle-draft]", e)
+      res.status(500).json({ error: "draft_failed", detail: String(e?.message || e) })
     }
   }
 )
