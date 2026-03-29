@@ -19,7 +19,7 @@ node server.js
 
 Set **`REDIS_URL`** for persistence and horizontal scaling. Without it, the process uses **in-memory** state (dev only).
 
-**Optional SQLite puzzle vault:** set **`PUZZLE_SOURCE=sqlite`** plus vault env vars in `backend/.env.example`. Run `npm run vault-init -- migrate` then `npm run vault-init -- bootstrap-from-env` from **`backend/`** (uses the same **`TARGET_*` / `PUZZLE_WORDS`** as env mode for the first row). The server then loads the active **`unsolved`** puzzle from SQLite instead of static env fields. See **`docs/ENV_SETTINGS.md`** (Puzzle vault).
+**Optional SQLite puzzle vault:** set **`PUZZLE_SOURCE=sqlite`** plus **`SQLITE_PATH`** (see `backend/.env.example`). Run `npm run vault-init -- migrate` then `npm run vault-init -- bootstrap-from-env` from **`backend/`** (uses the same **`TARGET_*` / `PUZZLE_WORDS`** as env mode for the first row). The server loads the active **`unsolved`** puzzle from SQLite; the arena can show **Recent puzzles** (`GET /puzzle/recent`) and operators can use **New Puzzle** in the UI (admin key + vault). Full env contract: **`docs/ENV_SETTINGS.md`** (Puzzle vault).
 
 Notes:
 - In `NODE_ENV=production`, backend now fails fast if `REDIS_URL` is missing.
@@ -121,9 +121,9 @@ Also test a wrong permutation (same words, different order) and verify it does n
 
 ### 6) Fund the prize wallet and add SOL for transaction fees
 
-Your prize wallet is the wallet controlled by the canonical mnemonic.
+Your prize wallet is the on-chain address **`TARGET_ADDRESS`** (derived from the canonical mnemonic).
 
-- Send prize tokens (default **SAUSD** mint `CK9PodBifHymLBGeZujExFnpoLCsYxAw7t8c8LsDKLxG`, override with **`PRIZE_SPL_MINT`**) and SOL to `TARGET_ADDRESS`.
+- Send the **prize SPL** you want the arena to display (balance read via **`GET /prize/balances`**) to `TARGET_ADDRESS`. The server chooses the mint in this order: **`PRIZE_SPL_MINT`** → **`QUEST_MINT`** → legacy **`USDC_MINT`** → default **SAUSD** mint `CK9PodBifHymLBGeZujExFnpoLCsYxAw7t8c8LsDKLxG`. Amounts are on-chain **ui** balances, not a market USD price.
 - Also send enough **SOL** for transaction fees/rent.
 
 Typical operational minimum: keep at least ~`0.01` SOL available, and prefer a buffer (for example `0.02` to `0.05` SOL) to avoid payout operations failing due to fee starvation.
@@ -236,8 +236,9 @@ Wins are registered when evaluation finds a valid mnemonic that matches **`TARGE
 | `POST /validate_batch` | Body `{ mnemonics }`; no auth; size cap and concurrency from env (see Batch validation) |
 | `GET /stats` | Counters + `attempts_per_sec`, `valid_rate`, arena time |
 | `GET /leaderboard` | `?limit=&wallet=` → `{ top, self? }` |
-| `GET /prize/balances` | Prize wallet SAUSD + SOL balances (RPC) |
-| Others | `/validate`, `/submit`, `/puzzle`, `/events`, operator wizard routes under `/public/wizard-*` |
+| `GET /prize/balances` | SPL balance on `TARGET_ADDRESS` for resolved prize mint + SOL (RPC); mint = `PRIZE_SPL_MINT` → `QUEST_MINT` → `USDC_MINT` → SAUSD default |
+| `GET /puzzle/recent` | Recent vault rows (SQLite); `{ source, puzzles }` — empty when `PUZZLE_SOURCE=env` |
+| Others | `/validate`, `/submit`, `/puzzle`, `/events`, `/public/wizard-derive`, `/public/wizard-clear-solved`, `/public/admin/new-puzzle-draft`, `/public/admin/new-puzzle` |
 
 ---
 

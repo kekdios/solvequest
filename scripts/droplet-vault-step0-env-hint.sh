@@ -26,7 +26,7 @@ SQLITE_BACKUP_KEEP=7
 # QUEST_AUTO_FUND=1
 # QUEST_OPERATOR_SECRET_KEY=<base58 or JSON secret — never commit>
 # QUEST_OPERATOR_PUBLIC_KEY=<optional; must match pubkey from secret>
-# QUEST_MINT=<SPL mint address (QUEST token; not SAUSD / PRIZE_SPL_MINT)>
+# QUEST_MINT=<SPL mint for QUEST auto-fund; also used for /prize/balances if PRIZE_SPL_MINT unset>
 # QUEST_FUND_AMOUNT_RAW=<positive integer, smallest units>
 # SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
 

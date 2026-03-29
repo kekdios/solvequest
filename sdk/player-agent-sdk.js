@@ -1,3 +1,7 @@
+/**
+ * Player agent HTTP client: GET /puzzle, POST /validate_batch, POST /submit.
+ * Submit body: { phrase, wallet }; server also accepts mnemonic. See docs/PLAYER_AGENT_SDK.md.
+ */
 export class SolveQuestAgentClient {
   constructor({ baseUrl, agentName, fetchImpl = globalThis.fetch }) {
     if (!baseUrl) throw new Error("baseUrl is required")

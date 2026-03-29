@@ -1,6 +1,6 @@
 # SolveQuest Environment Settings Reference
 
-This file explains environment variables used by the backend code (including optional future-facing vault vars parsed in `puzzle-vault-env.js`).
+This file explains environment variables used by the backend code (including the SQLite puzzle vault and QUEST funding vars parsed in `puzzle-vault-env.js`).
 
 Use it alongside:
 - `backend/.env.example` (starter template)

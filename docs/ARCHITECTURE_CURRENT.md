@@ -19,47 +19,43 @@ The system supports:
 
 ## 2) System Components
 
-## Backend (`backend/server.js`)
+### Backend (`backend/server.js`)
 - Express API server (default `PORT=3001`)
 - Serves static frontend from `frontend/`
-- Handles validation, submits, leaderboard, stats, optional payout jobs, and SSE
+- Handles validation, submits, leaderboard, stats, optional payout jobs, prize RPC reads, and SSE
+- Prize line / `GET /prize/balances`: SPL mint resolved as `PRIZE_SPL_MINT` → `QUEST_MINT` → `USDC_MINT` → default SAUSD mint; balance on `TARGET_ADDRESS` + SOL (no fiat price)
 - Uses Redis when `REDIS_URL` is set; otherwise falls back to in-memory store
 
-## Puzzle/Evaluation (`backend/puzzle.js`)
-- Loads puzzle config from env:
-  - `TARGET_ADDRESS`
-  - `SOLUTION_HASH` (commitment only, not win gate)
-  - `PUZZLE_WORDS` (12 comma-separated words)
+### Puzzle / evaluation (`backend/puzzle.js`)
+- Loads puzzle config from env or SQLite vault row (when `PUZZLE_SOURCE=sqlite` and an unsolved row exists)
+- Env fields: `TARGET_ADDRESS`, `SOLUTION_HASH` (commitment only, not win gate), `PUZZLE_WORDS` (12 comma-separated words)
 - Normalizes mnemonics (`trim`, lowercase, collapse spaces)
-- Evaluates:
-  - constraints pass/fail
-  - BIP39 checksum validity
-  - derived address match (`mnemonicToAddressCached`) to target
-## Solana Helpers
-- `backend/solana.js`: mnemonic -> Solana pubkey derivation (`m/44'/501'/0'/0'`) with LRU cache
+- Evaluates: constraints pass/fail, BIP39 checksum validity, derived address match (`mnemonicToAddressCached`) to target
+
+### Solana helpers
+- `backend/solana.js`: mnemonic → Solana pubkey derivation (`m/44'/501'/0'/0'`) with LRU cache
 - `backend/verify.js`: Ed25519 signature verification (unit tests; not used on the main win path)
 
-## Store Layer (`backend/store.js`)
+### Store layer (`backend/store.js`)
 - Redis + in-memory implementations behind one API
 - Tracks global stats, winner state, leaderboard ZSET, optional payout job queue
 - Publishes/subscribes realtime events on Redis channel `arena:events` when Redis is enabled
 
-## Frontend (`frontend/`)
-- **`index.html` + `main.js` + `style.css`**: arena UI (puzzle words, commitments, prize display, stats, leaderboard, collapsible SSE log)
+### Frontend (`frontend/`)
+- **`index.html` + `main.js` + `style.css`**: arena UI (puzzle words, commitments, prize / REWARD display, **Recent puzzles** panel from `GET /puzzle/recent`, stats, leaderboard, operator **New Puzzle** dialog with draft + **Copy all fields**, collapsible SSE log)
 - **`developers.html`**: agent documentation (same-origin `curl` examples; reads `GET /public/developer-info`)
-- **`puzzle-wizard.html`**: operator tool for deriving `.env` fields and clearing solved state (`wizard-derive`, `wizard-clear-solved` with admin key)
-- Uses SSE (`GET /events`) for live updates; `puzzle_cleared` events refresh solved UI
-- Submits via `POST /submit`
+- **`puzzle-wizard.html`**: operator tool for deriving `.env` fields, bundle copy, and clearing solved state (`wizard-derive`, `wizard-clear-solved` with admin key)
+- Uses SSE (`GET /events`) for live updates; `puzzle_cleared` and `new_puzzle` refresh UI as implemented in `main.js`
 
 ## 3) Runtime Modes
 
-## Redis mode (recommended for deploy)
+### Redis mode (recommended for deploy)
 Enabled when `REDIS_URL` is configured.
 - Shared winner state across instances
 - Shared leaderboard/stats
 - Pub/sub fan-out for SSE across instances
 
-## In-memory mode (dev only)
+### In-memory mode (dev only)
 Used when `REDIS_URL` is missing.
 - Single process only
 - No persistence across restart
@@ -67,7 +63,7 @@ Used when `REDIS_URL` is missing.
 
 ## 4) Core Game Semantics
 
-## Puzzle Metadata
+### Puzzle metadata
 `GET /puzzle` returns:
 - `id`, `difficulty`
 - shuffled `words`
@@ -75,7 +71,7 @@ Used when `REDIS_URL` is missing.
 - winner/solved state
 - `vault_empty` when sqlite has no unsolved row
 
-## Win Conditions
+### Win conditions
 - `POST /submit`: win if evaluation says `matches_target=true`; winner set with `SET puzzle:winner NX` if not already solved
 
 ## 5) API Surface (Current)
@@ -103,7 +99,7 @@ Used when `REDIS_URL` is missing.
 
 - `POST /submit`
   - body: `{ phrase | mnemonic, wallet }`
-  - browser-friendly submit lane
+  - JSON `status`: `win` (with `winner`), `already_solved` (with `winner`), `invalid`, `valid_but_wrong`, `constraint_violation`; no round-based rejections
 
 - `GET /leaderboard`
   - supports `?limit=` and `?wallet=`
@@ -113,7 +109,7 @@ Used when `REDIS_URL` is missing.
   - `{ version }` from `backend/package.json`
 
 - `GET /prize/balances`
-  - SPL + SOL snapshot for `TARGET_ADDRESS` (RPC)
+  - SPL + SOL snapshot for `TARGET_ADDRESS` (RPC); SPL mint from env resolution (`PRIZE_SPL_MINT` → `QUEST_MINT` → `USDC_MINT` → default)
 
 - `GET /payout/jobs`
   - optional `?limit=`; returns `{ jobs }` when payout pipeline is configured
@@ -141,14 +137,14 @@ Used when `REDIS_URL` is missing.
 
 ## 6) Stats and Leaderboard
 
-## Stats
+### Stats
 Tracked metrics include:
 - attempts (`validations_single`, `batch_items`, `submits`)
 - `valid_checksums`
 - `constraint_rejects`, `invalid_mnemonics`, `valid_target_misses`
 - computed `attempts_per_sec`, `time_elapsed`, `valid_rate`
 
-## Leaderboard
+### Leaderboard
 - Redis ZSET key: `leaderboard:global`
 - Large score bonus on a successful win (`POST /submit` after winner set); default `LEADERBOARD_WIN_POINTS` (see `ENV_SETTINGS.md`)
 - Smaller +1 increments on valid-checksum near misses (`valid_but_wrong`)
@@ -162,14 +158,14 @@ Tracked metrics include:
 
 ## 8) Deployment Model (Website + API)
 
-## Minimal production posture
+### Minimal production posture
 - Run backend as long-lived service (systemd/PM2/container)
 - Put HTTPS reverse proxy in front (e.g. Nginx)
 - Set `REDIS_URL` for persistence and multi-instance safety
 - Tune rate limits and batch sizes for your traffic
 - Restrict CORS to your website origin(s)
 
-## Website integration options
+### Website integration options
 - Host as subdomain (recommended): `arena.example.com` -> backend
 - Or reverse-proxy path under main site: `example.com/arena/*` -> backend
 - Frontend is static and already served by backend; same-origin calls work by default
@@ -199,7 +195,8 @@ solvequest/
 │   └── player-agent-sdk.js
 ├── scripts/
 │   ├── deploy.sh
-│   └── launch.sh
+│   ├── launch.sh
+│   └── droplet-vault-*.sh (optional server vault bootstrap helpers)
 └── docs/
     ├── ARCHITECTURE_CURRENT.md
     ├── ENV_SETTINGS.md

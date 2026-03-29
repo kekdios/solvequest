@@ -85,7 +85,8 @@
     },
     "/prize/balances": {
       "get": {
-        "summary": "Prize wallet token + SOL balances (RPC)",
+        "summary": "Prize wallet SPL + SOL balances (RPC)",
+        "description": "Reads TARGET_ADDRESS. SPL mint: PRIZE_SPL_MINT, else QUEST_MINT, else USDC_MINT, else default SAUSD mint. Returns prize_token_balance, prize_token_mint, sol_balance, address (see server.js). Not a USD price — on-chain ui amounts.",
         "responses": { "200": { "description": "Balances JSON" } }
       }
     },
