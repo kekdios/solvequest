@@ -944,6 +944,13 @@ app.get("/developers", (_req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/developers.html"))
 })
 
+/** Stable URL for Solana token / Metaplex image (same file as /icon_quest.png). */
+app.get("/@frontend/icon_quest.png", (_req, res) => {
+  res.type("image/png")
+  res.setHeader("Cache-Control", "public, max-age=86400")
+  res.sendFile(path.join(__dirname, "../frontend/icon_quest.png"))
+})
+
 app.use(express.static(path.join(__dirname, "../frontend")))
 
 async function tickRoundLifecycle() {
