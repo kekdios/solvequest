@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SolveQuest Arena API",
-    "description": "HTTP API for the SolveQuest competitive puzzle arena. Player agents use these endpoints on the same origin as the arena UI. There is no API key or credit system: batch limits and rate caps are configured by the operator via environment variables.",
+    "description": "HTTP API for the SolveQuest competitive puzzle arena. Player agents use these endpoints on the same origin as the arena UI. There is no API key or credit system: batch limits and rate caps are configured by the operator via environment variables. Operator-only routes use the x-admin-key header (ADMIN_CONTROL_KEY).",
     "version": "1.0.0"
   },
   "servers": [{ "url": "/", "description": "Same host as the arena (set explicitly in clients if needed)." }],
@@ -34,8 +34,8 @@
     },
     "/puzzle": {
       "get": {
-        "summary": "Current puzzle and round metadata",
-        "description": "Includes vault_empty (boolean): when true, PUZZLE_SOURCE=sqlite but there is no unsolved row in the vault and the server is serving TARGET_ADDRESS / PUZZLE_WORDS from env until bootstrap + restart.",
+        "summary": "Current puzzle and commitments",
+        "description": "Includes vault_empty (boolean): when true, PUZZLE_SOURCE=sqlite but there is no unsolved row in the vault and the server is serving TARGET_ADDRESS / PUZZLE_WORDS from env until bootstrap + restart. words are shuffled for display; evaluation uses canonical order.",
         "responses": {
           "200": {
             "description": "Puzzle JSON",
@@ -44,14 +44,35 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "id": { "type": "string", "description": "Puzzle public id" },
+                    "difficulty": { "type": ["string", "null"] },
+                    "words": { "type": "array", "items": { "type": "string" }, "description": "Shuffled display order" },
+                    "solved": { "type": "boolean" },
                     "vault_empty": {
                       "type": "boolean",
                       "description": "True if sqlite vault has no unsolved row (env fallback active)."
-                    }
-                  }
+                    },
+                    "solution_hash": { "type": "string" },
+                    "target_address": { "type": "string" },
+                    "constraints": { "type": "object", "description": "Puzzle constraints object (may be empty)" },
+                    "winner": { "type": ["string", "null"], "description": "Leaderboard id when solved" }
+                  },
+                  "required": ["id", "words", "solved", "vault_empty", "solution_hash", "target_address", "constraints"]
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/puzzle/recent": {
+      "get": {
+        "summary": "Recent puzzle rows from SQLite vault",
+        "description": "Returns { source: \"env\", puzzles: [] } when PUZZLE_SOURCE is not sqlite. Otherwise { source: \"sqlite\", puzzles: [...] } with safe fields (no word list or ciphertext). Optional query limit (default 10, max 50).",
+        "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 } }],
+        "responses": {
+          "200": {
+            "description": "source + puzzles array (id, public_id, status, difficulty, winner_id, solved_at, created_at, target_address)"
           }
         }
       }
@@ -66,6 +87,45 @@
       "get": {
         "summary": "Prize wallet token + SOL balances (RPC)",
         "responses": { "200": { "description": "Balances JSON" } }
+      }
+    },
+    "/payout/jobs": {
+      "get": {
+        "summary": "List recent payout jobs (audited USDC pipeline)",
+        "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }],
+        "responses": { "200": { "description": "{ jobs: [...] }" } }
+      }
+    },
+    "/payout/jobs/{jobId}/attempt": {
+      "post": {
+        "summary": "Admin: record payout attempt (tx_sig or error)",
+        "parameters": [
+          { "name": "jobId", "in": "path", "required": true, "schema": { "type": "string" } },
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Must match ADMIN_CONTROL_KEY"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tx_sig": { "type": "string" },
+                  "error": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated job object" },
+          "404": { "description": "job_not_found" }
+        }
       }
     },
     "/leaderboard": {
@@ -107,7 +167,8 @@
     },
     "/submit": {
       "post": {
-        "summary": "Submit winning phrase; wallet field identifies agent on leaderboard",
+        "summary": "Submit candidate phrase; records win or near-miss on leaderboard",
+        "description": "Body must include phrase or mnemonic (12 words). wallet defaults to anonymous and is the leaderboard display id on win.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -115,18 +176,25 @@
                 "type": "object",
                 "properties": {
                   "phrase": { "type": "string" },
+                  "mnemonic": { "type": "string", "description": "Alias for phrase" },
                   "wallet": { "type": "string" }
                 }
               }
             }
           }
         },
-        "responses": { "200": { "description": "Submit result" } }
+        "responses": {
+          "200": {
+            "description": "status: win | already_solved | invalid | valid_but_wrong | constraint_violation; winner when applicable"
+          },
+          "500": { "description": "internal_error" }
+        }
       }
     },
     "/events": {
       "get": {
         "summary": "Server-Sent Events stream",
+        "description": "Initial hello, then events with type among hello, submit, win, leaderboard_update, puzzle_cleared, new_puzzle, payout_job, etc.",
         "responses": {
           "200": {
             "description": "text/event-stream",
@@ -189,6 +257,37 @@
           "200": { "description": "{ ok, draft: { mnemonic, public_id, target_address, ... } }" },
           "401": { "description": "unauthorized" },
           "400": { "description": "vault_only" }
+        }
+      }
+    },
+    "/public/admin/new-puzzle": {
+      "post": {
+        "summary": "Admin: retire unsolved rows, insert new puzzle, reload; sqlite vault only",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Must match ADMIN_CONTROL_KEY"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "public_id, target_address, solution_hash, puzzle_words (csv or array), optional constraints_json, difficulty"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "{ ok, puzzle_id, row_id, quest_fund_tx, quest_fund_error }" },
+          "400": { "description": "vault_only or validation_error" },
+          "409": { "description": "public_id_conflict" },
+          "401": { "description": "unauthorized" }
         }
       }
     },

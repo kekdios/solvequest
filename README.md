@@ -23,18 +23,7 @@ Set **`REDIS_URL`** for persistence and horizontal scaling. Without it, the proc
 
 Notes:
 - In `NODE_ENV=production`, backend now fails fast if `REDIS_URL` is missing.
-- Set **`ADMIN_CONTROL_KEY`** for admin routes (`x-admin-key` header): **`POST /payout/jobs/:jobId/attempt`**, **`POST /public/wizard-clear-solved`** (clears Redis winner state from the puzzle wizard).
-
-Round automation (new):
-
-```env
-ROUND_START_DELAY_SEC=0
-ROUND_DURATION_SEC=86400
-ROUND_SETTLE_GRACE_SEC=3
-ROUND_ARCHIVE_DELAY_SEC=120
-AUTO_ROTATE_ROUNDS=0
-ROUND_ROTATION_JSON=[]
-```
+- Set **`ADMIN_CONTROL_KEY`** for admin routes (`x-admin-key` header): **`POST /public/admin/new-puzzle-draft`** and **`POST /public/admin/new-puzzle`** (SQLite vault only), **`POST /payout/jobs/:jobId/attempt`**, **`POST /public/wizard-clear-solved`** (clears Redis/in-memory winner).
 
 Payout pipeline (audited jobs):
 
@@ -50,7 +39,7 @@ API:
 
 ## Create a new puzzle (step-by-step)
 
-Use this process each time you want to launch a fresh round.
+Use this process each time you want to launch a fresh puzzle.
 
 **Local wizard (derived values + copy buttons):** with the backend running, open **`http://127.0.0.1:<port>/puzzle-wizard.html`**. Derivation uses **`POST /public/wizard-derive`** on the same server (no browser CDN). On production set **`ALLOW_WIZARD_DERIVE=1`** if you want the wizard enabled.
 
@@ -150,14 +139,6 @@ PUZZLE_WORDS=<comma-separated 12 words from step 4>
 REDIS_URL=redis://127.0.0.1:6379
 ```
 
-Optional round controls:
-
-```env
-ROUND_ID=alpha-1
-ROUND_DURATION_SEC=86400
-ROUND_SETTLE_GRACE_SEC=3
-```
-
 Then restart:
 
 ```bash
@@ -212,14 +193,6 @@ Wins are registered when evaluation finds a valid mnemonic that matches **`TARGE
 
 **Derivation cache:** normalized mnemonic → address LRU (**`DERIVATION_CACHE_MAX`**, default **5000**).
 
-### Timed rounds
-
-- **`ROUND_DURATION_SEC`** — on first Redis boot, sets **`puzzle:round_end_ms`** (NX) to `now + duration`. Omit to leave the round open-ended (in-memory dev: set on process start).
-- **`ROUND_ID`** — stored as **`puzzle:round_id`** (NX); echoed on **`GET /puzzle`**.
-- **`ROUND_SETTLE_GRACE_SEC`** (default **3**) — after **`round_end_ms`**, a short grace, then **`puzzle:round_settled`** is set and **`puzzle:round_leaderboard_winner`** = top of **`leaderboard:global`**. SSE: **`round_end`**, **`round_settled`**.
-- After **`round_end`**: **`POST /submit`** returns **`{ "status": "round_ended" }`**. Leaderboard **ZSET** stops accepting new increments.
-- **`GET /puzzle`** includes **`round_phase`** (`active` \| `grace` \| `settled`), **`round_settle_at_ms`**, **`round_settled`**, **`round_leaderboard_winner`**.
-
 ### Leaderboard (game score)
 
 - Redis **`leaderboard:global`** sorted set: score = **valid checksum + wrong target** attempts (not raw spam).
@@ -243,14 +216,14 @@ Wins are registered when evaluation finds a valid mnemonic that matches **`TARGE
 
 ### Puzzle metadata
 
-- **`GET /puzzle`** includes **`difficulty`**, **`round_id`**, **`round_end_ms`**, **`round_active`**, **`round_phase`**, settlement fields (see Timed rounds).
+- **`GET /puzzle`** includes **`id`**, **`difficulty`**, **`vault_empty`** (sqlite fallback), commitments, and solved state.
 - **Word display order is stable per backend process**: words are shuffled once at startup and reused on each `/puzzle` response.
 
 ### SSE across instances
 
 - With **Redis**: events are **`PUBLISH arena:events`**; each instance **subscribes** and pushes to its local SSE clients (no double delivery on the publishing node).
 - Without Redis: local broadcast only.
-- Structured types include **`attempt`**, **`leaderboard_update`** (with **`top`** preview), **`round_end`**, **`round_settled`** ( **`leaderboard_winner`**, **`puzzle_winner`** ), **`puzzle_cleared`** (winner cleared for a new round), plus **`submit`** / **`win`**.
+- Structured types include **`attempt`**, **`leaderboard_update`** (with **`top`** preview), **`puzzle_cleared`**, **`new_puzzle`**, **`payout_job`**, plus **`submit`** / **`win`**.
 
 ---
 
@@ -274,11 +247,6 @@ Wins are registered when evaluation finds a valid mnemonic that matches **`TARGE
 |-----|---------|
 | `stats:global` | Hash: counters including new outcome fields |
 | `leaderboard:global` | ZSET: valid-checksum near-miss scores |
-| `puzzle:round_end_ms` | Round cutoff (optional) |
-| `puzzle:round_id` | Round identifier |
-| `puzzle:round_settled` | Set when round is finalized after grace |
-| `puzzle:round_leaderboard_winner` | Top ZSET pubkey at settlement |
-| `arena:round_end_event:{round_id}` | NX flag for one `round_end` broadcast |
 | `puzzle:winner` | Winner id (`SET NX`) |
 | `arena:events` | Pub/sub channel for SSE fan-out |
 

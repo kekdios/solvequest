@@ -85,14 +85,12 @@ export function loadPuzzleFromEnv() {
 
   const id = process.env.PUZZLE_ID?.trim() || "001"
   const constraints = parseConstraints()
-  const round_id = process.env.ROUND_ID?.trim() || "default"
   const difficulty =
     process.env.PUZZLE_DIFFICULTY?.trim().toLowerCase() ||
     computeDifficulty(words.length, constraints)
 
   return {
     id,
-    round_id,
     difficulty,
     words,
     solution_hash,
@@ -104,7 +102,6 @@ export function loadPuzzleFromEnv() {
 /** Mutable in-process puzzle; filled from env or from SQLite vault row. */
 export const PUZZLE = {
   id: "001",
-  round_id: "default",
   difficulty: "easy",
   words: [],
   solution_hash: "",
@@ -118,7 +115,7 @@ if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE) {
 
 /**
  * Apply active vault row to `PUZZLE` (must match `puzzles` table shape).
- * @param {object} row - DB row with public_id, target_address, solution_hash, puzzle_words_csv, constraints_json?, round_id?, difficulty?
+ * @param {object} row - DB row with public_id, target_address, solution_hash, puzzle_words_csv, constraints_json?, difficulty?
  */
 export function applyPuzzleRowFromVault(row) {
   const wordsRaw = row.puzzle_words_csv?.trim()
@@ -138,7 +135,6 @@ export function applyPuzzleRowFromVault(row) {
     computeDifficulty(words.length, constraints)
   Object.assign(PUZZLE, {
     id: String(row.public_id).trim(),
-    round_id: row.round_id?.trim() || "default",
     difficulty,
     words,
     solution_hash: String(row.solution_hash).trim(),

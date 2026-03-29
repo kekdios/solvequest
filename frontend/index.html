@@ -53,8 +53,8 @@
         <span id="ticker-puzzle-status" class="ticker-value mono ticker-puzzle-status" aria-atomic="true">—</span>
       </div>
       <div class="ticker-cell">
-        <span class="ticker-label">Round ends</span>
-        <span id="countdown" class="ticker-value mono">—</span>
+        <span class="ticker-label">Puzzle id</span>
+        <span id="ticker-puzzle-id" class="ticker-value mono">—</span>
       </div>
       <div class="ticker-cell">
         <span class="ticker-label">Attempts / sec</span>
@@ -125,7 +125,17 @@
         <div id="puzzle" aria-live="polite"></div>
       </div>
 
-      <aside class="arena-side" aria-label="Leaderboard">
+      <aside class="arena-side" aria-label="Sidebar">
+        <section class="puzzle-history" aria-labelledby="puzzle-history-title">
+          <h2 id="puzzle-history-title">Recent puzzles</h2>
+          <p id="puzzle-history-hint" class="side-hint puzzle-history-hint">
+            Vault history (SQLite). Env-only servers have no list.
+          </p>
+          <div id="puzzle-history-body" class="puzzle-history-body" role="region" aria-live="polite">
+            <p class="puzzle-history-placeholder">Loading…</p>
+          </div>
+        </section>
+
         <div class="leaderboard-head">
           <h2>Leaderboard</h2>
           <button type="button" id="player-names-open" class="player-names-btn">
@@ -257,10 +267,6 @@
             <div class="new-puzzle-kv">
               <span class="new-puzzle-k">Constraints JSON</span>
               <pre class="new-puzzle-v" id="new-puzzle-show-constraints"></pre>
-            </div>
-            <div class="new-puzzle-kv">
-              <span class="new-puzzle-k">Round id</span>
-              <pre class="new-puzzle-v" id="new-puzzle-show-round"></pre>
             </div>
           </div>
           <div class="player-dialog-actions">

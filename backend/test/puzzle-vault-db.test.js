@@ -8,6 +8,7 @@ import {
   retireAllUnsolvedPuzzles,
   insertUnsolvedPuzzleRow,
   getActiveUnsolvedPuzzle,
+  listRecentPuzzles,
 } from "../puzzle-vault-db.js"
 
 const keys = [
@@ -137,7 +138,6 @@ test("retireAllUnsolvedPuzzles then insertUnsolvedPuzzleRow", () => {
     target_address: "T2",
     solution_hash: hash64,
     puzzle_words_csv: "z,y,x,w,v,u,t,s,r,q,p,o",
-    round_id: "default",
     difficulty: null,
   })
   assert.ok(rowId > 0)
@@ -152,9 +152,37 @@ test("retireAllUnsolvedPuzzles then insertUnsolvedPuzzleRow", () => {
         target_address: "T3",
         solution_hash: hash64,
         puzzle_words_csv: "a,b,c,d,e,f,g,h,i,j,k,l",
-        round_id: "default",
         difficulty: null,
       }),
     /public_id already/
   )
+})
+
+test("listRecentPuzzles orders by id desc and caps limit", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pv-list-"))
+  const dbfile = path.join(root, "vault.db")
+  process.env.PUZZLE_SOURCE = "sqlite"
+  process.env.SQLITE_PATH = dbfile
+  process.env.SQLITE_BACKUP_KEEP = "7"
+  delete process.env.QUEST_OPERATOR_SECRET_KEY
+  delete process.env.QUEST_MINT
+  delete process.env.QUEST_FUND_AMOUNT_RAW
+
+  const h = openPuzzleVaultDatabase()
+  assert.ok(h)
+  lastDb = h.db
+  const hash64 = "b".repeat(64)
+  for (let i = 1; i <= 3; i++) {
+    h.db
+      .prepare(
+        `INSERT INTO puzzles (public_id, status, target_address, solution_hash, puzzle_words_csv) VALUES (?,?,?,?,?)`
+      )
+      .run(`px${i}`, "unsolved", `T${i}`, hash64, "a,b,c,d,e,f,g,h,i,j,k,l")
+  }
+  const recent = listRecentPuzzles(h.db, 2)
+  assert.equal(recent.length, 2)
+  assert.equal(recent[0].public_id, "px3")
+  assert.equal(recent[1].public_id, "px2")
+  assert.ok(!("puzzle_words_csv" in recent[0]))
+  assert.ok(!("ciphertext" in recent[0]))
 })

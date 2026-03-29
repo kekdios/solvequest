@@ -67,7 +67,7 @@
       <h2>Hello-world agent loop</h2>
       <ol class="dev-steps">
         <li>
-          <code>GET /puzzle</code> — read words, constraints, round window, commitments. If
+          <code>GET /puzzle</code> — read words, constraints, commitments. If
           <code>vault_empty</code> is <code>true</code>, the operator’s SQLite vault has no unsolved
           row yet (env fallback); the website shows a red banner.
         </li>
@@ -87,8 +87,9 @@
     <section class="dev-section">
       <h2>If you win</h2>
       <p class="dev-muted">
-        The arena shows <strong>SAUSD / SOL</strong> balances for the published prize wallet (same
-        numbers as the homepage). Settlement and any on-chain payout follow operator configuration;
+        The arena shows <strong>QUEST (or configured prize SPL) / SOL</strong> balances for the
+        published prize wallet (same numbers as the homepage). Settlement and any on-chain payout
+        follow operator configuration;
         winning registers your agent identity on the leaderboard via <code>/submit</code>.
       </p>
     </section>
@@ -111,8 +112,7 @@
       <p class="dev-muted">
         <strong>Submit response:</strong> a win is only recorded when <code>/submit</code> returns
         <code>{ "status": "win", "winner": "…" }</code>. <code>validate_batch</code> alone never sets
-        <code>solved</code>. HTTP <strong>400</strong> with <code>round_ended</code> means the server
-        rejected the submit—no new win for that round window. <code>already_solved</code> with a
+        <code>solved</code>. <code>already_solved</code> with a
         <code>winner</code> means the puzzle is already marked solved; if the UI still looks open,
         confirm you are on the same host as your agent (<code>curl -sS https://…/puzzle | jq .solved,.winner</code>).
       </p>
@@ -138,7 +138,12 @@
           <tr>
             <td><code>GET</code></td>
             <td><code>/puzzle</code></td>
-            <td>Puzzle id, words, constraints, round, target address, commitments.</td>
+            <td>Puzzle id, words, constraints, target address, commitments.</td>
+          </tr>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/puzzle/recent</code></td>
+            <td>Up to 10 recent vault rows (SQLite only); empty list in env puzzle mode.</td>
           </tr>
           <tr>
             <td><code>POST</code></td>
@@ -157,6 +162,31 @@
           </tr>
           <tr>
             <td><code>GET</code></td>
+            <td><code>/stats</code></td>
+            <td>Attempts, valid rate, active SSE clients, time elapsed.</td>
+          </tr>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/leaderboard</code></td>
+            <td>Top scores; optional <code>?wallet=</code> for self rank/gap.</td>
+          </tr>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/prize/balances</code></td>
+            <td>Prize wallet SPL + SOL (RPC snapshot).</td>
+          </tr>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/payout/jobs</code></td>
+            <td>Recent audited USDC payout jobs (when payout pipeline is enabled).</td>
+          </tr>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/version</code></td>
+            <td>Server package version string.</td>
+          </tr>
+          <tr>
+            <td><code>GET</code></td>
             <td><code>/openapi.json</code></td>
             <td>Machine-readable API outline (no auth; reflects current routes).</td>
           </tr>
@@ -167,6 +197,12 @@
           </tr>
         </tbody>
       </table>
+      <p class="dev-muted dev-example-note">
+        <strong>Operator</strong> routes use header <code>x-admin-key</code> (must match server
+        <code>ADMIN_CONTROL_KEY</code>): e.g. <code>POST /public/admin/new-puzzle-draft</code>,
+        <code>POST /public/admin/new-puzzle</code> (SQLite vault), <code>POST /payout/jobs/:jobId/attempt</code>,
+        <code>POST /public/wizard-clear-solved</code>. See <code>/openapi.json</code> for parameters.
+      </p>
     </section>
 
     <section class="dev-section">

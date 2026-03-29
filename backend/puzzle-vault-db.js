@@ -69,7 +69,6 @@ function migratePuzzlesDropClaimedStatus(db) {
         solved_at TEXT,
         claimed_at TEXT,
         quest_fund_tx TEXT,
-        round_id TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `)
@@ -77,7 +76,7 @@ function migratePuzzlesDropClaimedStatus(db) {
       INSERT INTO puzzles__status_mig (
         id, public_id, status, target_address, solution_hash,
         ciphertext, cipher_nonce, constraints_json, puzzle_words_csv, difficulty,
-        winner_id, solved_at, claimed_at, quest_fund_tx, round_id, created_at
+        winner_id, solved_at, claimed_at, quest_fund_tx, created_at
       )
       SELECT
         id,
@@ -97,7 +96,6 @@ function migratePuzzlesDropClaimedStatus(db) {
         END,
         claimed_at,
         quest_fund_tx,
-        round_id,
         created_at
       FROM puzzles
     `)
@@ -135,7 +133,6 @@ export function runVaultMigrations(db) {
       solved_at TEXT,
       claimed_at TEXT,
       quest_fund_tx TEXT,
-      round_id TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_puzzles_public_id ON puzzles (public_id);
@@ -143,6 +140,66 @@ export function runVaultMigrations(db) {
   `)
   ensureVaultColumns(db)
   migratePuzzlesDropClaimedStatus(db)
+  migratePuzzlesRemoveRoundId(db)
+}
+
+/**
+ * Drop legacy `round_id` column from `puzzles` (one-time rebuild).
+ */
+function migratePuzzlesRemoveRoundId(db) {
+  const cols = tableColumnNames(db, "puzzles")
+  if (!cols.includes("round_id")) return
+
+  db.exec("PRAGMA foreign_keys = OFF")
+  db.exec("BEGIN IMMEDIATE")
+  try {
+    db.exec(`DROP TABLE IF EXISTS puzzles__no_round`)
+    db.exec(`
+      CREATE TABLE puzzles__no_round (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        public_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('unsolved', 'solved')),
+        target_address TEXT NOT NULL,
+        solution_hash TEXT NOT NULL,
+        ciphertext BLOB,
+        cipher_nonce BLOB,
+        constraints_json TEXT,
+        puzzle_words_csv TEXT,
+        difficulty TEXT,
+        winner_id TEXT,
+        solved_at TEXT,
+        claimed_at TEXT,
+        quest_fund_tx TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `)
+    db.exec(`
+      INSERT INTO puzzles__no_round (
+        id, public_id, status, target_address, solution_hash,
+        ciphertext, cipher_nonce, constraints_json, puzzle_words_csv, difficulty,
+        winner_id, solved_at, claimed_at, quest_fund_tx, created_at
+      )
+      SELECT
+        id, public_id, status, target_address, solution_hash,
+        ciphertext, cipher_nonce, constraints_json, puzzle_words_csv, difficulty,
+        winner_id, solved_at, claimed_at, quest_fund_tx, created_at
+      FROM puzzles
+    `)
+    db.exec(`DROP TABLE puzzles`)
+    db.exec(`ALTER TABLE puzzles__no_round RENAME TO puzzles`)
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_puzzles_public_id ON puzzles (public_id)`)
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_puzzles_status ON puzzles (status)`)
+    db.exec(`COMMIT`)
+  } catch (e) {
+    try {
+      db.exec(`ROLLBACK`)
+    } catch {
+      /* ignore */
+    }
+    throw e
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON")
+  }
 }
 
 /** Latest unsolved puzzle row (highest id). */
@@ -152,6 +209,21 @@ export function getActiveUnsolvedPuzzle(db) {
       `SELECT * FROM puzzles WHERE status = 'unsolved' ORDER BY id DESC LIMIT 1`
     )
     .get()
+}
+
+/**
+ * Recent puzzle rows for operator / arena history (no ciphertext, no word list).
+ * @param {import("better-sqlite3").Database} db
+ * @param {number} [limit]
+ */
+export function listRecentPuzzles(db, limit = 10) {
+  const n = Math.min(Math.max(Number(limit) || 10, 1), 50)
+  return db
+    .prepare(
+      `SELECT id, public_id, status, difficulty, winner_id, solved_at, created_at, target_address
+       FROM puzzles ORDER BY id DESC LIMIT ?`
+    )
+    .all(n)
 }
 
 /**
@@ -182,7 +254,6 @@ export function insertBootstrapPuzzleFromEnv(db, vault, { force = false } = {}) 
     throw new Error("PUZZLE_WORDS must be exactly 12 comma-separated words")
   }
   const public_id = process.env.PUZZLE_ID?.trim() || "001"
-  const round_id = process.env.ROUND_ID?.trim() || "default"
   const constraints_json = process.env.PUZZLE_CONSTRAINTS_JSON?.trim() || null
   const difficulty = process.env.PUZZLE_DIFFICULTY?.trim().toLowerCase() || null
 
@@ -192,8 +263,8 @@ export function insertBootstrapPuzzleFromEnv(db, vault, { force = false } = {}) 
     .prepare(
       `INSERT INTO puzzles (
         public_id, status, target_address, solution_hash, puzzle_words_csv,
-        constraints_json, round_id, difficulty
-      ) VALUES (?, 'unsolved', ?, ?, ?, ?, ?, ?)`
+        constraints_json, difficulty
+      ) VALUES (?, 'unsolved', ?, ?, ?, ?, ?)`
     )
     .run(
       public_id,
@@ -201,7 +272,6 @@ export function insertBootstrapPuzzleFromEnv(db, vault, { force = false } = {}) 
       solution_hash,
       normalizedWordCsv,
       constraints_json,
-      round_id,
       difficulty
     )
   return Number(info.lastInsertRowid)
@@ -236,7 +306,6 @@ export function insertUnsolvedPuzzleRow(
     solution_hash,
     puzzle_words_csv,
     constraints_json = null,
-    round_id = "default",
     difficulty = null,
   }
 ) {
@@ -249,8 +318,8 @@ export function insertUnsolvedPuzzleRow(
     .prepare(
       `INSERT INTO puzzles (
         public_id, status, target_address, solution_hash, puzzle_words_csv,
-        constraints_json, round_id, difficulty
-      ) VALUES (?, 'unsolved', ?, ?, ?, ?, ?, ?)`
+        constraints_json, difficulty
+      ) VALUES (?, 'unsolved', ?, ?, ?, ?, ?)`
     )
     .run(
       public_id,
@@ -258,7 +327,6 @@ export function insertUnsolvedPuzzleRow(
       solution_hash,
       puzzle_words_csv,
       constraints_json,
-      round_id,
       difficulty
     )
   return Number(info.lastInsertRowid)

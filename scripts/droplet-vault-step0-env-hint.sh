@@ -35,7 +35,6 @@ TARGET_ADDRESS=<...>
 SOLUTION_HASH=<...>
 PUZZLE_WORDS=word1,word2,...,word12
 PUZZLE_ID=001
-ROUND_ID=default
 # PUZZLE_CONSTRAINTS_JSON={"fixed_positions":{"0":"word1","11":"word12"}}
 # PUZZLE_DIFFICULTY=easy
 

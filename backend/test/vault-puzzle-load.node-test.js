@@ -23,22 +23,20 @@ test("applyPuzzleRowFromVault fills PUZZLE from vault row", () => {
   assert.ok(h)
   h.db
     .prepare(
-      `INSERT INTO puzzles (public_id, status, target_address, solution_hash, puzzle_words_csv, round_id)
-       VALUES (?,?,?,?,?,?)`
+      `INSERT INTO puzzles (public_id, status, target_address, solution_hash, puzzle_words_csv)
+       VALUES (?,?,?,?,?)`
     )
     .run(
       "pv-001",
       "unsolved",
       "6h4oTiusvVchVP67bjTLmuCxGjyPo2fSNTR1Pq4nwwGy",
       "abc123hash",
-      "estate,refuse,glad,rare,only,faith,maximum,wide,army,hub,rent,wisdom",
-      "round-a"
+      "estate,refuse,glad,rare,only,faith,maximum,wide,army,hub,rent,wisdom"
     )
   const row = getActiveUnsolvedPuzzle(h.db)
   assert.ok(row)
   applyPuzzleRowFromVault(row)
   assert.equal(PUZZLE.id, "pv-001")
-  assert.equal(PUZZLE.round_id, "round-a")
   assert.equal(PUZZLE.words.length, 12)
   assert.equal(PUZZLE.target_address, "6h4oTiusvVchVP67bjTLmuCxGjyPo2fSNTR1Pq4nwwGy")
   h.db.close()

@@ -22,7 +22,7 @@ The system supports:
 ## Backend (`backend/server.js`)
 - Express API server (default `PORT=3001`)
 - Serves static frontend from `frontend/`
-- Handles validation, submits, leaderboard, stats, rounds, and SSE
+- Handles validation, submits, leaderboard, stats, optional payout jobs, and SSE
 - Uses Redis when `REDIS_URL` is set; otherwise falls back to in-memory store
 
 ## Puzzle/Evaluation (`backend/puzzle.js`)
@@ -41,11 +41,11 @@ The system supports:
 
 ## Store Layer (`backend/store.js`)
 - Redis + in-memory implementations behind one API
-- Tracks global stats, winner state, leaderboard ZSET, rounds
+- Tracks global stats, winner state, leaderboard ZSET, optional payout job queue
 - Publishes/subscribes realtime events on Redis channel `arena:events` when Redis is enabled
 
 ## Frontend (`frontend/`)
-- **`index.html` + `main.js` + `style.css`**: arena UI (puzzle words, commitments, SAUSD display, countdown, stats, leaderboard, collapsible SSE log)
+- **`index.html` + `main.js` + `style.css`**: arena UI (puzzle words, commitments, prize display, stats, leaderboard, collapsible SSE log)
 - **`developers.html`**: agent documentation (same-origin `curl` examples; reads `GET /public/developer-info`)
 - **`puzzle-wizard.html`**: operator tool for deriving `.env` fields and clearing solved state (`wizard-derive`, `wizard-clear-solved` with admin key)
 - Uses SSE (`GET /events`) for live updates; `puzzle_cleared` events refresh solved UI
@@ -69,11 +69,11 @@ Used when `REDIS_URL` is missing.
 
 ## Puzzle Metadata
 `GET /puzzle` returns:
-- `id`, `round_id`, `difficulty`
+- `id`, `difficulty`
 - shuffled `words`
 - `solution_hash`, `target_address`, `constraints`
 - winner/solved state
-- round timing/phase fields
+- `vault_empty` when sqlite has no unsolved row
 
 ## Win Conditions
 - `POST /submit`: win if evaluation says `matches_target=true`; winner set with `SET puzzle:winner NX` if not already solved
@@ -84,7 +84,10 @@ Used when `REDIS_URL` is missing.
   - `{ ok: true }`
 
 - `GET /puzzle`
-  - current puzzle + commitment + round metadata
+  - current puzzle + commitments + solved state
+
+- `GET /puzzle/recent`
+  - optional `?limit=` (default 10, max 50); `{ source: "sqlite" | "env", puzzles: [...] }` — vault row metadata for arena history panel; empty when not using SQLite vault
 
 - `GET /stats`
   - global counters, derived rates, solved status, activity
@@ -106,8 +109,20 @@ Used when `REDIS_URL` is missing.
   - supports `?limit=` and `?wallet=`
   - returns top list and optional self metrics (`rank`, `gap_to_leader`)
 
+- `GET /version`
+  - `{ version }` from `backend/package.json`
+
+- `GET /prize/balances`
+  - SPL + SOL snapshot for `TARGET_ADDRESS` (RPC)
+
+- `GET /payout/jobs`
+  - optional `?limit=`; returns `{ jobs }` when payout pipeline is configured
+
+- `POST /payout/jobs/:jobId/attempt` (`x-admin-key`)
+  - body `{ tx_sig?, error? }`; records an audited payout attempt
+
 - `GET /events` (SSE)
-  - realtime event stream (`hello`, `attempt`, `leaderboard_update`, `submit`, `win`, `puzzle_cleared`, `round_end`, `round_settled`, …)
+  - realtime event stream (`hello`, `attempt`, `leaderboard_update`, `submit`, `win`, `puzzle_cleared`, `payout_job`, `new_puzzle`, …)
 
 - `GET /public/developer-info`
   - `validate_batch_max`, `rate_limit_validate_batch_per_sec`, `wizard_derive_enabled`
@@ -140,19 +155,10 @@ Tracked metrics include:
 - Optional negative penalty on constraint violations (`LEADERBOARD_CONSTRAINT_PENALTY`)
 - Per-wallet per-second increment cap applies to near-miss increments only (`LEADERBOARD_MAX_INCR_PER_SEC`)
 
-## 7) Round Lifecycle
+## 7) Payout jobs (optional)
 
-- `ROUND_DURATION_SEC` sets round end on first initialization (Redis NX)
-- `getRoundState()` exposes phase:
-  - `active`
-  - `grace` (after end, before settlement)
-  - `settled`
-- During non-active rounds:
-  - `/submit` returns `round_ended`
-- Background tick:
-  - emits `round_end`
-  - settles round after grace (`ROUND_SETTLE_GRACE_SEC`)
-  - captures `round_leaderboard_winner`
+- When `PAYOUT_AMOUNT_USDC` > 0, a background tick creates at most one audited job per `(puzzle id, winner, amount)` while the puzzle is solved with a winner (idempotent). SSE may emit `payout_job` with `puzzle_id`.
+- Operators list jobs via `GET /payout/jobs` and record chain results via `POST /payout/jobs/:jobId/attempt` (see `ENV_SETTINGS.md`).
 
 ## 8) Deployment Model (Website + API)
 

@@ -25,6 +25,7 @@ import {
   getActiveUnsolvedPuzzle,
   retireAllUnsolvedPuzzles,
   insertUnsolvedPuzzleRow,
+  listRecentPuzzles,
 } from "./puzzle-vault-db.js"
 import { tryQuestFundAfterBootstrap } from "./quest-spl-fund.js"
 import { mnemonicToAddress } from "./solana.js"
@@ -48,15 +49,10 @@ import {
   publishArenaEvent,
   isRedisEnabled,
   getExtendedStats,
-  getRoundState,
   recordLeaderboardConstraintPenalty,
-  maybeSendRoundEndEvent,
-  maybeSettleRound,
-  maybeArchiveRound,
   createPayoutJob,
   listPayoutJobs,
   recordPayoutAttempt,
-  startNewRound,
   getLeaderboardScore,
   getLeaderboardRank1Based,
 } from "./store.js"
@@ -93,7 +89,7 @@ if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE) {
   refreshDisplayWords()
 }
 
-/** Open SQLite vault (PUZZLE_SOURCE=sqlite); kept open for future rotation. */
+/** Open SQLite vault (PUZZLE_SOURCE=sqlite); kept open for admin new-puzzle and QUEST funding. */
 export let puzzleVaultHandle = null
 
 /** True when PUZZLE_SOURCE=sqlite but there is no unsolved row (puzzle served from env until bootstrap + restart). */
@@ -147,13 +143,7 @@ const BATCH_CONCURRENCY = Math.min(
 
 const IS_PROD = process.env.NODE_ENV === "production"
 const ADMIN_CONTROL_KEY = process.env.ADMIN_CONTROL_KEY?.trim() || ""
-const AUTO_ROTATE_ROUNDS =
-  process.env.AUTO_ROTATE_ROUNDS === "1" || process.env.AUTO_ROTATE_ROUNDS === "true"
 const PAYOUT_AMOUNT_USDC = Number(process.env.PAYOUT_AMOUNT_USDC || 0)
-const ROUND_ROTATION_JSON = process.env.ROUND_ROTATION_JSON?.trim() || ""
-let roundRotation = []
-let rotationIndex = 0
-let lastAutoRotatedRoundId = null
 
 const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
@@ -169,17 +159,6 @@ const PRIZE_BALANCE_TTL_MS = Math.max(
 const solanaConn = new Connection(SOLANA_RPC_URL, "confirmed")
 let prizeBalanceCache = null
 let prizeBalanceCacheAt = 0
-
-if (ROUND_ROTATION_JSON) {
-  try {
-    const parsed = JSON.parse(ROUND_ROTATION_JSON)
-    if (Array.isArray(parsed)) {
-      roundRotation = parsed
-    }
-  } catch (e) {
-    console.error("[round rotation] invalid ROUND_ROTATION_JSON", e)
-  }
-}
 
 function localBroadcast(event) {
   const payload = `data: ${JSON.stringify(event)}\n\n`
@@ -209,35 +188,6 @@ function requireAdminControl(req, res, next) {
     return res.status(401).json({ error: "unauthorized" })
   }
   next()
-}
-
-function applyRotationItem(item) {
-  if (!item || typeof item !== "object") return false
-  if (typeof item.id === "string" && item.id.trim()) PUZZLE.id = item.id.trim()
-  if (typeof item.round_id === "string" && item.round_id.trim()) {
-    PUZZLE.round_id = item.round_id.trim()
-  }
-  if (typeof item.target_address === "string" && item.target_address.trim()) {
-    PUZZLE.target_address = item.target_address.trim()
-  }
-  if (typeof item.solution_hash === "string" && item.solution_hash.trim()) {
-    PUZZLE.solution_hash = item.solution_hash.trim()
-  }
-  if (typeof item.difficulty === "string" && item.difficulty.trim()) {
-    PUZZLE.difficulty = item.difficulty.trim().toLowerCase()
-  }
-  if (item.constraints && typeof item.constraints === "object") {
-    PUZZLE.constraints = item.constraints
-  }
-  if (Array.isArray(item.words) && item.words.length === 12) {
-    PUZZLE.words = item.words.map((w) => String(w).trim().toLowerCase()).filter(Boolean)
-    if (PUZZLE.words.length === 12) {
-      DISPLAY_WORDS = shuffle(PUZZLE.words)
-    }
-  }
-  prizeBalanceCache = null
-  prizeBalanceCacheAt = 0
-  return true
 }
 
 async function fetchPrizeBalances() {
@@ -386,7 +336,6 @@ function parseAdminNewPuzzlePayload(body) {
   const solution_hash = String(body?.solution_hash ?? "").trim()
   const wordsRaw = String(body?.puzzle_words ?? body?.puzzle_words_csv ?? "").trim()
   const public_id = String(body?.public_id ?? body?.puzzle_id ?? "").trim()
-  const round_id = String(body?.round_id ?? "default").trim() || "default"
   let constraints_json = null
   if (body?.constraints_json != null && String(body.constraints_json).trim() !== "") {
     const cj = body.constraints_json
@@ -427,7 +376,6 @@ function parseAdminNewPuzzlePayload(body) {
     solution_hash: solution_hash.toLowerCase(),
     puzzle_words_csv: words.join(","),
     constraints_json,
-    round_id,
     difficulty,
   }
 }
@@ -554,7 +502,6 @@ app.post(
           detail: "PUZZLE_SOURCE must be sqlite and the vault must be open",
         })
       }
-      const round_id = String(req.body?.round_id ?? "default").trim() || "default"
       const mnemonic = bip39.generateMnemonic(128)
       const n = normalizePhrase(mnemonic)
       const d = buildWizardDerivationFromNormalizedPhrase(n)
@@ -568,7 +515,6 @@ app.post(
           solution_hash: d.solution_hash,
           puzzle_words: d.puzzle_words,
           constraints_json: d.puzzle_constraints_json,
-          round_id,
           difficulty: null,
         },
       })
@@ -651,13 +597,21 @@ app.post(
   }
 )
 
+app.get("/puzzle/recent", (req, res) => {
+  setNoStore(res)
+  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50)
+  if (parsePuzzleSource() !== PUZZLE_SOURCE_SQLITE || !puzzleVaultHandle?.db) {
+    return res.json({ source: "env", puzzles: [] })
+  }
+  const puzzles = listRecentPuzzles(puzzleVaultHandle.db, limit)
+  res.json({ source: "sqlite", puzzles })
+})
+
 app.get("/puzzle", async (_req, res) => {
   setNoStore(res)
   const state = await getPuzzleState()
-  const round = await getRoundState()
   res.json({
     id: PUZZLE.id,
-    round_id: PUZZLE.round_id,
     difficulty: PUZZLE.difficulty,
     words: DISPLAY_WORDS,
     solved: state.solved,
@@ -667,15 +621,6 @@ app.get("/puzzle", async (_req, res) => {
     target_address: PUZZLE.target_address,
     constraints: PUZZLE.constraints,
     winner: state.winner,
-    round_start_ms: round.round_start_ms,
-    round_end_ms: round.round_end_ms,
-    round_active: round.round_active,
-    round_phase: round.round_phase,
-    round_settle_at_ms: round.round_settle_at_ms,
-    round_archive_at_ms: round.round_archive_at_ms,
-    round_settled: round.round_settled,
-    round_archived: round.round_archived,
-    round_leaderboard_winner: round.round_leaderboard_winner,
   })
 })
 
@@ -794,14 +739,6 @@ app.post("/submit", submitLimiter, async (req, res) => {
       })
     }
 
-    const round = await getRoundState()
-    if (!round.round_active) {
-      return res.status(400).json({
-        status: "round_ended",
-        round_id: round.round_id,
-      })
-    }
-
     const ev = await evalAndRecord(rawPhrase)
 
     if (ev.rejected_by_constraints) {
@@ -899,64 +836,24 @@ app.get("/@frontend/icon_quest.png", (_req, res) => {
 
 app.use(express.static(path.join(__dirname, "../frontend")))
 
-async function tickRoundLifecycle() {
-  await maybeSendRoundEndEvent((ev) => broadcast(ev))
-  await maybeSettleRound((ev) => broadcast(ev))
-  await maybeArchiveRound((ev) => broadcast(ev))
-
-  const round = await getRoundState()
-  if (round.round_settled && PAYOUT_AMOUNT_USDC > 0) {
-    const state = await getPuzzleState()
-    if (state.winner) {
-      const job = await createPayoutJob({
-        roundId: round.round_id,
-        winnerAddress: state.winner,
-        amountUsdc: PAYOUT_AMOUNT_USDC,
-      })
-      if (job) {
-        broadcast({
-          type: "payout_job",
-          job_id: job.job_id,
-          round_id: job.round_id,
-          winner_address: job.winner_address,
-          amount_usdc: job.amount_usdc,
-          status: job.status,
-        })
-      }
-    }
-  }
-
-  if (
-    AUTO_ROTATE_ROUNDS &&
-    round.round_archived &&
-    round.round_id &&
-    round.round_id !== lastAutoRotatedRoundId &&
-    roundRotation.length > 0
-  ) {
-    const item = roundRotation[rotationIndex % roundRotation.length]
-    const ok = applyRotationItem(item)
-    if (ok) {
-      lastAutoRotatedRoundId = round.round_id
-      rotationIndex += 1
-      const nextRound = await startNewRound({
-        roundId: item.round_id || `${round.round_id}-next-${rotationIndex}`,
-        durationSec:
-          Number(item.round_duration_sec) ||
-          Number(process.env.ROUND_DURATION_SEC) ||
-          0,
-        startDelaySec:
-          Number(item.round_start_delay_sec) ||
-          Number(process.env.ROUND_START_DELAY_SEC) ||
-          0,
-      })
-      PUZZLE.round_id = nextRound.round_id
-      broadcast({
-        type: "round_rotated",
-        from_round_id: round.round_id,
-        to_round_id: nextRound.round_id,
-        puzzle_id: PUZZLE.id,
-      })
-    }
+async function tickPayoutJobs() {
+  if (PAYOUT_AMOUNT_USDC <= 0) return
+  const state = await getPuzzleState()
+  if (!state.solved || !state.winner) return
+  const job = await createPayoutJob({
+    puzzleId: PUZZLE.id,
+    winnerAddress: state.winner,
+    amountUsdc: PAYOUT_AMOUNT_USDC,
+  })
+  if (job) {
+    broadcast({
+      type: "payout_job",
+      job_id: job.job_id,
+      puzzle_id: job.puzzle_id,
+      winner_address: job.winner_address,
+      amount_usdc: job.amount_usdc,
+      status: job.status,
+    })
   }
 }
 
@@ -971,7 +868,7 @@ async function main() {
   loadPuzzleFromSqliteVault()
 
   setInterval(() => {
-    tickRoundLifecycle().catch(() => {})
+    tickPayoutJobs().catch(() => {})
   }, 1000)
 
   const server = app.listen(PORT, () => {

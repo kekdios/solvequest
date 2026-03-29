@@ -221,6 +221,98 @@ body {
   font-size: 1rem;
 }
 
+.puzzle-history {
+  margin-bottom: 1.1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.puzzle-history-hint {
+  margin-bottom: 8px;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.puzzle-history-body {
+  font-size: 0.72rem;
+  max-height: 14rem;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--panel) 70%, #000);
+}
+
+.puzzle-history-placeholder {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--muted);
+}
+
+.puzzle-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.puzzle-history-table th,
+.puzzle-history-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  vertical-align: top;
+}
+
+.puzzle-history-table th {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: color-mix(in srgb, var(--panel) 92%, #000);
+  z-index: 1;
+}
+
+.puzzle-history-table tr:last-child td {
+  border-bottom: none;
+}
+
+.puzzle-history-table tr.is-current td {
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
+
+.ph-id {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ph-status {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ph-status--open {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+}
+
+.ph-status--done {
+  background: rgba(120, 120, 130, 0.25);
+  color: var(--muted);
+}
+
+.ph-mono {
+  font-family: ui-monospace, monospace;
+  font-size: 0.68rem;
+  word-break: break-all;
+}
+
 .side-hint {
   margin: 0 0 10px;
   font-size: 0.75rem;

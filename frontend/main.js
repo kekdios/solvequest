@@ -141,8 +141,9 @@ function renderPlayerSavedList() {
   })
 }
 
-let countdownTimer = null
 let lastTopSig = ""
+/** @type {string} */
+let currentPuzzlePublicId = ""
 
 function fmtShortPubkey(pk) {
   if (!pk || pk.length < 12) return pk || "—"
@@ -150,124 +151,165 @@ function fmtShortPubkey(pk) {
 }
 
 async function loadPuzzle() {
-  const res = await fetch(`${API}/puzzle`, { cache: "no-store" })
-  if (!res.ok) {
-    uiNotice(`Failed to load puzzle: ${res.status}`)
-    return
-  }
-  const data = await res.json()
-  /** Authoritative: API can keep round_active/phase "active" after a win — UI must not show "open" then. */
-  const isSolved = data.solved === true
-
-  const vaultBanner = document.getElementById("vault-empty-banner")
-  if (vaultBanner) {
-    vaultBanner.hidden = data.vault_empty !== true
-  }
-
-  document.getElementById("puzzle").innerText = data.words.join(" ")
-  document.getElementById("commitment-hash").textContent = data.solution_hash ?? "—"
-  document.getElementById("commitment-addr").textContent = data.target_address ?? "—"
-
-  const statusTicker = document.getElementById("ticker-puzzle-status")
-  const statusWrap = document.getElementById("ticker-puzzle-status-wrap")
-  if (statusTicker) {
-    statusTicker.textContent = isSolved ? "SOLVED" : "NOT SOLVED"
-    statusTicker.classList.toggle("is-solved", isSolved)
-    statusTicker.classList.toggle("is-open", !isSolved)
-  }
-  if (statusWrap) {
-    statusWrap.classList.toggle("is-solved", isSolved)
-    statusWrap.classList.toggle("is-open", !isSolved)
-  }
-
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-    countdownTimer = null
-  }
-  const endMs = data.round_end_ms
-  const phase = data.round_phase || "active"
-  const active = data.round_active !== false
-
-  function tickCountdown() {
-    const el = document.getElementById("countdown")
-    if (isSolved) {
-      el.textContent = "solved"
+  try {
+    const res = await fetch(`${API}/puzzle`, { cache: "no-store" })
+    if (!res.ok) {
+      uiNotice(`Failed to load puzzle: ${res.status}`)
       return
     }
-    if (phase === "settled") {
-      el.textContent = "settled"
-      return
-    }
-    if (phase === "ended" && endMs) {
-      el.textContent = "ended"
-      return
-    }
-    if (!endMs || !active) {
-      el.textContent = endMs && !active ? "ended" : "open"
-      return
-    }
-    const left = Math.max(0, endMs - Date.now())
-    if (left <= 0) {
-      el.textContent = "ended"
-      return
-    }
-    const s = Math.floor(left / 1000)
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = s % 60
-    el.textContent =
-      h > 0
-        ? `${h}h ${String(m).padStart(2, "0")}m ${String(sec).padStart(2, "0")}s`
-        : `${m}m ${String(sec).padStart(2, "0")}s`
-  }
-  tickCountdown()
-  if (!isSolved && endMs && active && phase === "active") {
-    countdownTimer = setInterval(tickCountdown, 1000)
-  }
+    const data = await res.json()
+    const isSolved = data.solved === true
 
-  const fp = data.constraints?.fixed_positions
-  const sec = document.getElementById("constraints-section")
-  const txt = document.getElementById("constraints-text")
-  const envLine = document.getElementById("constraints-env-line")
-  if (fp && Object.keys(fp).length > 0) {
-    const parts = Object.entries(fp)
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([i, w]) => `position ${Number(i) + 1} = ${w}`)
-    txt.textContent = `Fixed words: ${parts.join("; ")}`
-    const sorted = {}
-    for (const k of Object.keys(fp).sort((a, b) => Number(a) - Number(b))) {
-      sorted[k] = String(fp[k]).trim().toLowerCase()
+    const vaultBanner = document.getElementById("vault-empty-banner")
+    if (vaultBanner) {
+      vaultBanner.hidden = data.vault_empty !== true
     }
-    envLine.textContent = `PUZZLE_CONSTRAINTS_JSON=${JSON.stringify({
-      fixed_positions: sorted,
-    })}`
-    sec.hidden = false
-  } else {
-    txt.textContent = ""
-    envLine.textContent = ""
-    sec.hidden = true
-  }
 
-  const solvedPanel = document.getElementById("puzzle-solved-panel")
-  const solvedDetail = document.getElementById("puzzle-solved-detail")
-  const puzzleEl = document.getElementById("puzzle")
-  if (isSolved) {
-    if (solvedPanel) solvedPanel.hidden = false
-    if (solvedDetail) {
-      const wRaw = data.winner
-      const w = wRaw != null && String(wRaw).trim() !== "" ? String(wRaw).trim() : ""
-      if (w) {
-        const label = getPlayerLabel(w)
-        solvedDetail.textContent = label ? `Winner: ${label} (${w})` : `Winner: ${w}`
-      } else {
-        solvedDetail.textContent = "Puzzle solved."
+    document.getElementById("puzzle").innerText = data.words.join(" ")
+    document.getElementById("commitment-hash").textContent = data.solution_hash ?? "—"
+    document.getElementById("commitment-addr").textContent = data.target_address ?? "—"
+
+    const statusTicker = document.getElementById("ticker-puzzle-status")
+    const statusWrap = document.getElementById("ticker-puzzle-status-wrap")
+    if (statusTicker) {
+      statusTicker.textContent = isSolved ? "SOLVED" : "NOT SOLVED"
+      statusTicker.classList.toggle("is-solved", isSolved)
+      statusTicker.classList.toggle("is-open", !isSolved)
+    }
+    if (statusWrap) {
+      statusWrap.classList.toggle("is-solved", isSolved)
+      statusWrap.classList.toggle("is-open", !isSolved)
+    }
+
+    const pid = document.getElementById("ticker-puzzle-id")
+    if (pid) pid.textContent = data.id != null ? String(data.id) : "—"
+    currentPuzzlePublicId = data.id != null ? String(data.id) : ""
+
+    const fp = data.constraints?.fixed_positions
+    const sec = document.getElementById("constraints-section")
+    const txt = document.getElementById("constraints-text")
+    const envLine = document.getElementById("constraints-env-line")
+    if (fp && Object.keys(fp).length > 0) {
+      const parts = Object.entries(fp)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([i, w]) => `position ${Number(i) + 1} = ${w}`)
+      txt.textContent = `Fixed words: ${parts.join("; ")}`
+      const sorted = {}
+      for (const k of Object.keys(fp).sort((a, b) => Number(a) - Number(b))) {
+        sorted[k] = String(fp[k]).trim().toLowerCase()
       }
+      envLine.textContent = `PUZZLE_CONSTRAINTS_JSON=${JSON.stringify({
+        fixed_positions: sorted,
+      })}`
+      sec.hidden = false
+    } else {
+      txt.textContent = ""
+      envLine.textContent = ""
+      sec.hidden = true
     }
-    if (puzzleEl) puzzleEl.classList.add("puzzle-words--solved")
-  } else {
-    if (solvedPanel) solvedPanel.hidden = true
-    if (solvedDetail) solvedDetail.textContent = ""
-    if (puzzleEl) puzzleEl.classList.remove("puzzle-words--solved")
+
+    const solvedPanel = document.getElementById("puzzle-solved-panel")
+    const solvedDetail = document.getElementById("puzzle-solved-detail")
+    const puzzleEl = document.getElementById("puzzle")
+    if (isSolved) {
+      if (solvedPanel) solvedPanel.hidden = false
+      if (solvedDetail) {
+        const wRaw = data.winner
+        const w = wRaw != null && String(wRaw).trim() !== "" ? String(wRaw).trim() : ""
+        if (w) {
+          const label = getPlayerLabel(w)
+          solvedDetail.textContent = label ? `Winner: ${label} (${w})` : `Winner: ${w}`
+        } else {
+          solvedDetail.textContent = "Puzzle solved."
+        }
+      }
+      if (puzzleEl) puzzleEl.classList.add("puzzle-words--solved")
+    } else {
+      if (solvedPanel) solvedPanel.hidden = true
+      if (solvedDetail) solvedDetail.textContent = ""
+      if (puzzleEl) puzzleEl.classList.remove("puzzle-words--solved")
+    }
+  } finally {
+    void loadPuzzleHistory()
+  }
+}
+
+function fmtHistoryDate(s) {
+  if (s == null || String(s).trim() === "") return "—"
+  const t = Date.parse(String(s).replace(" ", "T") + (String(s).includes("Z") ? "" : ""))
+  if (!Number.isFinite(t)) return String(s).slice(0, 16)
+  return new Date(t).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+async function loadPuzzleHistory() {
+  const body = document.getElementById("puzzle-history-body")
+  const hint = document.getElementById("puzzle-history-hint")
+  if (!body) return
+  try {
+    const res = await fetch(`${API}/puzzle/recent?limit=10`, { cache: "no-store" })
+    if (!res.ok) {
+      body.innerHTML =
+        '<p class="puzzle-history-placeholder">Could not load puzzle history.</p>'
+      return
+    }
+    const data = await res.json()
+    if (data.source === "env") {
+      if (hint) {
+        hint.textContent =
+          "Puzzle history is stored in the SQLite vault. This server uses env-only puzzle mode."
+      }
+      body.innerHTML =
+        '<p class="puzzle-history-placeholder">No vault history (env puzzle mode).</p>'
+      return
+    }
+    if (hint) {
+      hint.textContent =
+        "Last 10 rows from the vault (new puzzle retires the previous open row). Current puzzle is highlighted."
+    }
+    const rows = Array.isArray(data.puzzles) ? data.puzzles : []
+    if (rows.length === 0) {
+      body.innerHTML = '<p class="puzzle-history-placeholder">No puzzles in the vault yet.</p>'
+      return
+    }
+    const thead = `<thead><tr>
+      <th>Id</th>
+      <th>Status</th>
+      <th>Winner</th>
+      <th>Added</th>
+    </tr></thead>`
+    const tbody = document.createElement("tbody")
+    for (const r of rows) {
+      const tr = document.createElement("tr")
+      const pub = r.public_id != null ? String(r.public_id) : "—"
+      if (currentPuzzlePublicId && pub === currentPuzzlePublicId) {
+        tr.classList.add("is-current")
+      }
+      const st = String(r.status || "")
+      const stClass =
+        st === "unsolved" ? "ph-status ph-status--open" : "ph-status ph-status--done"
+      const w = r.winner_id != null && String(r.winner_id).trim() !== ""
+        ? escapeHtml(fmtShortPubkey(String(r.winner_id).trim()))
+        : "—"
+      tr.innerHTML = `<td class="ph-mono ph-id">${escapeHtml(pub)}</td>
+        <td><span class="${stClass}">${escapeHtml(st || "—")}</span></td>
+        <td class="ph-mono">${w}</td>
+        <td class="ph-mono">${escapeHtml(fmtHistoryDate(r.created_at))}</td>`
+      tbody.appendChild(tr)
+    }
+    body.replaceChildren()
+    const table = document.createElement("table")
+    table.className = "puzzle-history-table"
+    table.innerHTML = thead
+    table.appendChild(tbody)
+    body.appendChild(table)
+  } catch {
+    body.innerHTML =
+      '<p class="puzzle-history-placeholder">Could not load puzzle history.</p>'
   }
 }
 
@@ -420,15 +462,10 @@ function connectEvents() {
       if (
         t === "win" ||
         t === "puzzle_cleared" ||
+        t === "new_puzzle" ||
         (t === "submit" && (payload.status === "win" || payload.status === "already_solved"))
       ) {
         loadPuzzle()
-      }
-      if (t === "round_end" || t === "round_settled" || t === "round_archived" || t === "round_rotated") {
-        loadPuzzle()
-        loadStats()
-        loadPrizeBalances()
-        loadLeaderboard()
       }
     } catch {
       logSse(ev.data)
@@ -486,7 +523,6 @@ function resetNewPuzzleDialog() {
     "new-puzzle-show-hash",
     "new-puzzle-show-words",
     "new-puzzle-show-constraints",
-    "new-puzzle-show-round",
   ]
   for (const id of preIds) {
     const el = document.getElementById(id)
@@ -516,7 +552,6 @@ function showNewPuzzleDraft(draft) {
   set("new-puzzle-show-hash", draft.solution_hash)
   set("new-puzzle-show-words", draft.puzzle_words)
   set("new-puzzle-show-constraints", draft.constraints_json ?? "")
-  set("new-puzzle-show-round", draft.round_id ?? "default")
   newPuzzleDraftEl?.removeAttribute("hidden")
 }
 
@@ -610,7 +645,6 @@ if (newPuzzleOpen && newPuzzleDlg) {
       target_address: d.target_address,
       solution_hash: String(d.solution_hash).toLowerCase(),
       puzzle_words: d.puzzle_words,
-      round_id: d.round_id || "default",
     }
     if (d.constraints_json && String(d.constraints_json).trim()) {
       body.constraints_json = d.constraints_json

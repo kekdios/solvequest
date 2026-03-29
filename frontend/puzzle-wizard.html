@@ -283,8 +283,6 @@
       <h2>3) Optional labels</h2>
       <label for="puzzle-id">PUZZLE_ID</label>
       <input type="text" id="puzzle-id" value="001" placeholder="001" />
-      <label for="round-id" style="margin-top: 12px">ROUND_ID</label>
-      <input type="text" id="round-id" value="default" placeholder="default" />
     </section>
 
     <section class="step">
@@ -423,9 +421,6 @@
         if (o.PUZZLE_ID != null && String(o.PUZZLE_ID).trim()) {
           document.getElementById("puzzle-id").value = String(o.PUZZLE_ID).trim()
         }
-        if (o.ROUND_ID != null && String(o.ROUND_ID).trim()) {
-          document.getElementById("round-id").value = String(o.ROUND_ID).trim()
-        }
       }
 
       function applyOutputs(addr, hash, canonical, scrambled, constraintsJson, statusEl, okMsg) {
@@ -545,7 +540,6 @@
         const scrambled = document.getElementById("out-words-scrambled").textContent
         const constraints = document.getElementById("out-constraints").textContent
         const pid = document.getElementById("puzzle-id").value.trim() || "001"
-        const rid = document.getElementById("round-id").value.trim() || "default"
         if (
           target === "—" ||
           hash === "—" ||
@@ -561,8 +555,7 @@
           `SOLUTION_HASH=${hash}\n` +
           `PUZZLE_WORDS=${scrambled}\n` +
           `PUZZLE_CONSTRAINTS_JSON=${constraints}\n` +
-          `PUZZLE_ID=${pid}\n` +
-          `ROUND_ID=${rid}\n`
+          `PUZZLE_ID=${pid}\n`
       }
 
       document.getElementById("btn-gen").addEventListener("click", async () => {
@@ -621,7 +614,6 @@
       })
 
       document.getElementById("puzzle-id").addEventListener("input", updateEnvBlock)
-      document.getElementById("round-id").addEventListener("input", updateEnvBlock)
 
       document.getElementById("btn-clear-solved").addEventListener("click", async () => {
         const statusEl = document.getElementById("clear-solved-status")

@@ -3,9 +3,9 @@
 On a deployed arena, open **`/developers`** on the same site for copy-paste **base URL**, **curl** examples, and links to this repo. A machine-readable outline lives at **`/openapi.json`** (same origin). **`POST /validate_batch` is unauthenticated**; batch size and rate limits are set by the operator in env.
 
 Use `sdk/player-agent-sdk.js` to build player agents that:
-- fetch puzzle metadata
+- fetch puzzle metadata (`GET /puzzle`: `id`, shuffled `words`, `constraints`, `solution_hash`, `target_address`, `solved`, `winner`, `vault_empty`, `difficulty` — no timed “round” fields)
 - validate candidate batches
-- submit winning phrase
+- submit a winning phrase (`POST /submit`: body `phrase` or `mnemonic`, plus `wallet` = leaderboard id)
 - identify themselves on leaderboard via `agentName`
 
 ## Quick example (Node 20+)
@@ -59,3 +59,7 @@ Recommended format:
 ## Batch notes
 
 - `validate_batch` max size and internal concurrency are configured with **`VALIDATE_BATCH_MAX`** (or legacy **`PAID_TIER_BATCH_MAX`**) and **`VALIDATE_BATCH_CONCURRENCY`** (or **`PAID_TIER_BATCH_CONCURRENCY`**). See **`GET /public/developer-info`** → **`validate_batch_max`**.
+
+## SSE (`GET /events`)
+
+Optional: subscribe for live events (`hello`, `submit`, `win`, `leaderboard_update`, `puzzle_cleared`, `new_puzzle`, `payout_job`, etc.). Same origin as the arena; no auth.

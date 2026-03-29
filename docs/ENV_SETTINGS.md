@@ -115,45 +115,12 @@ REDIS_URL=redis://127.0.0.1:6379
 - **Used by:** `backend/server.js`.
 
 ### `PAYOUT_AMOUNT_USDC` (optional, default `0`)
-- **Purpose:** If >0, create audited payout job on round settlement when a winner exists.
+- **Purpose:** If >0, create an audited payout job when the puzzle is solved and a winner is set (idempotent per puzzle id + winner + amount).
 - **Used by:** `backend/server.js` + `backend/store.js`.
 
 ### `PAYOUT_MAX_RETRIES` (optional, default `5`)
 - **Purpose:** Max retries for payout attempt tracking.
 - **Used by:** `backend/store.js`.
-
----
-
-## Round lifecycle settings
-
-### `ROUND_ID` (optional, default `default`)
-- **Purpose:** Round identifier.
-- **Used by:** `backend/puzzle.js`, `backend/store.js`.
-
-### `ROUND_DURATION_SEC` (optional)
-- **Purpose:** Set round end timestamp on init.
-- **Used by:** `backend/store.js`.
-
-### `ROUND_START_DELAY_SEC` (optional, default `0`)
-- **Purpose:** Delay round activation after boot/rotation.
-- **Used by:** `backend/store.js`.
-
-### `ROUND_SETTLE_GRACE_SEC` (optional, default `3`)
-- **Purpose:** Grace window after round end before settlement.
-- **Used by:** `backend/store.js`.
-
-### `ROUND_ARCHIVE_DELAY_SEC` (optional, default `120`)
-- **Purpose:** Delay from settled -> archived phase.
-- **Used by:** `backend/store.js`.
-
-### `AUTO_ROTATE_ROUNDS` (optional, default off)
-- **Purpose:** Enable automatic metadata rotation after round archive.
-- **Used by:** `backend/server.js`.
-
-### `ROUND_ROTATION_JSON` (optional, default empty)
-- **Purpose:** Array of next-round metadata objects for auto-rotation.
-- **Used by:** `backend/server.js`.
-- **Supported fields per item:** `id`, `round_id`, `target_address`, `solution_hash`, `words` (12), `constraints`, `difficulty`, `round_duration_sec`, `round_start_delay_sec`.
 
 ---
 
@@ -208,7 +175,7 @@ There are **no** API keys, credits, or “request key” URLs in this response.
 
 ## Puzzle vault (SQLite automation)
 
-These variables configure **optional** automated puzzle rotation with **encrypted** solutions in **SQLite** and **QUEST** SPL funding.
+These variables configure the **optional SQLite puzzle vault** (persisted rows, migrations, backups) and optional **QUEST** SPL auto-funding after insert.
 
 **Modules (backend):**
 - `puzzle-vault-env.js` — `requireSqliteStorageEnv()` (path + backups) for opening the DB; `requireSqliteVaultEnv()` adds **`QUEST_*`** for funding/signing paths.
@@ -228,7 +195,7 @@ Override **`DEPLOY_TARGET`**, **`APP_DIR`**, **`SERVICE_NAME`**, **`PUBLIC_HEALT
 **CLI (repo root or `backend/`):** with **`PUZZLE_SOURCE=sqlite`**, **`SQLITE_PATH`**, and optional backup/HKDF vars, from **`backend/`** run:
 - `npm run vault-init -- migrate` — create/migrate DB file only.
 - `npm run vault-init -- status` — row counts + active unsolved row.
-- `npm run vault-init -- bootstrap-from-env` — insert one **`unsolved`** row from **`TARGET_ADDRESS`**, **`SOLUTION_HASH`**, **`PUZZLE_WORDS`** (and optional **`PUZZLE_CONSTRAINTS_JSON`**, **`PUZZLE_ID`**, **`ROUND_ID`**, **`PUZZLE_DIFFICULTY`**). Fails if an unsolved row already exists unless **`--force`**. If **`QUEST_AUTO_FUND=1`** and **`QUEST_OPERATOR_SECRET_KEY`**, **`QUEST_MINT`**, **`QUEST_FUND_AMOUNT_RAW`** are set, immediately sends QUEST from the operator wallet to the puzzle **`TARGET_ADDRESS`** (recipient ATA) and stores the signature in **`puzzles.quest_fund_tx`**.
+- `npm run vault-init -- bootstrap-from-env` — insert one **`unsolved`** row from **`TARGET_ADDRESS`**, **`SOLUTION_HASH`**, **`PUZZLE_WORDS`** (and optional **`PUZZLE_CONSTRAINTS_JSON`**, **`PUZZLE_ID`**, **`PUZZLE_DIFFICULTY`**). Fails if an unsolved row already exists unless **`--force`**. If **`QUEST_AUTO_FUND=1`** and **`QUEST_OPERATOR_SECRET_KEY`**, **`QUEST_MINT`**, **`QUEST_FUND_AMOUNT_RAW`** are set, immediately sends QUEST from the operator wallet to the puzzle **`TARGET_ADDRESS`** (recipient ATA) and stores the signature in **`puzzles.quest_fund_tx`**.
 
 **`puzzles.puzzle_words_csv`:** 12 comma-separated words (normalized lowercase in DB) for display/evaluation; required for server load.
 
@@ -238,7 +205,7 @@ Leaving **`PUZZLE_SOURCE` unset or `env`** keeps the classic model (puzzle from 
 
 **Backup policy:**
 - On **open** (`openPuzzleVaultDatabase`): if the DB file **already exists** and is **non-empty**, copy it to the backup dir (then prune) **before** attaching. First boot (no file) skips backup.
-- Before **mutating** puzzle data (future rotation/insert/update), call **`backupPuzzleVaultBeforeWrite(vault)`** so each logical change is preceded by a file copy.
+- Before **mutating** puzzle data (bootstrap, **`POST /public/admin/new-puzzle`**, vault CLI), call **`backupPuzzleVaultBeforeWrite(vault)`** so each logical change is preceded by a file copy.
 - Schema uses **`IF NOT EXISTS`** only so migrations do not wipe existing tables.
 
 ### `PUZZLE_SOURCE` (optional, default `env`)
