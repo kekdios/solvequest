@@ -74,10 +74,10 @@ REDIS_URL=redis://127.0.0.1:6379
 - **Used by:** `backend/server.js`.
 
 ### `PRIZE_SPL_MINT` (optional, default SAUSD)
-- **Purpose:** SPL token mint used for prize balance on `TARGET_ADDRESS` (`GET /prize/balances`).
+- **Purpose:** SPL token mint used for prize balance on `TARGET_ADDRESS` (`GET /prize/balances`, arena REWARD / prize line). The UI label says “QUEST” but the **number** is whatever mint you configure here — there is **no** fiat/market price; amounts are on-chain `uiAmount` from the RPC.
 - **Used by:** `backend/server.js`.
-- **Default:** `CK9PodBifHymLBGeZujExFnpoLCsYxAw7t8c8LsDKLxG` (SAUSD).
-- **Legacy:** `USDC_MINT` is still read if `PRIZE_SPL_MINT` is unset (older `.env` files).
+- **Resolution order if unset:** `QUEST_MINT` → `USDC_MINT` → default `CK9PodBifHymLBGeZujExFnpoLCsYxAw7t8c8LsDKLxG` (SAUSD). Set `PRIZE_SPL_MINT` explicitly when your display token should differ from `QUEST_MINT`.
+- **Legacy:** `USDC_MINT` is still read when `PRIZE_SPL_MINT` and `QUEST_MINT` are both unset.
 
 ### `PRIZE_BALANCE_TTL_MS` (optional, default `10000`)
 - **Purpose:** Cache TTL for RPC prize balance reads.
@@ -240,7 +240,7 @@ Leaving **`PUZZLE_SOURCE` unset or `env`** keeps the classic model (puzzle from 
 - **Purpose:** When **`1`** / **`true`**, **`vault-init bootstrap-from-env`** (after the row insert) sends QUEST via **`@solana/spl-token`** from **`QUEST_OPERATOR_SECRET_KEY`** to the new row’s **`target_address`** (creates the recipient ATA if needed; operator pays rent). Signature is written to **`puzzles.quest_fund_tx`**.
 - **Requires:** **`QUEST_OPERATOR_SECRET_KEY`**, **`QUEST_MINT`**, **`QUEST_FUND_AMOUNT_RAW`**, and **`SOLANA_RPC_URL`** (defaults to mainnet RPC if unset).
 - **Safety:** Off by default so dev/bootstrap cannot send mainnet tokens by accident.
-- **SAUSD / prize display:** Unrelated to QUEST. **`PRIZE_SPL_MINT`** (and **`TARGET_ADDRESS`**) still drive **`GET /prize/balances`** for the published commitment address.
+- **Prize display:** If **`PRIZE_SPL_MINT`** is unset, the server uses **`QUEST_MINT`** for **`GET /prize/balances`** (same token as auto-fund). Override **`PRIZE_SPL_MINT`** when the token shown in the arena should differ from **`QUEST_MINT`**.
 
 ### `QUEST_OPERATOR_PUBLIC_KEY` (optional)
 - **Purpose:** If set, must equal the base58 pubkey derived from **`QUEST_OPERATOR_SECRET_KEY`**; otherwise the transfer throws (catch typos between secret and expected pubkey).

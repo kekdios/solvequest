@@ -147,9 +147,14 @@ const PAYOUT_AMOUNT_USDC = Number(process.env.PAYOUT_AMOUNT_USDC || 0)
 
 const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
-/** SPL mint for prize token balance on `TARGET_ADDRESS` (default SAUSD). */
+/**
+ * SPL mint for `/prize/balances` + arena REWARD (balance on `TARGET_ADDRESS`).
+ * Order: PRIZE_SPL_MINT → QUEST_MINT → USDC_MINT → default SAUSD mint.
+ * Not a USD price: UI shows on-chain uiAmount from RPC (token decimals) + SOL.
+ */
 const PRIZE_SPL_MINT =
   process.env.PRIZE_SPL_MINT?.trim() ||
+  process.env.QUEST_MINT?.trim() ||
   process.env.USDC_MINT?.trim() ||
   "CK9PodBifHymLBGeZujExFnpoLCsYxAw7t8c8LsDKLxG"
 const PRIZE_BALANCE_TTL_MS = Math.max(
