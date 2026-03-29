@@ -13,6 +13,7 @@ SQLITE_FILE="${VAULT_SQLITE_FILE:-${APP_DIR}/data/puzzle-vault/vault.db}"
 
 cat <<EOF
 === Add or merge these into:  ${APP_DIR}/backend/.env  (on the droplet) ===
+# Or edit on the server from your Mac:  ./scripts/droplet-edit-env.sh
 
 # Puzzle vault (SQLite) — after this, run step3 migrate + step4 bootstrap on the droplet
 PUZZLE_SOURCE=sqlite
