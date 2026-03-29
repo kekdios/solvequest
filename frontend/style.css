@@ -95,19 +95,19 @@ body {
   text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 65%, transparent);
 }
 
-.sausd-with-icon {
+.token-with-icon {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
 }
 
-.sausd-icon {
+.token-icon {
   display: block;
   flex-shrink: 0;
   object-fit: contain;
 }
 
-.reward-value.sausd-with-icon .sausd-icon {
+.reward-value.token-with-icon .token-icon {
   width: 2.25rem;
   height: 2.25rem;
 }
@@ -565,7 +565,7 @@ body {
   text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
-.prize-usdc.sausd-with-icon .sausd-icon {
+.prize-usdc.token-with-icon .token-icon {
   width: 1.35rem;
   height: 1.35rem;
 }
