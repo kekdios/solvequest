@@ -256,3 +256,4 @@ Wins are registered when evaluation finds a valid mnemonic that matches **`TARGE
 ## Operational notes
 
 - **Horizontal scaling**: require **Redis**; point all instances at the same **`REDIS_URL`**.
+- **Visitor log** (optional operator feature): page views on `/`, `/developers`, `/puzzle-wizard.html`, etc. record client IP + approximate location via **geoip-lite**; data lives in Redis (or in-memory without `REDIS_URL`). Open **`/visitors`** (or **`/visitors.html`**), enter **`ADMIN_CONTROL_KEY`**, then **Load**. Set **`TRUST_PROXY`** when behind a reverse proxy so IPs are correct. Treat logs as **personal data** under your privacy policy.

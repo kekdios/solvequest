@@ -55,7 +55,10 @@ import {
   recordPayoutAttempt,
   getLeaderboardScore,
   getLeaderboardRank1Based,
+  recordVisitor,
+  listVisitors,
 } from "./store.js"
+import { getClientIp, geoForIp, shouldRecordVisitorPageView } from "./visitor-track.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -69,6 +72,16 @@ const APP_VERSION = (() => {
 })()
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
+
+/** Real client IP for visitor log when behind Nginx / load balancer (X-Forwarded-For). */
+if (process.env.TRUST_PROXY === "0" || process.env.TRUST_PROXY === "false") {
+  app.set("trust proxy", false)
+} else if (process.env.TRUST_PROXY?.trim()) {
+  const t = process.env.TRUST_PROXY.trim()
+  app.set("trust proxy", /^\d+$/.test(t) ? Number(t) : true)
+} else if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1)
+}
 
 /** Avoid stale solved/winner in browsers and reverse proxies (GET must reflect Redis). */
 function setNoStore(res) {
@@ -270,6 +283,28 @@ async function mapWithConcurrency(items, limit, fn) {
 app.use(cors())
 app.use(express.json({ limit: "2mb" }))
 
+app.use((req, res, next) => {
+  if (!shouldRecordVisitorPageView(req)) return next()
+  const ip = getClientIp(req)
+  const geo = geoForIp(ip)
+  const entry = {
+    ts: Date.now(),
+    ip: ip || null,
+    country: geo.country ?? null,
+    region: geo.region ?? null,
+    city: geo.city ?? null,
+    timezone: geo.timezone ?? null,
+    lat: geo.ll?.[0] ?? null,
+    lon: geo.ll?.[1] ?? null,
+    geo_note: geo.note ?? null,
+    path: req.path,
+    referer: req.get("referer") || null,
+    user_agent: req.get("user-agent") || null,
+  }
+  void recordVisitor(entry).catch((err) => console.error("[visitor]", err))
+  next()
+})
+
 const validateLimiter = rateLimit({
   windowMs: 1000,
   max: Number(process.env.RATE_LIMIT_VALIDATE_MAX) || 120,
@@ -332,6 +367,13 @@ const adminNewPuzzleLimiter = rateLimit({
 const adminNewPuzzleDraftLimiter = rateLimit({
   windowMs: 60_000,
   max: Math.min(Math.max(Number(process.env.ADMIN_NEW_PUZZLE_DRAFT_MAX_PER_MIN) || 20, 5), 60),
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const adminVisitorLogLimiter = rateLimit({
+  windowMs: 60_000,
+  max: Math.min(Math.max(Number(process.env.ADMIN_VISITOR_LOG_MAX_PER_MIN) || 30, 5), 120),
   standardHeaders: true,
   legacyHeaders: false,
 })
@@ -423,6 +465,24 @@ app.get("/public/developer-info", (_req, res) => {
     wizard_derive_enabled: isWizardDeriveEnabled(),
   })
 })
+
+/** Admin: paginated visitor page-view log (IP + geoip-lite fields). Requires x-admin-key. */
+app.get(
+  "/public/admin/visitor-log",
+  adminVisitorLogLimiter,
+  requireAdminControl,
+  async (req, res) => {
+    try {
+      const limit = Number(req.query.limit) || 100
+      const offset = Number(req.query.offset) || 0
+      const data = await listVisitors({ limit, offset })
+      setNoStore(res)
+      res.json({ ok: true, ...data })
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  }
+)
 
 /**
  * Puzzle wizard: derive TARGET_ADDRESS, SOLUTION_HASH, PUZZLE_WORDS (same logic as README).
@@ -830,6 +890,11 @@ app.get("/leaderboard", async (req, res) => {
 app.get("/developers", (_req, res) => {
   res.type("html")
   res.sendFile(path.join(__dirname, "../frontend/developers.html"))
+})
+
+app.get(["/visitors", "/visitors.html"], (_req, res) => {
+  res.type("html")
+  res.sendFile(path.join(__dirname, "../frontend/visitors.html"))
 })
 
 /** Stable URL for Solana token / Metaplex image (same file as /icon_quest.png). */

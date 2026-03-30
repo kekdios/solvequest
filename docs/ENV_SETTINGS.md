@@ -87,10 +87,25 @@ REDIS_URL=redis://127.0.0.1:6379
 - **Purpose:** Protect admin-only HTTP endpoints.
 - **Used by:** `backend/server.js`.
 - **How:** client must send `x-admin-key: <ADMIN_CONTROL_KEY>` for:
+  - `GET /public/admin/visitor-log` (paginated page-view log: IP + geo; arena **`/visitors`** loads this)
   - `POST /payout/jobs/:jobId/attempt`
   - `POST /public/wizard-clear-solved` (clear `puzzle:winner` in Redis/memory only)
   - `POST /public/admin/new-puzzle-draft` (**SQLite vault only** — random mnemonic + derived fields for review; arena **New Puzzle** flow)
   - `POST /public/admin/new-puzzle` (**SQLite vault only** — retire current unsolved row, insert puzzle from approved payload, reload arena, clear winner)
+
+### `TRUST_PROXY` (optional)
+- **Purpose:** Express `trust proxy` so **`req.ip`** and **`X-Forwarded-For`** reflect the real client when the app sits behind Nginx, a load balancer, or Cloudflare.
+- **Values:** `1` / `true` / `yes` → trust; `0` / `false` → off; a positive integer → hop count (e.g. `1`).
+- **Default:** In **`NODE_ENV=production`**, trust is set to **`1`** if `TRUST_PROXY` is unset. In development, off unless you set `TRUST_PROXY`.
+- **Used by:** visitor IP logging (`backend/server.js` + `visitor-track.js`).
+
+### `VISITOR_LOG_MAX` (optional, default `5000`, max `50000`)
+- **Purpose:** Cap stored visitor page-view rows (Redis list or in-memory). Oldest dropped after cap.
+- **Used by:** `backend/store.js`.
+
+### `ADMIN_VISITOR_LOG_MAX_PER_MIN` (optional, default `30`, max `120`)
+- **Purpose:** Per-IP rate limit for **`GET /public/admin/visitor-log`** per rolling minute.
+- **Used by:** `backend/server.js`.
 
 ### `ALLOW_WIZARD_DERIVE` (optional)
 - **Purpose:** In **`NODE_ENV=production`**, enables **`POST /public/wizard-derive`** used by **`puzzle-wizard.html`** (mnemonic in JSON body). In non-production, the endpoint is on by default unless set to a falsy value (`0`, `false`, `no`, `off`).

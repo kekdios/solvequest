@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SolveQuest — Visitor log</title>
+    <link rel="icon" type="image/png" href="icon_sq.png" />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .vis-page {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 20px 16px 48px;
+      }
+      .vis-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .vis-title {
+        margin: 0;
+        font-size: 1.25rem;
+      }
+      .vis-back {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .vis-back:hover {
+        text-decoration: underline;
+      }
+      .vis-panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .vis-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: flex-end;
+        margin-bottom: 12px;
+      }
+      .vis-field label {
+        display: block;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .vis-field input {
+        min-width: 14rem;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #0d0d0f;
+        color: var(--text);
+        font-family: ui-monospace, monospace;
+        font-size: 0.85rem;
+      }
+      .vis-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .vis-table-wrap {
+        overflow: auto;
+        max-height: min(70vh, 36rem);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+      }
+      .vis-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.78rem;
+      }
+      .vis-table th,
+      .vis-table td {
+        padding: 8px 10px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      .vis-table th {
+        position: sticky;
+        top: 0;
+        background: color-mix(in srgb, var(--panel) 95%, #000);
+        z-index: 1;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+      }
+      .vis-table .mono {
+        word-break: break-all;
+        max-width: 14rem;
+      }
+      .vis-meta {
+        font-size: 0.82rem;
+        color: var(--muted);
+        margin: 0 0 10px;
+      }
+      .vis-error {
+        color: #f87171;
+        font-size: 0.88rem;
+        margin: 0 0 10px;
+      }
+    </style>
+  </head>
+  <body class="dev-page">
+    <div class="vis-page">
+      <header class="vis-header">
+        <h1 class="vis-title">Visitor log</h1>
+        <a class="vis-back" href="/">← Arena</a>
+      </header>
+
+      <p class="vis-meta">
+        Page views only (arena, developers, wizard, this page). Geo from bundled
+        <strong>geoip-lite</strong> (approximate). Set <code>TRUST_PROXY</code> behind a reverse proxy so
+        IP reflects the real client. Data stored in <strong>Redis</strong> when <code>REDIS_URL</code> is set,
+        else in-memory (dev).
+      </p>
+
+      <section class="vis-panel" aria-label="Load log">
+        <div class="vis-row">
+          <div class="vis-field">
+            <label for="admin-key">Admin key</label>
+            <input
+              id="admin-key"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="ADMIN_CONTROL_KEY value"
+            />
+          </div>
+          <div class="vis-actions">
+            <button type="button" class="player-btn primary" id="btn-load">Load</button>
+            <button type="button" class="player-btn" id="btn-more" hidden>Next page</button>
+          </div>
+        </div>
+        <p id="vis-error" class="vis-error" role="alert" hidden></p>
+        <p id="vis-summary" class="vis-meta" hidden></p>
+      </section>
+
+      <section class="vis-panel" id="vis-results" hidden>
+        <div class="vis-table-wrap">
+          <table class="vis-table" id="vis-table">
+            <thead>
+              <tr>
+                <th>Time (UTC)</th>
+                <th>IP</th>
+                <th>Location</th>
+                <th>Path</th>
+                <th>User-Agent</th>
+              </tr>
+            </thead>
+            <tbody id="vis-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      ;(function () {
+        var origin = window.location.origin
+        var limit = 100
+        var offset = 0
+        var total = 0
+
+        function esc(s) {
+          if (s == null) return ""
+          var d = document.createElement("div")
+          d.textContent = String(s)
+          return d.innerHTML
+        }
+
+        function fmtTime(ts) {
+          if (ts == null) return "—"
+          try {
+            return new Date(Number(ts)).toISOString().replace("T", " ").slice(0, 19)
+          } catch {
+            return String(ts)
+          }
+        }
+
+        function locationLine(v) {
+          var parts = []
+          if (v.city) parts.push(v.city)
+          if (v.region) parts.push(v.region)
+          if (v.country) parts.push(v.country)
+          if (v.timezone) parts.push(v.timezone)
+          if (v.geo_note) parts.push("(" + v.geo_note + ")")
+          if (v.lat != null && v.lon != null) parts.push(String(v.lat) + ", " + String(v.lon))
+          return parts.length ? parts.join(" · ") : "—"
+        }
+
+        var errEl = document.getElementById("vis-error")
+        var sumEl = document.getElementById("vis-summary")
+        var tbody = document.getElementById("vis-tbody")
+        var results = document.getElementById("vis-results")
+        var moreBtn = document.getElementById("btn-more")
+
+        function setErr(msg) {
+          if (!msg) {
+            errEl.hidden = true
+            errEl.textContent = ""
+            return
+          }
+          errEl.hidden = false
+          errEl.textContent = msg
+        }
+
+        async function load(append) {
+          var keyEl = document.getElementById("admin-key")
+          var key = keyEl ? keyEl.value.trim() : ""
+          setErr("")
+          if (!key) {
+            setErr("Enter the admin key (same as ADMIN_CONTROL_KEY in backend .env).")
+            return
+          }
+          if (!append) {
+            offset = 0
+            tbody.innerHTML = ""
+          }
+          var url =
+            origin +
+            "/public/admin/visitor-log?limit=" +
+            limit +
+            "&offset=" +
+            offset
+          try {
+            var res = await fetch(url, {
+              headers: { "x-admin-key": key },
+            })
+            var j = null
+            try {
+              j = await res.json()
+            } catch {
+              j = null
+            }
+            if (res.status === 401) {
+              setErr("Unauthorized — wrong admin key.")
+              return
+            }
+            if (res.status === 503 && j && j.error === "admin_control_not_configured") {
+              setErr("Server has no ADMIN_CONTROL_KEY configured.")
+              return
+            }
+            if (!res.ok) {
+              setErr((j && (j.error || j.detail)) || "Request failed (" + res.status + ").")
+              return
+            }
+            if (!j || !j.ok || !Array.isArray(j.visitors)) {
+              setErr("Unexpected response.")
+              return
+            }
+            total = j.total != null ? Number(j.total) : 0
+            sumEl.hidden = false
+            sumEl.textContent =
+              "Showing " +
+              (offset + 1) +
+              "–" +
+              (offset + j.visitors.length) +
+              " of " +
+              total +
+              " (newest first)."
+            results.hidden = false
+            j.visitors.forEach(function (v) {
+              var tr = document.createElement("tr")
+              var ua = v.user_agent != null ? String(v.user_agent) : ""
+              if (ua.length > 120) ua = ua.slice(0, 117) + "…"
+              tr.innerHTML =
+                "<td class=\"mono\">" +
+                esc(fmtTime(v.ts)) +
+                "</td><td class=\"mono\">" +
+                esc(v.ip) +
+                "</td><td>" +
+                esc(locationLine(v)) +
+                "</td><td class=\"mono\">" +
+                esc(v.path) +
+                "</td><td class=\"mono\">" +
+                esc(ua) +
+                "</td>"
+              tbody.appendChild(tr)
+            })
+            offset += j.visitors.length
+            moreBtn.hidden = offset >= total || j.visitors.length < limit
+          } catch (e) {
+            setErr("Network error: " + String(e.message || e))
+          }
+        }
+
+        document.getElementById("btn-load").addEventListener("click", function () {
+          load(false)
+        })
+        moreBtn.addEventListener("click", function () {
+          load(true)
+        })
+      })()
+    </script>
+  </body>
+</html>

@@ -42,7 +42,8 @@ The system supports:
 - Publishes/subscribes realtime events on Redis channel `arena:events` when Redis is enabled
 
 ### Frontend (`frontend/`)
-- **`index.html` + `main.js` + `style.css`**: arena UI (puzzle words, commitments, prize / REWARD display, **Recent puzzles** panel from `GET /puzzle/recent`, stats, leaderboard, operator **New Puzzle** dialog with draft + **Copy all fields**, collapsible SSE log)
+- **`index.html` + `main.js` + `style.css`**: arena UI (puzzle words, commitments, prize / REWARD display, **Recent puzzles** panel from `GET /puzzle/recent`, stats, leaderboard, operator **Visitor log** button → **`/visitors`** (same file as **`visitors.html`**), **New Puzzle** dialog with draft + **Copy all fields**, collapsible SSE log)
+- **Visitor tracking:** selected `GET` page views log IP (from `X-Forwarded-For` when `trust proxy` is set) + **geoip-lite** city/region/country into Redis (or in-memory); **`GET /public/admin/visitor-log`** (`x-admin-key`) powers **`/visitors`**
 - **`developers.html`**: agent documentation (same-origin `curl` examples; reads `GET /public/developer-info`)
 - **`puzzle-wizard.html`**: operator tool for deriving `.env` fields, bundle copy, and clearing solved state (`wizard-derive`, `wizard-clear-solved` with admin key)
 - Uses SSE (`GET /events`) for live updates; `puzzle_cleared` and `new_puzzle` refresh UI as implemented in `main.js`
@@ -135,6 +136,9 @@ Used when `REDIS_URL` is missing.
 - `POST /public/admin/new-puzzle` (`x-admin-key`, sqlite vault open)
   - retires unsolved row(s), inserts row from JSON body, reloads arena, clears winner, optional QUEST fund
 
+- `GET /public/admin/visitor-log` (`x-admin-key`)
+  - query `limit`, `offset`; JSON `{ ok, visitors, total }` — page views with IP, geo fields, path, user-agent
+
 ## 6) Stats and Leaderboard
 
 ### Stats
@@ -189,6 +193,7 @@ solvequest/
 │   ├── style.css
 │   ├── developers.html
 │   ├── puzzle-wizard.html
+│   ├── visitors.html
 │   ├── openapi.json
 │   └── … (static assets)
 ├── sdk/

@@ -13,6 +13,7 @@ const LEADERBOARD_ZSET = "leaderboard:global"
 const CHANNEL_EVENTS = "arena:events"
 const PAYOUT_JOB_SEQ_KEY = "payout:job_seq"
 const PAYOUT_JOB_INDEX_KEY = "payout:jobs"
+const VISITORS_LOG_KEY = "visitors:log"
 
 const LEADERBOARD_MAX_INCR_PER_SEC = Math.min(
   Math.max(Number(process.env.LEADERBOARD_MAX_INCR_PER_SEC) || 20, 1),
@@ -46,9 +47,53 @@ function mem() {
       payoutJobs: {},
       payoutJobsOrder: [],
       payoutIdempotency: {},
+      visitorLog: [],
     }
   }
   return memory
+}
+
+const VISITORS_MAX = Math.min(
+  Math.max(Number(process.env.VISITOR_LOG_MAX) || 5000, 100),
+  50_000
+)
+
+/**
+ * Append a page-view record (newest-first in Redis list / memory array).
+ * @param {Record<string, unknown>} entry
+ */
+export async function recordVisitor(entry) {
+  const line = JSON.stringify(entry)
+  if (redis) {
+    await redis.lPush(VISITORS_LOG_KEY, line)
+    await redis.lTrim(VISITORS_LOG_KEY, 0, VISITORS_MAX - 1)
+    return
+  }
+  const m = mem()
+  m.visitorLog.unshift(entry)
+  if (m.visitorLog.length > VISITORS_MAX) {
+    m.visitorLog.length = VISITORS_MAX
+  }
+}
+
+/**
+ * @param {{ limit?: number, offset?: number }} opts
+ * @returns {Promise<{ visitors: Record<string, unknown>[], total: number }>}
+ */
+export async function listVisitors({ limit = 100, offset = 0 } = {}) {
+  const lim = Math.min(Math.max(Number(limit) || 100, 1), 500)
+  const off = Math.min(Math.max(Number(offset) || 0, 0), 500_000)
+  if (redis) {
+    const total = await redis.lLen(VISITORS_LOG_KEY)
+    const rows = await redis.lRange(VISITORS_LOG_KEY, off, off + lim - 1)
+    return {
+      visitors: rows.map((r) => JSON.parse(r)),
+      total,
+    }
+  }
+  const log = mem().visitorLog
+  const total = log.length
+  return { visitors: log.slice(off, off + lim), total }
 }
 
 export async function initStore(options = {}) {

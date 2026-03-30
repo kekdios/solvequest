@@ -310,6 +310,27 @@
           "503": { "description": "admin_control_not_configured" }
         }
       }
+    },
+    "/public/admin/visitor-log": {
+      "get": {
+        "summary": "Admin: paginated visitor page-view log (IP + geoip-lite)",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Must match ADMIN_CONTROL_KEY"
+          },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": {
+          "200": { "description": "{ ok, visitors: [...], total }" },
+          "401": { "description": "unauthorized" },
+          "503": { "description": "admin_control_not_configured" }
+        }
+      }
     }
   }
 }

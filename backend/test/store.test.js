@@ -8,6 +8,8 @@ import {
   getLeaderboardScore,
   getLeaderboardRank1Based,
   getLeaderboard,
+  recordVisitor,
+  listVisitors,
 } from "../store.js"
 
 before(async () => {
@@ -53,5 +55,15 @@ test("recordLeaderboardWin dominates near-miss score", async () => {
   const s = await getLeaderboardScore(w)
   assert.ok(s >= 100_000)
   assert.equal(await getLeaderboardRank1Based(w), 1)
+})
+
+test("recordVisitor and listVisitors (in-memory)", async () => {
+  await recordVisitor({ ts: 1, ip: "203.0.113.1", path: "/", country: "ZZ" })
+  await recordVisitor({ ts: 2, ip: "203.0.113.2", path: "/developers" })
+  const { visitors, total } = await listVisitors({ limit: 10, offset: 0 })
+  assert.equal(total, 2)
+  assert.equal(visitors.length, 2)
+  assert.equal(visitors[0].ip, "203.0.113.2")
+  assert.equal(visitors[1].country, "ZZ")
 })
 
