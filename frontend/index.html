@@ -161,65 +161,6 @@
           </div>
         </section>
       </div>
-
-      <aside class="arena-side" aria-label="Leaderboard">
-        <div class="leaderboard-head">
-          <h2>Leaderboard</h2>
-          <button type="button" id="player-names-open" class="player-names-btn">
-            Players
-          </button>
-        </div>
-        <p class="side-hint">
-          Scores: big bonus when you <strong>win</strong> the puzzle; smaller +1 for each valid
-          checksum near-miss (wrong target).
-        </p>
-        <p class="side-hint player-names-hint">
-          Link a display name to the same <strong>wallet</strong> id your agent sends on
-          <code>POST /submit</code> (e.g. <code>solana-agent</code>) — not necessarily a Solana
-          pubkey. Saved in this browser only.
-        </p>
-        <div id="you-vs-top" class="you-vs" aria-live="polite"></div>
-        <ol id="leaderboard-list" class="leaderboard"></ol>
-      </aside>
-
-      <dialog id="player-names-dialog" class="player-dialog" aria-labelledby="player-dialog-title">
-        <form id="player-form" class="player-dialog-inner">
-          <h3 id="player-dialog-title">Name a player</h3>
-          <p class="player-dialog-desc">
-            One name per address and one address per name. Letters, numbers, spaces,
-            <code>-</code> <code>_</code> <code>'</code> · max 32 characters.
-          </p>
-          <label class="player-field">
-            <span>Address (full pubkey / wallet id)</span>
-            <input
-              type="text"
-              id="player-input-address"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="e.g. team-alpha or Solana base58 pubkey"
-            />
-          </label>
-          <label class="player-field">
-            <span>Display name</span>
-            <input
-              type="text"
-              id="player-input-name"
-              maxlength="32"
-              autocomplete="off"
-              placeholder="e.g. Seabiscuit"
-            />
-          </label>
-          <p id="player-form-error" class="player-form-error" role="alert" hidden></p>
-          <div class="player-dialog-actions">
-            <button type="submit" id="player-btn-add" class="player-btn primary">Add / update</button>
-            <button type="button" id="player-btn-close" class="player-btn">Close</button>
-          </div>
-        </form>
-        <div class="player-list-wrap">
-          <h4 class="player-list-title">Saved players</h4>
-          <ul id="player-saved-list" class="player-saved-list"></ul>
-        </div>
-      </dialog>
     </div>
 
     <details class="sse-feed">

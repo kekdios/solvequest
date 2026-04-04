@@ -43,18 +43,12 @@ import {
   getPuzzleState,
   trySetWinner,
   clearPuzzleWinnerState,
-  recordLeaderboardAttempt,
-  recordLeaderboardWin,
-  getLeaderboard,
   publishArenaEvent,
   isRedisEnabled,
   getExtendedStats,
-  recordLeaderboardConstraintPenalty,
   createPayoutJob,
   listPayoutJobs,
   recordPayoutAttempt,
-  getLeaderboardScore,
-  getLeaderboardRank1Based,
   recordVisitor,
   listVisitors,
 } from "./store.js"
@@ -242,17 +236,6 @@ async function fetchPrizeBalances() {
   }
   prizeBalanceCacheAt = now
   return prizeBalanceCache
-}
-
-async function broadcastLeaderboardScoreEvents(pubkey) {
-  broadcast({ type: "attempt", pubkey, delta: 1, puzzle_id: PUZZLE.id })
-  const top = await getLeaderboard(5)
-  broadcast({ type: "leaderboard_update", top, puzzle_id: PUZZLE.id })
-}
-
-async function broadcastLeaderboardRefresh() {
-  const top = await getLeaderboard(5)
-  broadcast({ type: "leaderboard_update", top, puzzle_id: PUZZLE.id })
 }
 
 async function evalAndRecord(raw) {
@@ -807,8 +790,6 @@ app.post("/submit", submitLimiter, async (req, res) => {
     const ev = await evalAndRecord(rawPhrase)
 
     if (ev.rejected_by_constraints) {
-      const penalized = await recordLeaderboardConstraintPenalty(wallet)
-      if (penalized) await broadcastLeaderboardRefresh()
       broadcast({
         type: "submit",
         status: "constraint_violation",
@@ -834,8 +815,6 @@ app.post("/submit", submitLimiter, async (req, res) => {
         const s2 = await getPuzzleState()
         return res.json({ status: "already_solved", winner: s2.winner })
       }
-      await recordLeaderboardWin(wallet)
-      await broadcastLeaderboardRefresh()
       broadcast({ type: "win", winner: wallet, puzzle_id: PUZZLE.id })
       broadcast({
         type: "submit",
@@ -846,14 +825,12 @@ app.post("/submit", submitLimiter, async (req, res) => {
       return res.json({ status: "win", winner: wallet })
     }
 
-    const added = await recordLeaderboardAttempt(wallet)
     broadcast({
       type: "submit",
       status: "valid_but_wrong",
       wallet,
       puzzle_id: PUZZLE.id,
     })
-    if (added) await broadcastLeaderboardScoreEvents(wallet)
     return res.json({ status: "valid_but_wrong" })
   } catch (e) {
     console.error(e)
@@ -861,30 +838,6 @@ app.post("/submit", submitLimiter, async (req, res) => {
       res.status(500).json({ status: "error", message: "internal_error" })
     }
   }
-})
-
-app.get("/leaderboard", async (req, res) => {
-  setNoStore(res)
-  const limit = req.query.limit
-  const wallet = String(req.query.wallet || "").trim()
-  const top = await getLeaderboard(limit)
-  if (!wallet) {
-    return res.json({ top })
-  }
-  const score = await getLeaderboardScore(wallet)
-  const rank = await getLeaderboardRank1Based(wallet)
-  const leaderScore = top[0]?.score ?? 0
-  const gap = Math.max(0, leaderScore - (score ?? 0))
-  res.json({
-    top,
-    self: {
-      pubkey: wallet,
-      score: score ?? 0,
-      rank,
-      leader_score: leaderScore,
-      gap_to_leader: gap,
-    },
-  })
 })
 
 app.get("/developers", (_req, res) => {

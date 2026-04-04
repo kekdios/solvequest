@@ -1,15 +1,5 @@
 const API = ""
 
-const MY_WALLET =
-  typeof localStorage !== "undefined"
-    ? localStorage.getItem("solvequest_wallet") || "user_ui"
-    : "user_ui"
-
-const PLAYER_ROSTER_KEY = "solvequest_player_roster_v1"
-const LEGACY_RUNNER_ROSTER_KEY = "solvequest_runner_roster_v1"
-/** Display names: letter/digit first, then letters, numbers, space, - _ ' */
-const PLAYER_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9 _'\-]{0,31}$/
-
 function escapeHtml(s) {
   if (s == null) return ""
   const d = document.createElement("div")
@@ -17,131 +7,6 @@ function escapeHtml(s) {
   return d.innerHTML
 }
 
-function loadPlayerRoster() {
-  try {
-    let raw = localStorage.getItem(PLAYER_ROSTER_KEY)
-    if (raw == null || raw === "") {
-      raw = localStorage.getItem(LEGACY_RUNNER_ROSTER_KEY)
-      if (raw) {
-        localStorage.setItem(PLAYER_ROSTER_KEY, raw)
-        localStorage.removeItem(LEGACY_RUNNER_ROSTER_KEY)
-      }
-    }
-    if (!raw) return []
-    const j = JSON.parse(raw)
-    return Array.isArray(j) ? j : []
-  } catch {
-    return []
-  }
-}
-
-function savePlayerRoster(entries) {
-  localStorage.setItem(PLAYER_ROSTER_KEY, JSON.stringify(entries))
-}
-
-function getPlayerLabel(address) {
-  if (address == null || address === "") return null
-  const a = String(address).trim()
-  const hit = loadPlayerRoster().find((r) => r.address === a)
-  return hit?.name ?? null
-}
-
-function validatePlayerName(raw) {
-  const t = String(raw ?? "").trim()
-  if (t.length < 1) return { ok: false, error: "Enter a display name." }
-  if (t.length > 32) return { ok: false, error: "Name max 32 characters." }
-  if (!PLAYER_NAME_RE.test(t)) return { ok: false, error: "Name uses invalid characters." }
-  return { ok: true, name: t }
-}
-
-function validatePlayerAddress(raw) {
-  const t = String(raw ?? "").trim()
-  if (t.length < 2) return { ok: false, error: "Enter an address or wallet id." }
-  if (t.length > 128) return { ok: false, error: "Address too long." }
-  return { ok: true, address: t }
-}
-
-function addOrUpdatePlayer(addressRaw, nameRaw) {
-  const va = validatePlayerAddress(addressRaw)
-  if (!va.ok) return va
-  const vn = validatePlayerName(nameRaw)
-  if (!vn.ok) return vn
-  const roster = loadPlayerRoster()
-  const addr = va.address
-  const nameLower = vn.name.toLowerCase()
-  const idxAddr = roster.findIndex((r) => r.address === addr)
-  const idxName = roster.findIndex((r) => r.name.toLowerCase() === nameLower)
-  if (idxName !== -1 && roster[idxName].address !== addr) {
-    return { ok: false, error: "That name is already used for another address." }
-  }
-  if (idxAddr !== -1) {
-    roster[idxAddr].name = vn.name
-  } else {
-    roster.push({ address: addr, name: vn.name })
-  }
-  savePlayerRoster(roster)
-  return { ok: true }
-}
-
-function removePlayer(address) {
-  const a = String(address ?? "").trim()
-  savePlayerRoster(loadPlayerRoster().filter((r) => r.address !== a))
-}
-
-function setPlayerFormError(msg) {
-  const el = document.getElementById("player-form-error")
-  if (!el) return
-  if (!msg) {
-    el.hidden = true
-    el.textContent = ""
-    return
-  }
-  el.hidden = false
-  el.textContent = msg
-}
-
-function renderPlayerSavedList() {
-  const ul = document.getElementById("player-saved-list")
-  if (!ul) return
-  ul.replaceChildren()
-  const roster = loadPlayerRoster()
-  if (roster.length === 0) {
-    const li = document.createElement("li")
-    li.className = "player-saved-empty"
-    li.style.color = "var(--muted)"
-    li.style.fontSize = "0.82rem"
-    li.textContent = "No saved players yet."
-    ul.appendChild(li)
-    return
-  }
-  roster.forEach((r) => {
-    const li = document.createElement("li")
-    const meta = document.createElement("div")
-    meta.className = "player-saved-meta"
-    const nm = document.createElement("span")
-    nm.className = "player-saved-name"
-    nm.textContent = r.name
-    const ad = document.createElement("span")
-    ad.className = "player-saved-addr"
-    ad.textContent = r.address
-    meta.appendChild(nm)
-    meta.appendChild(ad)
-    const btn = document.createElement("button")
-    btn.type = "button"
-    btn.className = "player-saved-remove"
-    btn.textContent = "Remove"
-    btn.addEventListener("click", () => {
-      removePlayer(r.address)
-      renderPlayerSavedList()
-      loadLeaderboard()
-    })
-    li.appendChild(meta)
-    li.appendChild(btn)
-    ul.appendChild(li)
-  })
-}
-
-let lastTopSig = ""
 /** @type {string} */
 let currentPuzzlePublicId = ""
 
@@ -235,8 +100,7 @@ async function loadPuzzle() {
         const wRaw = data.winner
         const w = wRaw != null && String(wRaw).trim() !== "" ? String(wRaw).trim() : ""
         if (w) {
-          const label = getPlayerLabel(w)
-          solvedDetail.textContent = label ? `Winner: ${label} (${w})` : `Winner: ${w}`
+          solvedDetail.textContent = `Winner: ${w}`
         } else {
           solvedDetail.textContent = "Puzzle solved."
         }
@@ -394,66 +258,6 @@ function uiNotice(msg) {
   logSse(`[UI] ${msg}`)
 }
 
-function renderYouVs(self) {
-  const el = document.getElementById("you-vs-top")
-  if (!self) {
-    el.innerHTML = ""
-    return
-  }
-  const pk = self.pubkey ?? MY_WALLET
-  const displayName = getPlayerLabel(pk)
-  const rank = self.rank != null ? `#${self.rank}` : "—"
-  const ls = self.leader_score != null ? self.leader_score : self.gap_to_leader + self.score
-  const nickLine = displayName
-    ? `<div class="you-vs-nick">${escapeHtml(displayName)} <span class="mono you-vs-pk">${escapeHtml(fmtShortPubkey(pk))}</span></div>`
-    : ""
-  el.innerHTML = `${nickLine}<div class="you-vs-grid"><span>Your score</span><strong class="mono">${Number(self.score).toFixed(self.score % 1 ? 2 : 0)}</strong><span>Leader</span><strong class="mono">${Number(ls).toFixed(2)}</strong><span>Gap</span><strong class="mono accent">${Number(self.gap_to_leader).toFixed(2)}</strong><span>Rank</span><strong class="mono">${rank}</strong></div>`
-}
-
-async function loadLeaderboard() {
-  try {
-    const res = await fetch(
-      `${API}/leaderboard?limit=10&wallet=${encodeURIComponent(MY_WALLET)}`,
-      { cache: "no-store" }
-    )
-    if (!res.ok) return
-    const data = await res.json()
-    const rows = data.top ?? data
-    const ol = document.getElementById("leaderboard-list")
-    ol.replaceChildren()
-    if (data.self) renderYouVs(data.self)
-    if (!Array.isArray(rows) || rows.length === 0) {
-      const li = document.createElement("li")
-      li.className = "lb-empty"
-      li.textContent = "No scores yet"
-      ol.appendChild(li)
-      return
-    }
-    const sig = JSON.stringify(rows.map((r) => [r.pubkey, r.score]))
-    if (sig !== lastTopSig) {
-      ol.classList.add("lb-flash")
-      setTimeout(() => ol.classList.remove("lb-flash"), 400)
-      lastTopSig = sig
-    }
-    rows.forEach((row, i) => {
-      const li = document.createElement("li")
-      const pk = row.pubkey ?? row[0]
-      const score = row.score ?? row[1]
-      const isYou = pk === MY_WALLET
-      li.className = isYou ? "lb-you" : ""
-      const short = fmtShortPubkey(pk)
-      const label = getPlayerLabel(pk)
-      const mid = label
-        ? `<span class="lb-id"><span class="lb-name">${escapeHtml(label)}</span> <span class="lb-pk-short mono">${escapeHtml(short)}</span></span>`
-        : `<span class="mono">${escapeHtml(short)}</span>`
-      li.innerHTML = `<span class="lb-rank">${i + 1}</span><span class="lb-pk">${mid}</span><span class="lb-score mono">${Number(score).toFixed(score % 1 ? 2 : 0)}</span>`
-      ol.appendChild(li)
-    })
-  } catch {
-    /* ignore */
-  }
-}
-
 function logSse(msg) {
   const div = document.createElement("div")
   div.className = "log-line sse"
@@ -468,14 +272,8 @@ function connectEvents() {
       const payload = JSON.parse(ev.data)
       logSse(JSON.stringify(payload))
       const t = payload.type
-      if (
-        t === "submit" ||
-        t === "win" ||
-        t === "leaderboard_update" ||
-        t === "attempt"
-      ) {
+      if (t === "submit" || t === "win") {
         loadStats()
-        loadLeaderboard()
       }
       if (
         t === "win" ||
@@ -492,33 +290,6 @@ function connectEvents() {
   es.onerror = () => {
     logSse("[SSE] connection error — retrying in browser…")
   }
-}
-
-const playerDlg = document.getElementById("player-names-dialog")
-const playerOpen = document.getElementById("player-names-open")
-const playerForm = document.getElementById("player-form")
-if (playerOpen && playerDlg && playerForm) {
-  playerOpen.addEventListener("click", () => {
-    setPlayerFormError("")
-    renderPlayerSavedList()
-    playerDlg.showModal()
-  })
-  document.getElementById("player-btn-close")?.addEventListener("click", () => playerDlg.close())
-  playerForm.addEventListener("submit", (e) => {
-    e.preventDefault()
-    const addrEl = document.getElementById("player-input-address")
-    const nameEl = document.getElementById("player-input-name")
-    const r = addOrUpdatePlayer(addrEl?.value, nameEl?.value)
-    if (!r.ok) {
-      setPlayerFormError(r.error)
-      return
-    }
-    setPlayerFormError("")
-    if (addrEl) addrEl.value = ""
-    if (nameEl) nameEl.value = ""
-    renderPlayerSavedList()
-    loadLeaderboard()
-  })
 }
 
 const newPuzzleDlg = document.getElementById("new-puzzle-dialog")
@@ -823,8 +594,6 @@ loadVersion()
 loadPuzzle()
 loadStats()
 loadPrizeBalances()
-loadLeaderboard()
 setInterval(loadStats, 1500)
 setInterval(loadPrizeBalances, 10000)
-setInterval(loadLeaderboard, 8000)
 setInterval(loadPuzzle, 5000)

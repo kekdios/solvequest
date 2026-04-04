@@ -5,7 +5,6 @@ Competition backend with **Redis** (optional in-memory fallback), **batch valida
 ## Arena terminology
 
 - **Player Agents**: user-run agents/bots competing to solve the same puzzle (run your own client against the HTTP API).
-- **Leaderboard score**: counts valid-checksum near misses (`valid_but_wrong`).
 
 ## Quick start
 
@@ -193,13 +192,6 @@ Wins are registered when evaluation finds a valid mnemonic that matches **`TARGE
 
 **Derivation cache:** normalized mnemonic → address LRU (**`DERIVATION_CACHE_MAX`**, default **5000**).
 
-### Leaderboard (game score)
-
-- Redis **`leaderboard:global`** sorted set: score = **valid checksum + wrong target** attempts (not raw spam).
-- **Rate limit:** at most **`LEADERBOARD_MAX_INCR_PER_SEC`** (default **20**) score changes per wallet per second (incl. constraint penalty).
-- **`GET /leaderboard?limit=20`** — **`{ "top": [ { "pubkey", "score" } ] }`**. With **`&wallet=<pubkey>`**, adds **`self`**: **`score`**, **`rank`**, **`leader_score`**, **`gap_to_leader`**.
-- Optional **`LEADERBOARD_CONSTRAINT_PENALTY`** (e.g. **`-0.5`**) applied on constraint rejects (`POST /submit`).
-
 ### Stats (extended)
 
 `GET /stats` includes **`attempts_per_sec`**, **`time_elapsed`**, **`valid_rate`** (`valid_checksums / attempts_total`), plus:
@@ -223,7 +215,7 @@ Wins are registered when evaluation finds a valid mnemonic that matches **`TARGE
 
 - With **Redis**: events are **`PUBLISH arena:events`**; each instance **subscribes** and pushes to its local SSE clients (no double delivery on the publishing node).
 - Without Redis: local broadcast only.
-- Structured types include **`attempt`**, **`leaderboard_update`** (with **`top`** preview), **`puzzle_cleared`**, **`new_puzzle`**, **`payout_job`**, plus **`submit`** / **`win`**.
+- Structured types include **`puzzle_cleared`**, **`new_puzzle`**, **`payout_job`**, plus **`submit`** / **`win`**.
 
 ---
 
@@ -235,7 +227,6 @@ Wins are registered when evaluation finds a valid mnemonic that matches **`TARGE
 | `GET /public/developer-info` | `validate_batch_max`, `rate_limit_validate_batch_per_sec`, `wizard_derive_enabled` (for `/developers` + wizard UI) |
 | `POST /validate_batch` | Body `{ mnemonics }`; no auth; size cap and concurrency from env (see Batch validation) |
 | `GET /stats` | Counters + `attempts_per_sec`, `valid_rate`, arena time |
-| `GET /leaderboard` | `?limit=&wallet=` → `{ top, self? }` |
 | `GET /prize/balances` | SPL balance on `TARGET_ADDRESS` for resolved prize mint + SOL (RPC); mint = `PRIZE_SPL_MINT` → `QUEST_MINT` → `USDC_MINT` → SAUSD default |
 | `GET /puzzle/recent` | Recent vault rows (SQLite); `{ source, puzzles }` — empty when `PUZZLE_SOURCE=env` |
 | Others | `/validate`, `/submit`, `/puzzle`, `/events`, `/public/wizard-derive`, `/public/wizard-clear-solved`, `/public/admin/new-puzzle-draft`, `/public/admin/new-puzzle` |
@@ -247,7 +238,6 @@ Wins are registered when evaluation finds a valid mnemonic that matches **`TARGE
 | Key | Purpose |
 |-----|---------|
 | `stats:global` | Hash: counters including new outcome fields |
-| `leaderboard:global` | ZSET: valid-checksum near-miss scores |
 | `puzzle:winner` | Winner id (`SET NX`) |
 | `arena:events` | Pub/sub channel for SSE fan-out |
 

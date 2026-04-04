@@ -7,24 +7,10 @@ let memory = null
 const STATS_KEY = "stats:global"
 const PUZZLE_WINNER_KEY = "puzzle:winner"
 const ARENA_START_KEY = "arena:start_time"
-/** @deprecated legacy hash; new scores use LEADERBOARD_ZSET */
-const LEADERBOARD_HASH = "stats:wallet"
-const LEADERBOARD_ZSET = "leaderboard:global"
 const CHANNEL_EVENTS = "arena:events"
 const PAYOUT_JOB_SEQ_KEY = "payout:job_seq"
 const PAYOUT_JOB_INDEX_KEY = "payout:jobs"
 const VISITORS_LOG_KEY = "visitors:log"
-
-const LEADERBOARD_MAX_INCR_PER_SEC = Math.min(
-  Math.max(Number(process.env.LEADERBOARD_MAX_INCR_PER_SEC) || 20, 1),
-  500
-)
-
-/** Leaderboard points added when a wallet wins (dominates +1 near-miss increments). */
-const LEADERBOARD_WIN_POINTS = Math.max(
-  1,
-  Math.floor(Number(process.env.LEADERBOARD_WIN_POINTS) || 100_000)
-)
 
 function mem() {
   if (!memory) {
@@ -42,8 +28,6 @@ function mem() {
         attempts_valid_checksum: 0,
       },
       winner: null,
-      leaderboardZ: {},
-      lbRate: {},
       payoutJobs: {},
       payoutJobsOrder: [],
       payoutIdempotency: {},
@@ -348,110 +332,6 @@ export async function recordPayoutAttempt(jobId, { txSig = null, error = null })
   }
   await redis.set(`payout:job:${jobId}`, JSON.stringify(job))
   return job
-}
-
-async function leaderboardIncrAllowed(wallet) {
-  const key = wallet || "anonymous"
-  if (redis) {
-    const sec = Math.floor(Date.now() / 1000)
-    const rk = `leaderboard:lbps:${key}:${sec}`
-    const cnt = await redis.incr(rk)
-    if (cnt === 1) await redis.expire(rk, 2)
-    return cnt <= LEADERBOARD_MAX_INCR_PER_SEC
-  }
-  const m = mem()
-  const sec = Math.floor(Date.now() / 1000)
-  const k = `${key}:${sec}`
-  m.lbRate[k] = (m.lbRate[k] || 0) + 1
-  return m.lbRate[k] <= LEADERBOARD_MAX_INCR_PER_SEC
-}
-
-/**
- * +1 on leaderboard for a valid-checksum "near miss" (wrong target).
- * Rate-limited per wallet (LEADERBOARD_MAX_INCR_PER_SEC / sec).
- * @returns true if score changed
- */
-export async function recordLeaderboardAttempt(wallet) {
-  const key = wallet || "anonymous"
-  if (!(await leaderboardIncrAllowed(key))) return false
-  if (redis) {
-    await redis.zIncrBy(LEADERBOARD_ZSET, 1, key)
-    return true
-  }
-  const lb = mem().leaderboardZ
-  lb[key] = (lb[key] || 0) + 1
-  return true
-}
-
-/**
- * Add win bonus to leaderboard (same ZSET as near-misses; much larger delta).
- * Not rate-limited; only called after atomic winner set succeeds.
- */
-export async function recordLeaderboardWin(wallet) {
-  const key = wallet || "anonymous"
-  const delta = LEADERBOARD_WIN_POINTS
-  if (redis) {
-    await redis.zIncrBy(LEADERBOARD_ZSET, delta, key)
-    return true
-  }
-  const lb = mem().leaderboardZ
-  lb[key] = (lb[key] || 0) + delta
-  return true
-}
-
-/** Optional anti-spam: negative delta on constraint reject (set LEADERBOARD_CONSTRAINT_PENALTY). */
-export async function recordLeaderboardConstraintPenalty(wallet) {
-  const delta = Number(process.env.LEADERBOARD_CONSTRAINT_PENALTY)
-  if (!Number.isFinite(delta) || delta === 0) return false
-  const key = wallet || "anonymous"
-  if (!(await leaderboardIncrAllowed(key))) return false
-  if (redis) {
-    await redis.zIncrBy(LEADERBOARD_ZSET, delta, key)
-    return true
-  }
-  const lb = mem().leaderboardZ
-  lb[key] = (lb[key] || 0) + delta
-  return true
-}
-
-export async function getLeaderboardScore(pubkey) {
-  const key = pubkey || "anonymous"
-  if (redis) {
-    const s = await redis.zScore(LEADERBOARD_ZSET, key)
-    return s != null ? Number(s) : null
-  }
-  const v = mem().leaderboardZ[key]
-  return v != null ? v : null
-}
-
-/** 1-based rank, or null if not on board */
-export async function getLeaderboardRank1Based(pubkey) {
-  const key = pubkey || "anonymous"
-  if (redis) {
-    const r = await redis.zRevRank(LEADERBOARD_ZSET, key)
-    return r == null ? null : r + 1
-  }
-  const z = mem().leaderboardZ
-  if (z[key] == null) return null
-  const sorted = Object.entries(z).sort((a, b) => b[1] - a[1])
-  const idx = sorted.findIndex(([k]) => k === key)
-  return idx >= 0 ? idx + 1 : null
-}
-
-/** Sorted by score (near-miss +1 each, plus configurable win bonus). Highest first. */
-export async function getLeaderboard(limit = 20) {
-  const lim = Math.min(Math.max(Number(limit) || 20, 1), 100)
-  if (redis) {
-    const rows = await redis.zRangeWithScores(LEADERBOARD_ZSET, 0, lim - 1, {
-      REV: true,
-    })
-    return rows.map(({ value, score }) => ({ pubkey: value, score }))
-  }
-  const z = mem().leaderboardZ
-  return Object.entries(z)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, lim)
-    .map(([pubkey, score]) => ({ pubkey, score }))
 }
 
 export function isRedisEnabled() {

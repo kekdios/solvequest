@@ -15,14 +15,14 @@ A submission is evaluated against:
 The system supports:
 - interactive browser gameplay (`/submit`)
 - batch validation API with no API keys (`/validate_batch`; limits from env)
-- realtime feed and leaderboard
+- realtime feed (SSE)
 
 ## 2) System Components
 
 ### Backend (`backend/server.js`)
 - Express API server (default `PORT=3001`)
 - Serves static frontend from `frontend/`
-- Handles validation, submits, leaderboard, stats, optional payout jobs, prize RPC reads, and SSE
+- Handles validation, submits, stats, optional payout jobs, prize RPC reads, and SSE
 - Prize line / `GET /prize/balances`: SPL mint resolved as `PRIZE_SPL_MINT` → `QUEST_MINT` → `USDC_MINT` → default SAUSD mint; balance on `TARGET_ADDRESS` + SOL (no fiat price)
 - Uses Redis when `REDIS_URL` is set; otherwise falls back to in-memory store
 
@@ -38,11 +38,11 @@ The system supports:
 
 ### Store layer (`backend/store.js`)
 - Redis + in-memory implementations behind one API
-- Tracks global stats, winner state, leaderboard ZSET, optional payout job queue
+- Tracks global stats, winner state, optional payout job queue
 - Publishes/subscribes realtime events on Redis channel `arena:events` when Redis is enabled
 
 ### Frontend (`frontend/`)
-- **`index.html` + `main.js` + `style.css`**: arena UI (puzzle words, commitments, prize / REWARD display, **Recent puzzles** panel from `GET /puzzle/recent`, stats, leaderboard, operator **Visitor log** button → **`/visitors`** (same file as **`visitors.html`**), **New Puzzle** dialog with draft + **Copy all fields**, collapsible SSE log)
+- **`index.html` + `main.js` + `style.css`**: arena UI (puzzle words, commitments, prize / REWARD display, **Recent puzzles** panel from `GET /puzzle/recent`, stats, operator **Visitor log** button → **`/visitors`** (same file as **`visitors.html`**), **New Puzzle** dialog with draft + **Copy all fields**, collapsible SSE log)
 - **Visitor tracking:** selected `GET` page views log IP (from `X-Forwarded-For` when `trust proxy` is set) + **geoip-lite** city/region/country into Redis (or in-memory); **`GET /public/admin/visitor-log`** (`x-admin-key`) powers **`/visitors`**
 - **`developers.html`**: agent documentation (same-origin `curl` examples; reads `GET /public/developer-info`)
 - **`puzzle-wizard.html`**: operator tool for deriving `.env` fields, bundle copy, and clearing solved state (`wizard-derive`, `wizard-clear-solved` with admin key)
@@ -53,7 +53,7 @@ The system supports:
 ### Redis mode (recommended for deploy)
 Enabled when `REDIS_URL` is configured.
 - Shared winner state across instances
-- Shared leaderboard/stats
+- Shared stats
 - Pub/sub fan-out for SSE across instances
 
 ### In-memory mode (dev only)
@@ -102,10 +102,6 @@ Used when `REDIS_URL` is missing.
   - body: `{ phrase | mnemonic, wallet }`
   - JSON `status`: `win` (with `winner`), `already_solved` (with `winner`), `invalid`, `valid_but_wrong`, `constraint_violation`; no round-based rejections
 
-- `GET /leaderboard`
-  - supports `?limit=` and `?wallet=`
-  - returns top list and optional self metrics (`rank`, `gap_to_leader`)
-
 - `GET /version`
   - `{ version }` from `backend/package.json`
 
@@ -119,7 +115,7 @@ Used when `REDIS_URL` is missing.
   - body `{ tx_sig?, error? }`; records an audited payout attempt
 
 - `GET /events` (SSE)
-  - realtime event stream (`hello`, `attempt`, `leaderboard_update`, `submit`, `win`, `puzzle_cleared`, `payout_job`, `new_puzzle`, …)
+  - realtime event stream (`hello`, `submit`, `win`, `puzzle_cleared`, `payout_job`, `new_puzzle`, …)
 
 - `GET /public/developer-info`
   - `validate_batch_max`, `rate_limit_validate_batch_per_sec`, `wizard_derive_enabled`
@@ -139,21 +135,13 @@ Used when `REDIS_URL` is missing.
 - `GET /public/admin/visitor-log` (`x-admin-key`)
   - query `limit`, `offset`; JSON `{ ok, visitors, total }` — page views with IP, geo fields, path, user-agent
 
-## 6) Stats and Leaderboard
+## 6) Stats
 
-### Stats
 Tracked metrics include:
 - attempts (`validations_single`, `batch_items`, `submits`)
 - `valid_checksums`
 - `constraint_rejects`, `invalid_mnemonics`, `valid_target_misses`
 - computed `attempts_per_sec`, `time_elapsed`, `valid_rate`
-
-### Leaderboard
-- Redis ZSET key: `leaderboard:global`
-- Large score bonus on a successful win (`POST /submit` after winner set); default `LEADERBOARD_WIN_POINTS` (see `ENV_SETTINGS.md`)
-- Smaller +1 increments on valid-checksum near misses (`valid_but_wrong`)
-- Optional negative penalty on constraint violations (`LEADERBOARD_CONSTRAINT_PENALTY`)
-- Per-wallet per-second increment cap applies to near-miss increments only (`LEADERBOARD_MAX_INCR_PER_SEC`)
 
 ## 7) Payout jobs (optional)
 

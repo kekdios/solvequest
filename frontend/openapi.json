@@ -55,7 +55,7 @@
                     "solution_hash": { "type": "string" },
                     "target_address": { "type": "string" },
                     "constraints": { "type": "object", "description": "Puzzle constraints object (may be empty)" },
-                    "winner": { "type": ["string", "null"], "description": "Leaderboard id when solved" }
+                    "winner": { "type": ["string", "null"], "description": "Wallet id from winning POST /submit when solved" }
                   },
                   "required": ["id", "words", "solved", "vault_empty", "solution_hash", "target_address", "constraints"]
                 }
@@ -129,16 +129,6 @@
         }
       }
     },
-    "/leaderboard": {
-      "get": {
-        "summary": "Leaderboard top rows; optional self metrics",
-        "parameters": [
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
-          { "name": "wallet", "in": "query", "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "Top list + optional self" } }
-      }
-    },
     "/validate": {
       "post": {
         "summary": "Single mnemonic evaluation",
@@ -168,8 +158,8 @@
     },
     "/submit": {
       "post": {
-        "summary": "Submit candidate phrase; records win or near-miss on leaderboard",
-        "description": "Body must include phrase or mnemonic (12 words). wallet defaults to anonymous and is the leaderboard display id on win.",
+        "summary": "Submit candidate phrase; records win or validation outcome",
+        "description": "Body must include phrase or mnemonic (12 words). wallet defaults to anonymous and is stored as the winner id on win.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -195,7 +185,7 @@
     "/events": {
       "get": {
         "summary": "Server-Sent Events stream",
-        "description": "Initial hello, then events with type among hello, submit, win, leaderboard_update, puzzle_cleared, new_puzzle, payout_job, etc.",
+        "description": "Initial hello, then events with type among hello, submit, win, puzzle_cleared, new_puzzle, payout_job, etc.",
         "responses": {
           "200": {
             "description": "text/event-stream",

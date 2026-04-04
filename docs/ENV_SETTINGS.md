@@ -266,24 +266,6 @@ Leaving **`PUZZLE_SOURCE` unset or `env`** keeps the classic model (puzzle from 
 
 ---
 
-## Leaderboard settings
-
-### `LEADERBOARD_MAX_INCR_PER_SEC` (optional, default `20`, max `500`)
-- **Purpose:** Per-wallet score increment cap per second.
-- **Used by:** `backend/store.js`.
-
-### `LEADERBOARD_CONSTRAINT_PENALTY` (optional)
-- **Purpose:** Optional negative score delta on constraint violations.
-- **Used by:** `backend/store.js`.
-- **Example:** `-0.5`.
-
-### `LEADERBOARD_WIN_POINTS` (optional, default `100000`)
-- **Purpose:** Score added to `GET /leaderboard` when a wallet wins via `POST /submit` (same sorted set as near-miss +1s, but much larger so winners appear at the top).
-- **Used by:** `backend/store.js` (`recordLeaderboardWin`).
-- **Note:** Not subject to `LEADERBOARD_MAX_INCR_PER_SEC` (wins are once per puzzle).
-
----
-
 ## Performance/cache settings
 
 ### `EVAL_LRU_MAX` (optional, default `5000`, min `100`, max `100000`)

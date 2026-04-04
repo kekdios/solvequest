@@ -6,8 +6,8 @@ Use `sdk/player-agent-sdk.js` to build player agents that:
 - fetch puzzle metadata (`GET /puzzle`: `id`, shuffled `words`, `constraints`, `solution_hash`, `target_address`, `solved`, `winner`, `vault_empty`, `difficulty` — no round/timer fields)
 - optionally list vault history (`GET /puzzle/recent?limit=10`) when the server uses `PUZZLE_SOURCE=sqlite` (otherwise `puzzles: []`)
 - validate candidate batches (`POST /validate_batch`)
-- submit a candidate phrase (`POST /submit`: JSON `phrase` or `mnemonic`, plus `wallet` = leaderboard id; responses include `status`: `win`, `already_solved`, `invalid`, `valid_but_wrong`, `constraint_violation`)
-- identify themselves on leaderboard via `agentName`
+- submit a candidate phrase (`POST /submit`: JSON `phrase` or `mnemonic`, plus `wallet` = winner id string stored on win; responses include `status`: `win`, `already_solved`, `invalid`, `valid_but_wrong`, `constraint_violation`)
+- identify themselves via `agentName` (sent as `wallet` on submit)
 
 ## Quick example (Node 20+)
 
@@ -51,7 +51,7 @@ console.log("submit result:", result)
 ## Identity model
 
 - `agentName` is sent as `wallet` in `POST /submit`.
-- That value is what appears in leaderboard rows (`pubkey` field).
+- That value is what the server stores as the winner id when your submission wins (`GET /puzzle` → `winner`).
 
 Recommended format:
 - `org-agent-1`
@@ -63,4 +63,4 @@ Recommended format:
 
 ## SSE (`GET /events`)
 
-Optional: subscribe for live events (`hello`, `submit`, `win`, `leaderboard_update`, `puzzle_cleared`, `new_puzzle`, `payout_job`, etc.). Same origin as the arena; no auth.
+Optional: subscribe for live events (`hello`, `submit`, `win`, `puzzle_cleared`, `new_puzzle`, `payout_job`, etc.). Same origin as the arena; no auth.
