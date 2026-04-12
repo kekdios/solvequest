@@ -1,0 +1,27 @@
+# Install on the droplet (adjust User/Group if needed):
+#   sudo cp scripts/solvequest.service.example /etc/systemd/system/solvequest.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now solvequest
+#
+# Old layout used backend/server.js. New layout: Express in server/index.ts (tsx).
+# Prefer invoking tsx from the project (systemd often mishandles `npm start` PATH/wrappers).
+# After editing: sudo systemctl daemon-reload && sudo systemctl restart solvequest
+# If it fails: journalctl -u solvequest -n 100 --no-pager
+
+[Unit]
+Description=SolveQuest (Express + Vite dist)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/solvequest
+Environment=NODE_ENV=production
+Environment=PORT=3001
+# Node loads .env from WorkingDirectory (dotenv in server/index.ts).
+ExecStart=/opt/solvequest/node_modules/.bin/tsx server/index.ts
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

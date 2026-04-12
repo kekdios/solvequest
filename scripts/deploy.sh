@@ -4,11 +4,9 @@ set -euo pipefail
 # Local deploy helper for SolveQuest (Express + Vite SPA).
 # Runs from your machine and pulls + builds on the droplet over SSH.
 #
-# Droplet should run the app with systemd (e.g. solvequest.service):
-#   WorkingDirectory=/opt/solvequest
-#   Environment=NODE_ENV=production
-#   Environment=PORT=3001
-#   ExecStart=/usr/bin/npm start
+# Droplet systemd must match the new layout (NOT node backend/server.js).
+# Copy scripts/solvequest.service.example → /etc/systemd/system/solvequest.service
+# then: sudo systemctl daemon-reload && sudo systemctl restart solvequest
 #
 # Usage:
 #   ./scripts/deploy.sh
