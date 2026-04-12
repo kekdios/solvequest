@@ -1,7 +1,7 @@
 /**
  * Express server: /api/* (auth, account, admin), Solana RPC proxy, static SPA + fallback.
  */
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
@@ -13,6 +13,11 @@ import { createAdminApiMiddleware } from "../plugins/adminApiPlugin";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
+
+// Default dotenv cwd is process.cwd(); on droplets `.env` may still live under `backend/` (old layout).
+// Load root first, then legacy path; dotenv does not override existing env keys.
+dotenv.config({ path: path.join(root, ".env") });
+dotenv.config({ path: path.join(root, "backend", ".env") });
 
 const appVersion = (() => {
   try {
