@@ -14,6 +14,16 @@ import { createAdminApiMiddleware } from "../plugins/adminApiPlugin";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
+const appVersion = (() => {
+  try {
+    const raw = fs.readFileSync(path.join(root, "package.json"), "utf8");
+    const pkg = JSON.parse(raw) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
+
 function envRecord(): Record<string, string> {
   return { ...process.env } as Record<string, string>;
 }
@@ -26,6 +36,15 @@ const port = isProd
 const app = express();
 const env = envRecord();
 const mode = isProd ? "production" : "development";
+
+app.get("/health", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true });
+});
+app.get("/version", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ version: appVersion });
+});
 
 app.use(createUserAuthMiddleware(env, mode));
 app.use(createAccountApiMiddleware(env, root));

@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Local deploy helper for SolveQuest.
-# Deploys backend + static frontend (arena, /developers, puzzle-wizard, openapi.json, etc.).
-# Runs from your Mac and executes safe deploy steps on the droplet over SSH.
-# Arena shows a red "Vault empty" banner when GET /puzzle returns vault_empty: true (sqlite, no unsolved row).
-# QUEST → TARGET_ADDRESS SPL transfer runs only during `vault-init bootstrap-from-env` when QUEST_AUTO_FUND=1 (see docs/ENV_SETTINGS.md).
+# Local deploy helper for SolveQuest (Express + Vite SPA).
+# Runs from your machine and pulls + builds on the droplet over SSH.
+#
+# Droplet should run the app with systemd (e.g. solvequest.service):
+#   WorkingDirectory=/opt/solvequest
+#   Environment=NODE_ENV=production
+#   Environment=PORT=3001
+#   ExecStart=/usr/bin/npm start
 #
 # Usage:
 #   ./scripts/deploy.sh
@@ -17,10 +20,12 @@ BRANCH="${BRANCH:-main}"
 APP_DIR="${APP_DIR:-/opt/solvequest}"
 SERVICE_NAME="${SERVICE_NAME:-solvequest}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://solvequest.io/health}"
+# Port the Node process listens on (must match systemd Environment=PORT=…)
+HEALTH_PORT="${HEALTH_PORT:-3001}"
 SSH_BATCH_MODE="${SSH_BATCH_MODE:-yes}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOCAL_VER="$(grep -m1 '"version"' "${ROOT}/backend/package.json" | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
+LOCAL_VER="$(grep -m1 '"version"' "${ROOT}/package.json" | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
 PUBLIC_BASE="${PUBLIC_HEALTH_URL%/health}"
 PUBLIC_BASE="${PUBLIC_BASE%/}"
 
@@ -28,6 +33,7 @@ echo "==> Deploy target: ${TARGET}"
 echo "==> App dir: ${APP_DIR}"
 echo "==> Branch: ${BRANCH}"
 echo "==> Service: ${SERVICE_NAME}"
+echo "==> Health port (droplet): ${HEALTH_PORT}"
 echo "==> SSH batch mode: ${SSH_BATCH_MODE}"
 
 ssh -o BatchMode="${SSH_BATCH_MODE}" "${TARGET}" "bash -s" <<EOF
@@ -43,17 +49,19 @@ git checkout "${BRANCH}"
 echo "==> Pull latest code"
 git pull --ff-only origin "${BRANCH}"
 
-echo "==> Server backend/package.json version (after pull)"
-grep -m1 '"version"' "${APP_DIR}/backend/package.json" || true
+echo "==> package.json version (after pull)"
+grep -m1 '"version"' "${APP_DIR}/package.json" || true
 
-echo "==> Install backend dependencies (prefer npm ci)"
-cd "${APP_DIR}/backend"
-if npm ci --omit=dev >/dev/null 2>&1; then
-  echo "Backend dependencies installed via npm ci"
+echo "==> Install dependencies + production build"
+cd "${APP_DIR}"
+if npm ci >/dev/null 2>&1; then
+  echo "Dependencies installed via npm ci"
 else
-  echo "Backend npm ci failed, falling back to npm install"
-  npm install --omit=dev >/dev/null 2>&1 || npm install
+  echo "npm ci failed, falling back to npm install"
+  npm install
 fi
+
+npm run build
 
 echo "==> Restart service"
 systemctl restart "${SERVICE_NAME}"
@@ -63,7 +71,7 @@ echo "Service '${SERVICE_NAME}' is active."
 echo "==> Local health check (retry up to 30s)"
 ok=0
 for i in \$(seq 1 30); do
-  if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
+  if curl -fsS "http://127.0.0.1:${HEALTH_PORT}/health" >/dev/null 2>&1; then
     ok=1
     break
   fi
@@ -78,7 +86,7 @@ if [ "\$ok" -ne 1 ]; then
 fi
 
 echo "==> Local /version (after restart)"
-curl -fsS http://127.0.0.1:3001/version || true
+curl -fsS "http://127.0.0.1:${HEALTH_PORT}/version" || true
 echo ""
 
 echo "Local health OK"
@@ -88,22 +96,15 @@ echo "==> Public health check: ${PUBLIC_HEALTH_URL}"
 curl -fsS "${PUBLIC_HEALTH_URL}" >/dev/null
 echo "Public health OK"
 
-echo "==> Public GET /version (what the arena footer uses)"
+echo "==> Public GET /version"
 PUB_VER="$(curl -fsS "${PUBLIC_BASE}/version")"
 echo "${PUB_VER}"
-echo "==> Local repo backend version (this machine): ${LOCAL_VER}"
+echo "==> Local repo version (this machine): ${LOCAL_VER}"
 if echo "${PUB_VER}" | grep -q "\"version\":\"${LOCAL_VER}\""; then
-  echo "Public version matches local package.json — OK"
+  echo "Public /version matches local package.json — OK"
 else
   echo "WARNING: Public /version does not match local package.json." >&2
   echo "  Push commits to origin, redeploy, or fix APP_DIR / branch on the server." >&2
-fi
-
-echo "==> Public GET /puzzle (vault_empty — red arena banner when true)"
-if command -v python3 >/dev/null 2>&1; then
-  curl -fsS "${PUBLIC_BASE}/puzzle" | python3 -c "import sys, json; d=json.load(sys.stdin); print('vault_empty:', d.get('vault_empty', False))"
-else
-  curl -fsS "${PUBLIC_BASE}/puzzle" >/dev/null && echo "GET /puzzle OK (install python3 to print vault_empty in deploy log)"
 fi
 
 echo "==> Deploy completed successfully."
