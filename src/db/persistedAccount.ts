@@ -1,0 +1,43 @@
+/**
+ * Maps SQLite `accounts` row ↔ engine concepts.
+ * Not persisted (derive at runtime): equity, unrealizedPnL, marks, coverage warning flags.
+ */
+export type PersistedAccountRow = {
+  id: string;
+  created_at: number;
+  updated_at: number;
+  label: string | null;
+  /** Set when row is tied to email login — matches JWT `email` */
+  email: string | null;
+  usdc_balance: number;
+  coverage_limit_qusd: number;
+  premium_accrued_usdc: number;
+  covered_losses_qusd: number;
+  coverage_used_qusd: number;
+  insurance_tier_id: 1 | 2 | 3;
+  qusd_unlocked: number;
+  qusd_locked: number;
+  accumulated_losses_qusd: number;
+  sol_receive_address: string | null;
+};
+
+export type PerpTxnType = "open" | "close";
+
+/** One row per open or close event (append-only). */
+export type PerpTransactionRow = {
+  id: number;
+  account_id: string;
+  position_id: string;
+  txn_type: PerpTxnType;
+  symbol: string;
+  side: "long" | "short";
+  entry_price: number | null;
+  notional_usdc: number | null;
+  leverage: number | null;
+  margin_usdc: number | null;
+  opened_at: number | null;
+  exit_price: number | null;
+  realized_pnl_qusd: number | null;
+  closed_at: number | null;
+  inserted_at: number;
+};

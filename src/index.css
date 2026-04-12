@@ -1,0 +1,262 @@
+:root {
+  --bg: #0b0b0c;
+  --panel: #111213;
+  --surface: #111213;
+  --border: #1c1d1f;
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.55);
+  --accent: #00ffa3;
+  --warn: #f59e0b;
+  --danger: #ff5c5c;
+  --ok: #29e38a;
+  --solved: #f87171;
+  --solved-dim: color-mix(in srgb, #f87171 72%, var(--muted));
+  --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Monaco, monospace;
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --card-pad: 16px;
+  --card-radius: 10px;
+  /* App shell — tightened on small viewports */
+  --app-pad-x: 20px;
+  --app-pad-y: 32px;
+  --app-pad-bottom: 64px;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --app-pad-x: 16px;
+    --app-pad-y: 20px;
+    --app-pad-bottom: 48px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --app-pad-x: 12px;
+    --app-pad-y: 14px;
+    --app-pad-bottom: 40px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-x: clip;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Disabled: avoid fading the whole control (border disappeared). Muted fill + explicit edge. */
+button:disabled,
+button[aria-disabled="true"] {
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+  pointer-events: none;
+  color: var(--muted) !important;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, var(--text)) !important;
+  background: color-mix(in srgb, var(--muted) 8%, var(--panel)) !important;
+  box-shadow: none !important;
+}
+
+/* Wallet Send — panel background eats default --border; keep a visible outline in all states. */
+button.wallet-send-btn {
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--border) 55%, var(--muted)) !important;
+}
+
+button.wallet-send-btn[aria-disabled="true"] {
+  border: 1px solid color-mix(in srgb, var(--border) 45%, var(--text)) !important;
+  box-shadow: none !important;
+}
+
+input,
+select {
+  font-family: inherit;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.perps-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Index mid panel — 3×2 asset cards (2 cols on narrow screens) */
+.perps-mark-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .perps-mark-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .responsive-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .perps-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* —— App shell (see App.tsx classNames) —— */
+.app-shell {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+.app-page-title {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .app-header-top {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+
+  .app-nav {
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+    padding-bottom: 6px;
+    margin-left: -2px;
+    margin-right: -2px;
+    padding-left: 2px;
+    padding-right: 2px;
+    scrollbar-width: thin;
+  }
+
+  .app-nav::-webkit-scrollbar {
+    height: 4px;
+  }
+}
+
+/* Account: stack balance cards on narrow screens */
+.account-balance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .account-balance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .account-balance-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Perps: sticky order column only when two-column layout is active */
+.perps-order-card {
+  position: sticky;
+  top: 16px;
+}
+
+@media (max-width: 800px) {
+  .perps-order-card {
+    position: static;
+    top: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .perps-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+    scrollbar-width: thin;
+  }
+
+  .perps-tabs button {
+    flex: 0 0 auto !important;
+    min-width: 3rem;
+  }
+}
+
+/* Primary nav — active tab (classNames from App.tsx) */
+.app-nav-tab {
+  border-radius: 8px;
+}
+
+.app-nav-tab--on {
+  color: var(--text) !important;
+  background: color-mix(in srgb, var(--accent) 14%, transparent) !important;
+}
+
+.app-nav-tab:hover:not(.app-nav-tab--on) {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* App pages (Account, Insurance, Auth, Quick Start, Admin) — log rows + shared root */
+.app-page .app-page-log-row {
+  transition: background-color 0.12s ease;
+}
+
+.app-page .app-page-log-row:hover {
+  background: color-mix(in srgb, var(--text) 4.5%, transparent);
+}
