@@ -11,6 +11,7 @@ import {
 } from "react";
 import { SessionAuthProvider, useAuthMode, isDemoMode, useSessionAuth } from "./auth/sessionAuth";
 import { getDefaultDemoAppState, loadDemoAppState, saveDemoAppState } from "./lib/demoPersistence";
+import { loadUserPerpPositions, saveUserPerpPositions } from "./lib/userSessionPersistence";
 import type { DemoAppState, DemoLogEntry } from "./lib/demoSessionTypes";
 import {
   createAccount,
@@ -75,7 +76,7 @@ type Action =
   | { type: "repayBonusUsdc"; amount: number }
   | { type: "unlockedTopUpUsdc"; usdc: number }
   | { type: "unlockedWithdrawUsdc"; usdc: number }
-  | { type: "hydrateFromAccountRow"; row: PersistedAccountRow }
+  | { type: "hydrateFromAccountRow"; row: PersistedAccountRow; restoredPerpPositions: PerpPosition[] }
   | { type: "replaceAll"; state: DemoAppState };
 
 function pushLog(log: DemoLogEntry[], entry: Omit<DemoLogEntry, "id" | "t">): DemoLogEntry[] {
@@ -301,10 +302,17 @@ function reducer(state: State, action: Action): State {
     }
     case "hydrateFromAccountRow": {
       const slice = persistedRowToAppSlice(action.row);
+      const positions = action.restoredPerpPositions;
+      const marginLocked = positions.reduce((s, p) => s + p.marginUsdc, 0);
+      const baseUnlocked = slice.qusd.unlocked;
       return {
         ...state,
         ...slice,
-        perpPositions: [],
+        qusd: {
+          unlocked: Math.max(0, baseUnlocked - marginLocked),
+          locked: slice.qusd.locked,
+        },
+        perpPositions: positions,
         marks: { ...INITIAL_MARKS },
         coverageWarnFlags: INITIAL_COVERAGE_WARN_FLAGS,
         bonusRepaidUsdc: 0,
@@ -471,18 +479,32 @@ function AppInner() {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const demoPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userPerpPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!demo) return;
-    if (persistTimer.current) clearTimeout(persistTimer.current);
-    persistTimer.current = setTimeout(() => {
+    if (demoPersistTimer.current) clearTimeout(demoPersistTimer.current);
+    demoPersistTimer.current = setTimeout(() => {
       saveDemoAppState(state);
-      persistTimer.current = null;
+      demoPersistTimer.current = null;
     }, 400);
     return () => {
-      if (persistTimer.current) clearTimeout(persistTimer.current);
+      if (demoPersistTimer.current) clearTimeout(demoPersistTimer.current);
     };
   }, [demo, state]);
+
+  /** Logged-in: persist simulated perps (server DB has no open-position rows). */
+  useEffect(() => {
+    if (demo || !user?.email) return;
+    if (userPerpPersistTimer.current) clearTimeout(userPerpPersistTimer.current);
+    userPerpPersistTimer.current = setTimeout(() => {
+      saveUserPerpPositions(user.email, stateRef.current.perpPositions);
+      userPerpPersistTimer.current = null;
+    }, 400);
+    return () => {
+      if (userPerpPersistTimer.current) clearTimeout(userPerpPersistTimer.current);
+    };
+  }, [demo, user?.email, state.perpPositions]);
 
   useEffect(() => {
     if (!demo) return;
@@ -490,6 +512,13 @@ function AppInner() {
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
   }, [demo]);
+
+  useEffect(() => {
+    if (demo || !user?.email) return;
+    const flush = () => saveUserPerpPositions(user.email, stateRef.current.perpPositions);
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, [demo, user?.email]);
 
   /** Anonymous session: restore demo from localStorage. Signed-in uses SQLite via hydrate effect. */
   useEffect(() => {
@@ -513,7 +542,9 @@ function AppInner() {
         const data = (await r.json()) as PersistedAccountRow;
         if (cancelled) return;
         setLedgerAccountRow(data);
-        dispatch({ type: "hydrateFromAccountRow", row: data });
+        const email = (data.email ?? "").trim().toLowerCase();
+        const restoredPerpPositions = email ? loadUserPerpPositions(email) ?? [] : [];
+        dispatch({ type: "hydrateFromAccountRow", row: data, restoredPerpPositions });
       } catch {
         if (!cancelled) setLedgerAccountRow(null);
       }
