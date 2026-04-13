@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+/** Ensures `import.meta.env` types when checking Node-only projects (plugins/server) that import `src/`. */
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 interface ImportMetaEnv {
   /** Optional; sent as `Authorization: Bearer` on info API requests. */
   readonly HYPERLIQUID_API_KEY: string;
