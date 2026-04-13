@@ -16,7 +16,7 @@ export type AccountStatePutBody = {
   bonus_repaid_usdc: number;
   vault_activity_at: number | null;
   open_perp_positions: PerpPosition[];
-  /** Append-only closes to persist in `perp_transactions` (cleared client-side after successful PUT). */
+  /** Append-only closes to persist in `perp_transactions` (client removes only ACK'd ids after each successful PUT). */
   perp_close_events: PerpCloseSyncEvent[];
 };
 

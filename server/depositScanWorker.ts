@@ -14,6 +14,14 @@ import { scanNewUsdcDeposits, type ScanLedger } from "./solanaUsdcScan";
 
 type SqliteDb = InstanceType<typeof Database>;
 
+function openSqlite(path: string): SqliteDb {
+  const database = new Database(path);
+  database.pragma("foreign_keys = ON");
+  database.pragma("journal_mode = WAL");
+  database.pragma("busy_timeout = 8000");
+  return database;
+}
+
 function resolveDbPath(root: string, env: NodeJS.ProcessEnv): string {
   return env.SOLVEQUEST_DB_PATH?.trim() || path.join(root, "data", "solvequest.db");
 }
@@ -41,8 +49,7 @@ export async function runDepositScanOnce(
 
   let database: SqliteDb;
   try {
-    database = new Database(dbPath);
-    database.pragma("foreign_keys = ON");
+    database = openSqlite(dbPath);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };
@@ -106,8 +113,7 @@ export function startDepositScanWorker(root: string, env: NodeJS.ProcessEnv): vo
       return null;
     }
     try {
-      db = new Database(dbPath);
-      db.pragma("foreign_keys = ON");
+      db = openSqlite(dbPath);
       return db;
     } catch (e) {
       console.error("[deposit-scan] open db:", e);

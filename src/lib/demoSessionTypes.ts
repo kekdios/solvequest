@@ -41,6 +41,6 @@ export type DemoAppState = {
   qusd: { unlocked: number; locked: number };
   bonusRepaidUsdc: number;
   vaultActivityAt: number | null;
-  /** Registered users: appended on close, cleared after successful account sync. */
+  /** Registered users: appended on close; entries are removed after the server ACKs that close in PUT /api/account/state. */
   pendingPerpCloses: PerpCloseSyncEvent[];
 };

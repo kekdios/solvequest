@@ -180,6 +180,9 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
     try {
       db = new Database(dbPath);
       db.pragma("foreign_keys = ON");
+      /** WAL + busy wait — deposit worker / concurrent reads were contending on the same file without this. */
+      db.pragma("journal_mode = WAL");
+      db.pragma("busy_timeout = 8000");
       return db;
     } catch (e) {
       console.error("[account-api] open db:", e);
@@ -187,22 +190,28 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
     }
   };
 
-  const loadOrCreateRow = (email: string): AccountRow | null => {
+  /**
+   * @param skipInterest — MUST be true for `PUT /api/account/state`. Otherwise vault interest bumps
+   * `sync_version` before the optimistic-lock UPDATE and causes spurious 409s / failed writes.
+   */
+  const loadOrCreateRow = (email: string, options?: { skipInterest?: boolean }): AccountRow | null => {
     const database = getDb();
     if (!database) return null;
 
     const sel = database.prepare(`SELECT * FROM accounts WHERE email = ?`);
     const existing = sel.get(email) as AccountRow | undefined;
     if (existing) {
-      try {
-        applyLockedQusdInterest(database, String(existing.id));
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("no such column")) {
-          console.error("[account-api] schema mismatch — run: npm run db:init on a fresh database");
-          return null;
+      if (!options?.skipInterest) {
+        try {
+          applyLockedQusdInterest(database, String(existing.id));
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.includes("no such column")) {
+            console.error("[account-api] schema mismatch — run: npm run db:init on a fresh database");
+            return null;
+          }
+          throw e;
         }
-        throw e;
       }
       database.prepare(`UPDATE accounts SET updated_at = ? WHERE id = ?`).run(Date.now(), existing.id);
       const row = database.prepare(`SELECT * FROM accounts WHERE email = ?`).get(email) as AccountRow;
@@ -271,7 +280,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           }
           sendJson(res, 503, {
             error: "db_schema",
-            message: "Could not read accounts (run npm run db:migrate:email if upgrading).",
+            message: "Could not read accounts — run npm run db:init on a fresh database if upgrading from an old schema.",
           });
           return;
         }
@@ -285,7 +294,8 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           console.error("[account-api] load open positions:", e);
           sendJson(res, 503, {
             error: "db_schema",
-            message: "Run: npm run db:migrate:account-sync (perp_open_positions).",
+            message:
+              "SQLite schema mismatch (e.g. missing perp_open_positions). On the host: npm run db:init on a fresh DB.",
           });
           return;
         }
@@ -437,7 +447,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
             if (msg.includes("no such column: custodial_seckey_enc")) {
               sendJson(res, 503, {
                 error: "db_schema",
-                message: "Run: npm run db:migrate:custodial-deposit",
+                message: "Schema missing custodial columns — run npm run db:init on a fresh database.",
               });
               return;
             }
@@ -549,7 +559,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
             });
             return;
           }
-          const row = loadOrCreateRow(email);
+          const row = loadOrCreateRow(email, { skipInterest: true });
           if (!row?.id) {
             sendJson(res, 503, { error: "no_account" });
             return;
@@ -596,11 +606,17 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                 }
               }
 
+              /**
+               * Vault lock/unlock only: must conserve total QUSD (du + dl ≈ 0). Never "mint" to match a buggy client
+               * `qusd_unlocked` — that was inflating the ledger vs signup + trades + deposits.
+               */
               const { unlocked: Lu, locked: Ll } = getLedgerBalances(database, accountId);
               const du = body.qusd_unlocked - Lu;
               const dl = body.qusd_locked - Ll;
               if (Math.abs(du) > 1e-6 || Math.abs(dl) > 1e-6) {
-                insertVaultMove(database, accountId, du, dl, now);
+                if (Math.abs(du + dl) < 1e-5) {
+                  insertVaultMove(database, accountId, du, dl, now);
+                }
               }
 
               const upd = database

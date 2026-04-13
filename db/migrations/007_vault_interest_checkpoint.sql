@@ -1,2 +1,0 @@
--- See scripts/migrate-vault-interest.mjs (idempotent).
--- Run: npm run db:migrate:vault-interest

@@ -1,2 +1,0 @@
--- See scripts/migrate-deposit-worker.mjs (idempotent; handles duplicate columns).
--- Run: npm run db:migrate:deposit-worker

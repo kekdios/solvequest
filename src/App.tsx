@@ -14,6 +14,7 @@ import {
   buildAccountStatePutBody,
   putAccountState,
   putSolReceiveAddress,
+  type AccountStatePutBody,
 } from "./lib/accountSync";
 import { getOrCreateAccountReceiveWallet } from "./lib/accountReceiveAddresses";
 import type { DemoAppState, DemoLogEntry, PerpCloseSyncEvent } from "./lib/demoSessionTypes";
@@ -63,13 +64,18 @@ type Action =
       mergeUnsyncedLocalOpens: boolean;
     }
   | { type: "replaceAll"; state: DemoAppState }
-  | { type: "perpClosesSynced" };
+  /** Remove only closes included in a successful PUT — never drop newer closes added while a PUT was in flight. */
+  | { type: "perpClosesAcked"; positionIds: string[] };
 
 function pushLog(log: DemoLogEntry[], entry: Omit<DemoLogEntry, "id" | "t">): DemoLogEntry[] {
   return [
     ...log,
     { ...entry, id: crypto.randomUUID(), t: Date.now() },
   ].slice(-80);
+}
+
+function positionIdsAckedInPut(body: AccountStatePutBody): string[] {
+  return (body.perp_close_events ?? []).map((e) => e.positionId);
 }
 
 function reducer(state: State, action: Action): State {
@@ -168,26 +174,31 @@ function reducer(state: State, action: Action): State {
       const fromServerFiltered = fromServer.filter((p) => !pendingCloseIds.has(p.id));
 
       let positions: PerpPosition[];
+      let pendingLocal: PerpPosition[] = [];
       if (action.mergeUnsyncedLocalOpens) {
         const serverIds = new Set(fromServerFiltered.map((p) => p.id));
-        const pendingLocal = state.perpPositions.filter((p) => !serverIds.has(p.id));
+        pendingLocal = state.perpPositions.filter((p) => !serverIds.has(p.id));
         positions = [...fromServerFiltered, ...pendingLocal];
       } else {
         positions = fromServerFiltered;
       }
 
-      /** Server `qusd_unlocked` is display unlocked (ledger SUM); open positions are listed separately. */
+      /**
+       * Server `qusd_unlocked` is SUM(ledger) — includes margin locks only after PUT lands.
+       * Opens that exist only locally already had margin subtracted in the client; subtract that margin here
+       * so we don’t show inflated unlocked on periodic GET /me.
+       */
       const derivedUnlocked = slice.qusd.unlocked;
-      const mergedUnlocked =
-        action.mergeUnsyncedLocalOpens === true
-          ? Math.max(derivedUnlocked, state.qusd.unlocked)
-          : derivedUnlocked;
+      const derivedLocked = slice.qusd.locked;
+      const marginPendingOnServer = pendingLocal.reduce((s, p) => s + p.marginUsdc, 0);
+      const unlocked = Math.max(0, derivedUnlocked - marginPendingOnServer);
+
       return {
         ...state,
         ...slice,
         qusd: {
-          unlocked: mergedUnlocked,
-          locked: slice.qusd.locked,
+          unlocked,
+          locked: derivedLocked,
         },
         perpPositions: positions,
         /** HL index marks come only from {@link fetchHyperliquidMids}; keep them when syncing SQLite so we never show seed prices under a "live" feed badge. */
@@ -203,8 +214,14 @@ function reducer(state: State, action: Action): State {
     }
     case "replaceAll":
       return action.state;
-    case "perpClosesSynced":
-      return { ...state, pendingPerpCloses: [] };
+    case "perpClosesAcked": {
+      const drop = new Set(action.positionIds);
+      if (drop.size === 0) return state;
+      return {
+        ...state,
+        pendingPerpCloses: (state.pendingPerpCloses ?? []).filter((e) => !drop.has(e.positionId)),
+      };
+    }
     case "perpClose": {
       const pos = state.perpPositions.find((p) => p.id === action.positionId);
       if (!pos) return state;
@@ -312,10 +329,11 @@ function AppInner() {
     };
   }, [demo, state]);
 
-  /** Registered: persist full trading + vault state to SQLite (debounced). */
+  /** Registered: persist full trading + vault state to SQLite (debounced). Omits `marks` from deps so HL polls do not reset the timer (was delaying / losing close syncs). */
   useEffect(() => {
     if (demo || !user?.email || authLoading || !ledgerAccountRow) return;
     if (accountSyncTimer.current) clearTimeout(accountSyncTimer.current);
+    const delay = (state.pendingPerpCloses?.length ?? 0) > 0 ? 120 : 450;
     accountSyncTimer.current = setTimeout(() => {
       void (async () => {
         const body = buildAccountStatePutBody(stateRef.current, syncVersionRef.current);
@@ -323,7 +341,7 @@ function AppInner() {
         accountSyncTimer.current = null;
         if (result.ok) {
           syncVersionRef.current = result.sync_version;
-          dispatch({ type: "perpClosesSynced" });
+          dispatch({ type: "perpClosesAcked", positionIds: positionIdsAckedInPut(body) });
           return;
         }
         if (!("conflict" in result) || !result.conflict) return;
@@ -339,19 +357,35 @@ function AppInner() {
           mergeUnsyncedLocalOpens: true,
         });
         syncVersionRef.current = Number(data.sync_version ?? 0);
-        const retry = await putAccountState(
-          buildAccountStatePutBody(stateRef.current, syncVersionRef.current),
-        );
+        const retryBody = buildAccountStatePutBody(stateRef.current, syncVersionRef.current);
+        const retry = await putAccountState(retryBody);
         if (retry.ok) {
           syncVersionRef.current = retry.sync_version;
-          dispatch({ type: "perpClosesSynced" });
+          dispatch({ type: "perpClosesAcked", positionIds: positionIdsAckedInPut(retryBody) });
         }
       })();
-    }, 450);
+    }, delay);
     return () => {
       if (accountSyncTimer.current) clearTimeout(accountSyncTimer.current);
     };
-  }, [demo, user?.email, authLoading, state, ledgerAccountRow]);
+  }, [
+    demo,
+    user?.email,
+    authLoading,
+    ledgerAccountRow,
+    state.perpPositions,
+    state.pendingPerpCloses,
+    state.qusd.unlocked,
+    state.qusd.locked,
+    state.account.balance,
+    state.account.plan.coverageLimit,
+    state.account.premiumAccrued,
+    state.account.coveredLosses,
+    state.account.coverageUsed,
+    state.accumulatedLossesQusd,
+    state.bonusRepaidUsdc,
+    state.vaultActivityAt,
+  ]);
 
   useEffect(() => {
     if (!demo) return;
@@ -364,12 +398,11 @@ function AppInner() {
     if (demo || !user?.email || !ledgerAccountRow) return;
     const flush = () => {
       void (async () => {
-        const result = await putAccountState(
-          buildAccountStatePutBody(stateRef.current, syncVersionRef.current),
-        );
+        const body = buildAccountStatePutBody(stateRef.current, syncVersionRef.current);
+        const result = await putAccountState(body);
         if (result.ok) {
           syncVersionRef.current = result.sync_version;
-          dispatch({ type: "perpClosesSynced" });
+          dispatch({ type: "perpClosesAcked", positionIds: positionIdsAckedInPut(body) });
         }
       })();
     };
