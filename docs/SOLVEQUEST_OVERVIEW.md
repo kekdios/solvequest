@@ -55,10 +55,17 @@ On the **droplet**, ensure the process **working directory** is the app root (e.
 
 ## Deployment: droplet, IP, and DNS
 
-- **App directory on VPS** (typical): **`/opt/solvequest`** (see `scripts/deploy.sh` `APP_DIR`).
-- **Default SSH target in `deploy.sh`**: `root@152.42.168.173` — this is a **convenience default**; your real droplet IP may differ. Update **`DEPLOY_TARGET`** or pass ` ./scripts/deploy.sh user@YOUR_IP`**.
-- **Public URL** in `deploy.sh` health check default: **`https://solvequest.io/health`** — your domain/DNS points to the droplet (or a load balancer); **IP is not stored as the source of truth** in the repo.
-- **Process**: `NODE_ENV=production` + `tsx server/index.ts` (see `scripts/solvequest.service.example`). **nginx** (or similar) usually terminates TLS and reverse-proxies to `127.0.0.1:PORT`.
+Defaults below match **`scripts/deploy.sh`** and **`scripts/solvequest.service.example`**. If you deploy to another host, directory, or unit name, set **`DEPLOY_TARGET`**, **`APP_DIR`**, **`SERVICE_NAME`** (see `deploy.sh`) and substitute those values anywhere this doc uses the defaults.
+
+| Item | Value in repo defaults |
+|------|-------------------------|
+| SSH (deploy) | `root@152.42.168.173` |
+| App directory | `/opt/solvequest` |
+| systemd unit | `solvequest` |
+| Node listen port (example unit) | `3001` (`Environment=PORT=3001`) |
+| Public health URL (deploy check) | `https://solvequest.io/health` |
+
+- **Process**: `NODE_ENV=production` + `tsx server/index.ts` (see `scripts/solvequest.service.example`). **nginx** (or similar) usually terminates TLS and reverse-proxies to `127.0.0.1:PORT` (must match **`PORT`** in the unit).
 
 ---
 
@@ -79,6 +86,91 @@ On the **droplet**, ensure the process **working directory** is the app root (e.
 ### Server SQLite settings (implementation detail)
 
 - API and workers use **WAL** + **busy_timeout** to reduce lock errors when the deposit worker and HTTP API touch the same file.
+
+### Production droplet: delete SQLite and recreate (fresh DB)
+
+Use this when the server DB is corrupt, locked, or inconsistent and you accept **losing all server-side account data** (ledger, positions, deposit idempotency rows, custodial metadata). Defaults: **`root@152.42.168.173`**, **`/opt/solvequest`**, unit **`solvequest`**, DB file **`/opt/solvequest/data/solvequest.db`**.
+
+1. **SSH**  
+   `ssh root@152.42.168.173`
+
+2. **Stop the app** (releases SQLite locks)  
+   `sudo systemctl stop solvequest`  
+   Confirm: `systemctl is-active solvequest` prints `inactive`.
+
+3. **Resolve the DB path** (default vs `SOLVEQUEST_DB_PATH`)  
+   ```bash
+   grep -E '^SOLVEQUEST_DB_PATH=' /opt/solvequest/.env /opt/solvequest/backend/.env 2>/dev/null || true
+   ```  
+   - If **no** `SOLVEQUEST_DB_PATH`: use **`/opt/solvequest/data/solvequest.db`**.  
+   - If set: use that **absolute** path for the next steps (and its `-wal` / `-shm` siblings).
+
+4. **Optional backup** (skip if the file is unusable)  
+   `sudo cp /opt/solvequest/data/solvequest.db "/root/solvequest-backup-$(date +%Y%m%d%H%M).db"`
+
+5. **Remove DB + WAL files**  
+   ```bash
+   sudo rm -f /opt/solvequest/data/solvequest.db \
+              /opt/solvequest/data/solvequest.db-wal \
+              /opt/solvequest/data/solvequest.db-shm
+   ```  
+   If `SOLVEQUEST_DB_PATH` points elsewhere, delete **that** base path and the same basename with `-wal` and `-shm` appended.
+
+6. **Recreate from schema**  
+   ```bash
+   cd /opt/solvequest
+   npm run db:init
+   ```  
+   Ensure the new file is writable by whatever **`User=`** runs the service (`scripts/solvequest.service.example` uses **`User=root`**).
+
+7. **Start the app**  
+   `sudo systemctl start solvequest`  
+   Local health (port from unit; default **3001**):  
+   `curl -fsS http://127.0.0.1:3001/health`  
+   After start, wait ~2s or for **`[server] listening`** in logs before **`curl`** (immediate **`curl`** can race startup).
+
+8. **Aftereffects**  
+   All accounts and balances on that DB are gone; users re-register. Env secrets (e.g. **`JWT_SECRET`**) are unchanged unless you edit them.
+
+#### Copy-paste reset (default DB only — no IP or paths to fill in)
+
+Use this **only if** neither `/opt/solvequest/.env` nor `/opt/solvequest/backend/.env` sets **`SOLVEQUEST_DB_PATH`** (or you cleared it). If `grep` in step 2 shows a custom path, stop and use the numbered steps above instead.
+
+**Step 1 — on your laptop:** connect.
+
+```bash
+ssh root@152.42.168.173
+```
+
+**Step 2 — on the server:** stop app and confirm nothing overrides the DB path.
+
+```bash
+sudo systemctl stop solvequest
+grep -E '^SOLVEQUEST_DB_PATH=' /opt/solvequest/.env /opt/solvequest/backend/.env 2>/dev/null || echo "OK: default path"
+```
+
+If you see a line like `SOLVEQUEST_DB_PATH=/something/else.db`, do **not** run step 3 as written; use the custom path for `rm` and `db:init`’s working directory as in § “Production droplet” steps 5–6.
+
+**Step 3 — on the server:** remove the default DB and WAL files.
+
+```bash
+sudo rm -f /opt/solvequest/data/solvequest.db /opt/solvequest/data/solvequest.db-wal /opt/solvequest/data/solvequest.db-shm
+```
+
+**Step 4 — on the server:** recreate from `db/schema.sql`.
+
+```bash
+cd /opt/solvequest && npm run db:init
+```
+
+**Step 5 — on the server:** start and verify.
+
+```bash
+sudo systemctl start solvequest
+curl -fsS http://127.0.0.1:3001/health
+```
+
+After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10`** shows **`[server] listening`** before **`curl`** — an immediate **`curl`** can run before Node accepts connections.
 
 ---
 
@@ -129,8 +221,9 @@ npm run build        # tsc + vite build → dist/
 # Database
 npm run db:init      # create DB from db/schema.sql (default data/solvequest.db)
 
-# Deploy (from laptop; adjust host)
-./scripts/deploy.sh user@your.droplet.ip
+# Deploy from laptop (default host in deploy.sh: root@152.42.168.173)
+./scripts/deploy.sh
+# or: DEPLOY_TARGET=root@OTHER ./scripts/deploy.sh root@OTHER
 ```
 
 ---

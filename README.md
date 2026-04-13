@@ -29,7 +29,7 @@ Minimum env for local auth/API: set **`JWT_SECRET`** (and email OTP vars if you 
 
 ## Docs
 
-- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana, droplet notes.
+- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana, droplet notes. Default production SSH (matches `scripts/deploy.sh`): **`ssh root@152.42.168.173`**.
 
 ## Repository
 
