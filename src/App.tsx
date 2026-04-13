@@ -522,7 +522,8 @@ function AppInner() {
     dispatch({ type: "unlockQusd", amount });
   }, []);
 
-  const [hlFeedStatus, setHlFeedStatus] = useState<"connecting" | "live" | "partial">("connecting");
+  const [hlFeedStatus, setHlFeedStatus] = useState<"connecting" | "live" | "error">("connecting");
+  const [hlFeedError, setHlFeedError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined" && isAdminSubdomainHost()) return;
@@ -532,13 +533,21 @@ function AppInner() {
     const pull = () => {
       fetchHyperliquidMids(ac.signal)
         .then((r) => {
+          if (r.marks === null) {
+            setHlFeedError(
+              "Could not load full Hyperliquid index data (main + commodity feeds). Try again in a moment or check your network.",
+            );
+            setHlFeedStatus("error");
+            return;
+          }
+          setHlFeedError(null);
           dispatch({ type: "setMarks", marks: r.marks });
-          setHlFeedStatus(r.allLive ? "live" : "partial");
+          setHlFeedStatus("live");
         })
         .catch((e: unknown) => {
           if (ac.signal.aborted || (e instanceof DOMException && e.name === "AbortError")) return;
-          dispatch({ type: "setMarks", marks: { ...INITIAL_MARKS } });
-          setHlFeedStatus("partial");
+          setHlFeedError("Network error while loading Hyperliquid prices. No placeholder prices are shown.");
+          setHlFeedStatus("error");
         });
     };
 
@@ -671,6 +680,7 @@ function AppInner() {
               onClose={(positionId) => dispatch({ type: "perpClose", positionId })}
               priceFeed={{
                 status: hlFeedStatus,
+                errorMessage: hlFeedError,
                 intervalMs: HL_POLL_INTERVAL_MS,
                 sourceLabel: "Hyperliquid",
               }}

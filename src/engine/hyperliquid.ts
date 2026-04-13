@@ -1,9 +1,4 @@
-import {
-  COMMODITY_PERP_SYMBOLS,
-  INITIAL_MARKS,
-  MAIN_PERP_SYMBOLS,
-  type PerpSymbol,
-} from "./perps";
+import { COMMODITY_PERP_SYMBOLS, MAIN_PERP_SYMBOLS, type PerpSymbol } from "./perps";
 
 const DEFAULT_HL_INFO_URL = "https://api.hyperliquid.xyz/info";
 
@@ -54,22 +49,6 @@ const HL_XYZ_COMMODITY: Record<(typeof COMMODITY_PERP_SYMBOLS)[number], string> 
   "SILVER-PERP": "xyz:SILVER",
   "OIL-PERP": "xyz:CL",
 };
-
-function commodityFallback(): Record<(typeof COMMODITY_PERP_SYMBOLS)[number], number> {
-  return {
-    "GOLD-PERP": INITIAL_MARKS["GOLD-PERP"],
-    "SILVER-PERP": INITIAL_MARKS["SILVER-PERP"],
-    "OIL-PERP": INITIAL_MARKS["OIL-PERP"],
-  };
-}
-
-function mainFallback(): Record<(typeof MAIN_PERP_SYMBOLS)[number], number> {
-  return {
-    "BTC-PERP": INITIAL_MARKS["BTC-PERP"],
-    "ETH-PERP": INITIAL_MARKS["ETH-PERP"],
-    "SOL-PERP": INITIAL_MARKS["SOL-PERP"],
-  };
-}
 
 /** HL JSON sometimes uses strings; be tolerant of numbers too. */
 function parseHlNumber(raw: unknown): number | null {
@@ -130,14 +109,15 @@ async function fetchXyzCommodityMarks(signal?: AbortSignal): Promise<Record<
 }
 
 export type HyperliquidMidsResult = {
-  marks: Record<PerpSymbol, number>;
-  /** True when both main `allMids` and xyz `metaAndAssetCtxs` succeeded. */
+  /** Full index set from Hyperliquid only; `null` if either API leg failed or the network errored. */
+  marks: Record<PerpSymbol, number> | null;
+  /** True when both main `allMids` and xyz `metaAndAssetCtxs` returned valid mids. */
   allLive: boolean;
 };
 
 /**
  * BTC/ETH/SOL mids from `allMids`; gold/silver/oil from HIP-3 `xyz` `markPx`.
- * Always returns usable marks: failed legs use {@link INITIAL_MARKS} / commodity fallbacks.
+ * Returns `marks: null` when either leg is missing — callers must not substitute placeholder prices.
  */
 export async function fetchHyperliquidMids(signal?: AbortSignal): Promise<HyperliquidMidsResult> {
   let main: Awaited<ReturnType<typeof fetchMainDexMids>> = null;
@@ -145,19 +125,19 @@ export async function fetchHyperliquidMids(signal?: AbortSignal): Promise<Hyperl
   try {
     [main, xyz] = await Promise.all([fetchMainDexMids(signal), fetchXyzCommodityMarks(signal)]);
   } catch {
-    // Network / CORS — treat as missing legs below.
+    // Network / CORS / abort — no synthetic marks.
   }
 
   if (signal?.aborted) {
     throw new DOMException("Aborted", "AbortError");
   }
 
-  const mainMarks = main ?? mainFallback();
-  const commodities = xyz ?? commodityFallback();
-  const allLive = main !== null && xyz !== null;
+  if (main === null || xyz === null) {
+    return { marks: null, allLive: false };
+  }
 
   return {
-    marks: { ...mainMarks, ...commodities } as Record<PerpSymbol, number>,
-    allLive,
+    marks: { ...main, ...xyz } as Record<PerpSymbol, number>,
+    allLive: true,
   };
 }

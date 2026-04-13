@@ -23,7 +23,8 @@ type Props = {
   onClose: (positionId: string) => void;
   /** Live index feed (e.g. Hyperliquid allMids). */
   priceFeed?: {
-    status: "connecting" | "live" | "partial";
+    status: "connecting" | "live" | "error";
+    errorMessage?: string | null;
     intervalMs: number;
     sourceLabel: string;
   };
@@ -56,6 +57,8 @@ export default function PerpsTradeScreen({
   /** Product rule: all perps run at 100× (not 1×). */
   const exposure = allocateQusd * DEFAULT_PERP_LEVERAGE;
 
+  const feedLive = priceFeed?.status === "live";
+
   const mark = marks[symbol];
 
   const totalMargin = useMemo(
@@ -65,23 +68,28 @@ export default function PerpsTradeScreen({
 
   const totalUpl = useMemo(
     () =>
-      positions.reduce((s, p) => {
-        const m = marks[p.symbol];
-        return s + computeUnrealizedPnl(p, m);
-      }, 0),
-    [positions, marks],
+      feedLive
+        ? positions.reduce((s, p) => {
+            const m = marks[p.symbol];
+            return s + computeUnrealizedPnl(p, m);
+          }, 0)
+        : NaN,
+    [positions, marks, feedLive],
   );
 
   const totalNetQusd = useMemo(
     () =>
-      positions.reduce((s, p) => {
-        const m = marks[p.symbol];
-        return s + positionNetQusd(p, m);
-      }, 0),
-    [positions, marks],
+      feedLive
+        ? positions.reduce((s, p) => {
+            const m = marks[p.symbol];
+            return s + positionNetQusd(p, m);
+          }, 0)
+        : NaN,
+    [positions, marks, feedLive],
   );
 
   const place = () => {
+    if (!feedLive) return;
     if (allocateQusd <= 0) return;
     if (margin > qusdUnlocked + 1e-9) return;
     onOpen({ symbol, side, notionalUsdc: allocateQusd, leverage: DEFAULT_PERP_LEVERAGE });
@@ -112,10 +120,10 @@ export default function PerpsTradeScreen({
           <div style={s.chartHeader}>
             <div style={s.chartHeaderRow}>
               <span style={s.chartTitle}>
-                {priceFeed ? "Index mid (USD)" : "Price pulse (local)"}
+                {feedLive ? "Index mid (USD)" : priceFeed?.status === "error" ? "Index unavailable" : "Index mid (USD)"}
               </span>
               <span style={s.chartHeaderActions}>
-                {priceFeed && (
+                {priceFeed ? (
                   <span style={s.feedBadge}>
                     {priceFeed.status === "connecting" && (
                       <span style={{ color: "var(--muted)" }}>Connecting…</span>
@@ -127,31 +135,34 @@ export default function PerpsTradeScreen({
                         <span style={s.feedPollDim}>~{priceFeed.intervalMs / 1000}s</span>
                       </>
                     )}
-                    {priceFeed.status === "partial" && (
-                      <>
-                        <span style={{ color: "var(--warn)", marginRight: 4 }}>Partial</span>
-                        <span style={s.feedBrand}>{priceFeed.sourceLabel}</span>
-                        <span style={s.feedSep}> · </span>
-                        <span style={s.feedPollDim}>~{priceFeed.intervalMs / 1000}s</span>
-                      </>
+                    {priceFeed.status === "error" && (
+                      <span style={{ color: "var(--danger)", fontWeight: 600 }}>Feed error</span>
                     )}
                   </span>
-                )}
+                ) : null}
               </span>
             </div>
           </div>
+          {priceFeed?.status === "error" && priceFeed.errorMessage ? (
+            <p style={s.feedError} role="alert">
+              {priceFeed.errorMessage}
+            </p>
+          ) : null}
+          {priceFeed?.status === "connecting" ? (
+            <p style={s.feedConnecting}>Loading Hyperliquid index prices…</p>
+          ) : null}
           <div className="perps-mark-grid" role="group" aria-label="Index mid prices (read-only)">
             {PERP_SYMBOLS.map((sym) => (
               <div key={sym} style={{ ...s.markCell, ...s.markCellDisplay }}>
                 <span style={s.markSym}>{PERP_META[sym].short}</span>
-                <span style={s.markPx}>{formatPrice(marks[sym])}</span>
+                <span style={s.markPx}>{feedLive ? formatPrice(marks[sym]) : "—"}</span>
               </div>
             ))}
           </div>
           <p style={s.chartHint}>
-            {priceFeed
+            {feedLive && priceFeed
               ? `Hyperliquid: allMids for BTC, ETH, SOL; HIP-3 dex xyz markPx for GOLD, SILVER, CL (OIL). ~${priceFeed.intervalMs / 1000}s poll. Fixed ${DEFAULT_PERP_LEVERAGE}×: PnL = margin × (Δindex) × ${DEFAULT_PERP_LEVERAGE}; remaining = margin + PnL (≤0 ⇒ wiped).`
-              : `Fixed ${DEFAULT_PERP_LEVERAGE}× leverage: PnL = margin × (Δindex) × ${DEFAULT_PERP_LEVERAGE}; remaining = margin + PnL. Updates on a timer—no funding or slip.`}
+              : "Prices come only from Hyperliquid (both main and xyz feeds). Trading is disabled until the feed is live."}
           </p>
         </div>
 
@@ -227,10 +238,10 @@ export default function PerpsTradeScreen({
           </p>
 
           {showMechanics && (
-            <div className="mono" style={s.est}>
+              <div className="mono" style={s.est}>
               <div style={s.estRow}>
                 <span style={{ color: "var(--muted)" }}>Mark {PERP_META[symbol].short}</span>
-                <span>{formatPrice(mark)}</span>
+                <span>{feedLive ? formatPrice(mark) : "—"}</span>
               </div>
               <div style={s.estRow}>
                 <span style={{ color: "var(--muted)" }}>Exposure (margin × lev)</span>
@@ -245,15 +256,20 @@ export default function PerpsTradeScreen({
               ...s.submit,
               ...(side === "long" ? s.submitLong : s.submitShort),
             }}
-            disabled={margin > qusdUnlocked + 1e-9 || allocateQusd <= 0}
+            disabled={!feedLive || margin > qusdUnlocked + 1e-9 || allocateQusd <= 0}
             onClick={place}
           >
             {directionLabel(side)} on {PERP_META[symbol].short}
             {showMechanics ? ` · market ${side} ${symbol}` : ""}
           </button>
-          {margin > qusdUnlocked + 1e-9 && allocateQusd > 0 && (
+          {!feedLive ? (
+            <p style={s.warn} role="status">
+              Open trades are disabled until Hyperliquid prices load.
+            </p>
+          ) : null}
+          {feedLive && margin > qusdUnlocked + 1e-9 && allocateQusd > 0 ? (
             <p style={s.warn}>Allocate at most {formatUsd(qusdUnlocked)} QUSD (unlocked balance).</p>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -275,18 +291,26 @@ export default function PerpsTradeScreen({
               <QusdIcon size={14} />
               <span>
                 QUSD (Profit/Loss){" "}
-                <span style={{ color: totalUpl >= 0 ? "var(--ok)" : "var(--danger)" }}>
-                  {totalUpl >= 0 ? "+" : ""}
-                  {formatUsd(totalUpl)}
-                </span>
+                {feedLive ? (
+                  <span style={{ color: totalUpl >= 0 ? "var(--ok)" : "var(--danger)" }}>
+                    {totalUpl >= 0 ? "+" : ""}
+                    {formatUsd(totalUpl)}
+                  </span>
+                ) : (
+                  <span style={{ color: "var(--muted)" }}>—</span>
+                )}
               </span>
             </span>
             <span>
               Remaining{" "}
-              <span style={{ color: totalNetQusd >= 0 ? "var(--text)" : "var(--danger)" }}>
-                {totalNetQusd >= 0 ? "+" : ""}
-                {formatUsd(totalNetQusd)}
-              </span>
+              {feedLive ? (
+                <span style={{ color: totalNetQusd >= 0 ? "var(--text)" : "var(--danger)" }}>
+                  {totalNetQusd >= 0 ? "+" : ""}
+                  {formatUsd(totalNetQusd)}
+                </span>
+              ) : (
+                <span style={{ color: "var(--muted)" }}>—</span>
+              )}
             </span>
           </div>
         </div>
@@ -319,10 +343,10 @@ export default function PerpsTradeScreen({
               <tbody>
                 {positions.map((p) => {
                   const m = marks[p.symbol];
-                  const upl = computeUnrealizedPnl(p, m);
-                  const net = positionNetQusd(p, m);
-                  const atWipe = net <= 1e-9;
-                  const pct = marketPriceChangeSinceEntryPct(p, m);
+                  const upl = feedLive ? computeUnrealizedPnl(p, m) : NaN;
+                  const net = feedLive ? positionNetQusd(p, m) : NaN;
+                  const atWipe = feedLive && net <= 1e-9;
+                  const pct = feedLive ? marketPriceChangeSinceEntryPct(p, m) : NaN;
                   return (
                     <tr key={p.id}>
                       <td>{PERP_META[p.symbol].short}</td>
@@ -337,43 +361,61 @@ export default function PerpsTradeScreen({
                       <td
                         className="mono"
                         style={{
-                          color: pct > 0 ? "var(--ok)" : pct < 0 ? "var(--danger)" : "var(--muted)",
+                          color: !feedLive
+                            ? "var(--muted)"
+                            : pct > 0
+                              ? "var(--ok)"
+                              : pct < 0
+                                ? "var(--danger)"
+                                : "var(--muted)",
                         }}
                       >
-                        {formatPctSigned(pct)}
+                        {feedLive ? formatPctSigned(pct) : "—"}
                       </td>
                       {showMechanics && (
                         <>
                           <td className="mono">{formatPrice(p.entryPrice)}</td>
-                          <td className="mono">{formatPrice(m)}</td>
+                          <td className="mono">{feedLive ? formatPrice(m) : "—"}</td>
                           <td className="mono">{p.leverage}×</td>
                           <td className="mono">{formatUsd(p.marginUsdc)}</td>
                           <td className="mono">{formatUsd(p.notionalUsdc)}</td>
                         </>
                       )}
                       <td className="mono" style={{ color: upl >= 0 ? "var(--ok)" : "var(--danger)" }}>
-                        <span aria-hidden style={{ marginRight: 4, opacity: 0.85 }}>
-                          {upl >= 0 ? "↑" : "↓"}
-                        </span>
-                        {upl >= 0 ? "+" : ""}
-                        {formatUsd(upl)}
+                        {feedLive ? (
+                          <>
+                            <span aria-hidden style={{ marginRight: 4, opacity: 0.85 }}>
+                              {upl >= 0 ? "↑" : "↓"}
+                            </span>
+                            {upl >= 0 ? "+" : ""}
+                            {formatUsd(upl)}
+                          </>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className="mono">
-                        <span
-                          style={{
-                            color: atWipe ? "var(--danger)" : net >= 0 ? "var(--ok)" : "var(--danger)",
-                            fontWeight: atWipe ? 700 : undefined,
-                          }}
-                          title={`Margin ${formatUsd(p.marginUsdc)} + Δ ${upl >= 0 ? "+" : ""}${formatUsd(upl)}`}
-                        >
-                          {net >= 0 ? "+" : ""}
-                          {formatUsd(net)}
-                        </span>
-                        {showMechanics && atWipe ? (
-                          <span style={{ display: "block", fontSize: 10, color: "var(--danger)", marginTop: 2 }}>
-                            wiped (remaining ≤ 0)
-                          </span>
-                        ) : null}
+                        {feedLive ? (
+                          <>
+                            <span
+                              style={{
+                                color: atWipe ? "var(--danger)" : net >= 0 ? "var(--ok)" : "var(--danger)",
+                                fontWeight: atWipe ? 700 : undefined,
+                              }}
+                              title={`Margin ${formatUsd(p.marginUsdc)} + Δ ${upl >= 0 ? "+" : ""}${formatUsd(upl)}`}
+                            >
+                              {net >= 0 ? "+" : ""}
+                              {formatUsd(net)}
+                            </span>
+                            {showMechanics && atWipe ? (
+                              <span style={{ display: "block", fontSize: 10, color: "var(--danger)", marginTop: 2 }}>
+                                wiped (remaining ≤ 0)
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td>
                         <button type="button" style={s.closeBtn} onClick={() => onClose(p.id)}>
@@ -517,6 +559,17 @@ const s: Record<string, CSSProperties> = {
     fontVariantNumeric: "tabular-nums",
     lineHeight: 1.2,
   },
+  feedError: {
+    margin: "0 0 12px",
+    padding: "10px 12px",
+    borderRadius: 8,
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: "var(--danger)",
+    background: "color-mix(in srgb, var(--danger) 12%, var(--surface))",
+    border: "1px solid color-mix(in srgb, var(--danger) 35%, var(--border))",
+  },
+  feedConnecting: { margin: "0 0 12px", fontSize: 13, color: "var(--muted)" },
   chartHint: { margin: "14px 0 0", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 },
   orderCard: {
     background: "var(--surface)",
