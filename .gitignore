@@ -2,7 +2,9 @@ node_modules
 dist
 *.tsbuildinfo
 .env
+backend/.env
 .env.local
 *.local
 data/*.db
 data/*.sqlite
+data/backups/
