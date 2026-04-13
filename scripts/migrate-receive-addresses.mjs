@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Adds sol_receive_address to existing insured.db files (legacy installs).
+ * Adds sol_receive_address to existing account DB files (legacy installs).
  * EVM columns are no longer used; run db/migrations/003_drop_evm_receive.sql if present.
  */
 import path from "node:path";
@@ -9,7 +9,7 @@ import Database from "better-sqlite3";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
-const outPath = process.argv[2] ?? path.join(root, "data", "insured.db");
+const outPath = process.argv[2] ?? path.join(root, "data", "solvequest.db");
 
 const db = new Database(outPath);
 try {

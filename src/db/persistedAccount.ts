@@ -14,7 +14,7 @@ export type PersistedAccountRow = {
   premium_accrued_usdc: number;
   covered_losses_qusd: number;
   coverage_used_qusd: number;
-  insurance_tier_id: 1 | 2 | 3;
+  tier_id: 1 | 2 | 3;
   qusd_unlocked: number;
   qusd_locked: number;
   accumulated_losses_qusd: number;

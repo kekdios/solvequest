@@ -252,7 +252,7 @@ select {
   color: rgba(255, 255, 255, 0.85);
 }
 
-/* App pages (Account, Insurance, Auth, Quick Start, Admin) — log rows + shared root */
+/* App pages (Account, Auth, Quick Start, Admin, etc.) — log rows + shared root */
 .app-page .app-page-log-row {
   transition: background-color 0.12s ease;
 }

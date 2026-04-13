@@ -13,7 +13,7 @@
 
 ## Current state (baseline)
 
-- App state (insurance, perps, QUSD vault) largely in React **reducer** + some **localStorage** (`accountReceiveAddresses`, deposit ledger, etc.).
+- App state (perps, QUSD vault, account) largely in React **reducer** + some **localStorage** (`accountReceiveAddresses`, deposit ledger, etc.).
 - **Solana receive keypair** is created in the browser on load (`getOrCreateAccountReceiveWallet`) — **conflicts** with custodial + demo-only requirements.
 - **No** email/OTP, **no** backend session, **no** admin area.
 
@@ -34,7 +34,7 @@
 
 **Behavior**
 
-- First visit → **demo session** initialized with same **bonus QUSD** and rules as today, stored under a **demo-specific** storage key (e.g. `insured-demo-v1`).
+- First visit → **demo session** initialized with same **bonus QUSD** and rules as today, stored under a **demo-specific** storage key (e.g. `sq-demo-session-v1`).
 - Header: show **`Demo`** (and optionally “Register to save & deposit” CTA).
 - **Do not** call `getOrCreateAccountReceiveWallet` or any custodial Solana UI while `authMode === 'demo'`.
 - **Do not** show deposit address / custody panel in demo (or show disabled placeholder with copy).
@@ -76,7 +76,7 @@
 ## Phase 3 — Align existing features with modes
 
 - **Account screen**: Deposit / custody **only** when registered; show registration prompt in demo.
-- **Insurance / perps**: Decide: **allowed in demo** (current product ask: yes, with bonus QUSD) vs server-synced state after registration — document in reducer persistence layer.
+- **Perps / loss caps**: Decide: **allowed in demo** (current product ask: yes, with bonus QUSD) vs server-synced state after registration — document in reducer persistence layer.
 - **Custody monitor / sweep**: Run **server-side workers** with keys derived same as deposit (future phase); client can show **read-only** balance via API if needed.
 - Remove or gate **`VITE_SOLANA_TEST_SECRET_KEY_B64`** paths for production builds.
 

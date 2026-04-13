@@ -1,13 +1,13 @@
 /**
  * Persists demo-mode app state to localStorage (no server, no registration).
  */
-import { createAccount } from "../engine/insurance";
-import { applyTierToAccount, DEFAULT_INSURANCE_TIER_ID } from "../engine/insuranceTiers";
-import { INITIAL_COVERAGE_WARN_FLAGS } from "../engine/coverageWarnings";
+import { createAccount } from "../engine/accountCore";
+import { applyTierToAccount, DEFAULT_TIER_ID } from "../engine/tiers";
+import { INITIAL_SESSION_WARN_FLAGS } from "./demoSessionTypes";
 import { DEFAULT_PERP_LEVERAGE, INITIAL_MARKS } from "../engine/perps";
 import type { DemoAppState } from "./demoSessionTypes";
 
-const STORAGE_KEY = "insured-demo-session-v1";
+const STORAGE_KEY = "sq-demo-session-v1";
 const SCHEMA_VERSION = 1;
 
 type StoredEnvelope = {
@@ -17,12 +17,11 @@ type StoredEnvelope = {
 
 export function getDefaultDemoAppState(): DemoAppState {
   return {
-    account: applyTierToAccount(createAccount("demo", 0), DEFAULT_INSURANCE_TIER_ID),
-    insuranceTierId: DEFAULT_INSURANCE_TIER_ID,
+    account: applyTierToAccount(createAccount("demo", 0), DEFAULT_TIER_ID),
     log: [],
     perpPositions: [],
     marks: { ...INITIAL_MARKS },
-    coverageWarnFlags: INITIAL_COVERAGE_WARN_FLAGS,
+    sessionWarnFlags: INITIAL_SESSION_WARN_FLAGS,
     accumulatedLossesQusd: 0,
     qusd: { unlocked: 10_000, locked: 0 },
     bonusRepaidUsdc: 0,

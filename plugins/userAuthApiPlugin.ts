@@ -319,20 +319,20 @@ export function userAuthApiPlugin(): Plugin {
     } as Record<string, string>;
     if (!env.JWT_SECRET || env.JWT_SECRET === "change-this-secret-key") {
       server.config.logger.warn(
-        "insured-user-auth: set JWT_SECRET in .env to enable /api/auth (email OTP + sessions)",
+        "solvequest-user-auth: set JWT_SECRET in .env to enable /api/auth (email OTP + sessions)",
       );
     }
     if (!env.RESEND_API_KEY) {
-      server.config.logger.warn("insured-user-auth: set RESEND_API_KEY in .env to send OTP emails");
+      server.config.logger.warn("solvequest-user-auth: set RESEND_API_KEY in .env to send OTP emails");
     }
     if (!env.EMAIL_FROM_AUTH) {
-      server.config.logger.warn("insured-user-auth: set EMAIL_FROM_AUTH (e.g. onboarding@yourdomain.com)");
+      server.config.logger.warn("solvequest-user-auth: set EMAIL_FROM_AUTH (e.g. onboarding@yourdomain.com)");
     }
     server.middlewares.use(createUserAuthMiddleware(env, server.config.mode));
   };
 
   return {
-    name: "insured-user-auth",
+    name: "solvequest-user-auth",
     configureServer(server) {
       attach(server);
     },

@@ -10,7 +10,7 @@ import { loadEnv } from "vite";
 import { PublicKey } from "@solana/web3.js";
 import nacl from "tweetnacl";
 
-const COOKIE = "insured_admin";
+const COOKIE = "sq_admin_session";
 const NONCE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -48,7 +48,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
 function buildMessage(nonce: string): string {
   const issued = new Date().toISOString();
   return [
-    "Insured Theater — admin sign-in",
+    "Solve Quest — admin sign-in",
     "",
     `Nonce: ${nonce}`,
     `Issued (UTC): ${issued}`,
@@ -234,14 +234,14 @@ export function adminApiPlugin(): Plugin {
     } as Record<string, string>;
     const raw = env.ADMIN_SOLANA_ADDRESS ?? "";
     if (!raw.trim()) {
-      server.config.logger.warn("insured-admin-api: set ADMIN_SOLANA_ADDRESS in .env to enable /api/admin");
+      server.config.logger.warn("solvequest-admin-api: set ADMIN_SOLANA_ADDRESS in .env to enable /api/admin");
       return;
     }
     server.middlewares.use(createAdminApiMiddleware(env, server.config.mode));
   };
 
   return {
-    name: "insured-admin-api",
+    name: "solvequest-admin-api",
     configureServer(server) {
       attach(server);
     },

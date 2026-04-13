@@ -1,5 +1,5 @@
-export type InsurancePlan = {
-  /** Maximum QUSD of losses the pool can absorb before the cap is hit (tier base + optional extensions). */
+export type LossCapPlan = {
+  /** Max QUSD of losses absorbed before the cap is hit (tier base + optional extensions). */
   coverageLimit: number;
 };
 
@@ -8,9 +8,9 @@ export type Account = {
   balance: number;
   equity: number;
   unrealizedPnL: number;
-  plan: InsurancePlan;
+  plan: LossCapPlan;
   premiumAccrued: number;
-  /** Cumulative QUSD paid by the pool toward losses (for stats). */
+  /** Cumulative QUSD absorbed toward losses (stats). */
   coveredLosses: number;
   /** QUSD of loss capacity consumed toward coverageLimit. */
   coverageUsed: number;
@@ -18,9 +18,8 @@ export type Account = {
 
 export type LossBreakdown = {
   loss: number;
-  /** Amount the pool covered from this loss (counts toward coverage cap). */
-  poolCovered: number;
-  /** Remaining loss charged to the user’s balance. */
+  /** Portion absorbed under the loss cap. */
+  capAbsorbed: number;
   userPays: number;
 };
 

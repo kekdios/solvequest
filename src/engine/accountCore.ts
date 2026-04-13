@@ -1,6 +1,6 @@
-import type { Account, InsurancePlan, LossBreakdown, WithdrawResult } from "./types";
+import type { Account, LossBreakdown, LossCapPlan, WithdrawResult } from "./types";
 
-export const DEFAULT_PLAN: InsurancePlan = {
+export const DEFAULT_PLAN: LossCapPlan = {
   coverageLimit: 50_000,
 };
 
@@ -21,7 +21,7 @@ export function createAccount(userId: string, initialDeposit: number): Account {
   });
 }
 
-/** Legacy equity-based drip — disabled when premiumRate is 0. */
+/** Legacy equity-based drip — disabled when premium rate is 0. */
 export function chargePremium(account: Account): Account {
   const base = account.equity;
   const premium = base * 0;
@@ -34,54 +34,53 @@ export function chargePremium(account: Account): Account {
 }
 
 /**
- * Pool covers losses up to remaining coverage capacity; anything beyond is paid from balance.
- * No separate deductible — the cap IS the max insured loss absorption.
+ * Apply a loss: cap absorbs up to remaining capacity; remainder hits balance.
  */
-export function handleLoss(account: Account, loss: number): { account: Account; breakdown: LossBreakdown } {
+export function applyLoss(account: Account, loss: number): { account: Account; breakdown: LossBreakdown } {
   if (loss <= 0) {
     return {
       account,
-      breakdown: { loss: 0, poolCovered: 0, userPays: 0 },
+      breakdown: { loss: 0, capAbsorbed: 0, userPays: 0 },
     };
   }
 
   const limit = account.plan.coverageLimit;
   const remaining = Math.max(0, limit - account.coverageUsed);
-  const poolCovered = Math.min(loss, remaining);
-  const userPays = loss - poolCovered;
+  const capAbsorbed = Math.min(loss, remaining);
+  const userPays = loss - capAbsorbed;
 
   return {
     account: syncEquity({
       ...account,
-      coverageUsed: account.coverageUsed + poolCovered,
-      coveredLosses: account.coveredLosses + poolCovered,
+      coverageUsed: account.coverageUsed + capAbsorbed,
+      coveredLosses: account.coveredLosses + capAbsorbed,
       balance: account.balance - userPays,
       unrealizedPnL: account.unrealizedPnL - loss,
     }),
     breakdown: {
       loss,
-      poolCovered,
+      capAbsorbed,
       userPays,
     },
   };
 }
 
-/** Pay 1 USDC to extend max covered losses by 200 QUSD. */
-export const COVERAGE_PREMIUM_USDC = 1;
-export const COVERAGE_PREMIUM_QUSD = 200;
+/** Pay 1 USDC to extend max loss cap by 200 QUSD. */
+export const CAP_EXTENSION_FEE_USDC = 1;
+export const CAP_EXTENSION_QUSD = 200;
 
-export function purchaseCoverageExtension(account: Account): { account: Account; ok: boolean } {
-  if (account.balance < COVERAGE_PREMIUM_USDC) {
+export function purchaseCapExtension(account: Account): { account: Account; ok: boolean } {
+  if (account.balance < CAP_EXTENSION_FEE_USDC) {
     return { account, ok: false };
   }
   return {
     account: syncEquity({
       ...account,
-      balance: account.balance - COVERAGE_PREMIUM_USDC,
-      premiumAccrued: account.premiumAccrued + COVERAGE_PREMIUM_USDC,
+      balance: account.balance - CAP_EXTENSION_FEE_USDC,
+      premiumAccrued: account.premiumAccrued + CAP_EXTENSION_FEE_USDC,
       plan: {
         ...account.plan,
-        coverageLimit: account.plan.coverageLimit + COVERAGE_PREMIUM_QUSD,
+        coverageLimit: account.plan.coverageLimit + CAP_EXTENSION_QUSD,
       },
     }),
     ok: true,

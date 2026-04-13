@@ -2,7 +2,7 @@
  * Idempotent deposit ledger + scan watermarks (browser localStorage).
  * Server-side: mirror in `deposit_credits` SQLite table (see db/migrations).
  */
-const LEDGER_PREFIX = "insured-deposit-ledger-v1";
+const LEDGER_PREFIX = "sq-deposit-ledger-v1";
 
 export type CustodyLedger = {
   /** Processed tx signatures — never credit twice. */

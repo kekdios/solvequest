@@ -5,8 +5,7 @@
 import { Keypair } from "@solana/web3.js";
 import { clearDepositLedger } from "../deposit/depositLedger";
 
-const STORAGE_KEY = "insured-account-receive-v2";
-const LEGACY_TEST_KEY = "insured-test-receive-wallet-v1";
+const STORAGE_KEY = "sq-account-receive-v2";
 
 /** Base64-encoded 64-byte secret (`solSecretKeyB64` style). When set, overrides generated localStorage key. */
 function testSecretKeyB64FromEnv(): string | null {
@@ -73,22 +72,6 @@ function parseStored(raw: string): StoredPayload | null {
   }
 }
 
-/** Move legacy test-only storage into per-account format. */
-function migrateLegacyIfNeeded(): void {
-  if (typeof window === "undefined" || !window.localStorage) return;
-  if (window.localStorage.getItem(STORAGE_KEY)) return;
-  const leg = window.localStorage.getItem(LEGACY_TEST_KEY);
-  if (!leg) return;
-  try {
-    const j = JSON.parse(leg) as { evmPrivateKey?: string; solSecretKeyB64: string };
-    const accountId = crypto.randomUUID();
-    const next: StoredPayload = { accountId, solSecretKeyB64: j.solSecretKeyB64 };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    window.localStorage.removeItem(LEGACY_TEST_KEY);
-  }
-}
-
 function loadOrCreate(): AccountReceiveWallet {
   if (typeof window === "undefined" || !window.localStorage) {
     throw new Error("Receive wallet only runs in the browser");
@@ -102,8 +85,6 @@ function loadOrCreate(): AccountReceiveWallet {
       solAddress: solKp.publicKey.toBase58(),
     };
   }
-
-  migrateLegacyIfNeeded();
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -167,7 +148,6 @@ export function resetAccountReceiveWallet(): void {
       clearDepositLedger(testAccountIdFromEnv());
     }
     window.localStorage.removeItem(STORAGE_KEY);
-    window.localStorage.removeItem(LEGACY_TEST_KEY);
   }
 }
 
@@ -185,7 +165,6 @@ export function getSolanaKeypairFromStorage(): Keypair | null {
     }
   }
   if (typeof window === "undefined" || !window.localStorage) return null;
-  migrateLegacyIfNeeded();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;

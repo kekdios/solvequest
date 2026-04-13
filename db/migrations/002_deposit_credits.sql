@@ -1,5 +1,5 @@
--- On-chain deposit credits (mirror of browser `insured-deposit-ledger-v1` for server workers / reconciliation).
--- Apply with: sqlite3 data/insured.db < db/migrations/002_deposit_credits.sql
+-- On-chain deposit credits (mirror of browser deposit ledger localStorage for server workers / reconciliation).
+-- Apply with: sqlite3 data/solvequest.db < db/migrations/002_deposit_credits.sql
 
 CREATE TABLE IF NOT EXISTS deposit_credits (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

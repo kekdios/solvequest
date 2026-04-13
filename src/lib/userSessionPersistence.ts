@@ -5,7 +5,7 @@
 import { DEFAULT_PERP_LEVERAGE } from "../engine/perps";
 import type { PerpPosition } from "../engine/perps";
 
-const KEY_PREFIX = "insured-user-perp-v1:";
+const KEY_PREFIX = "sq-user-perp-v1:";
 const SCHEMA_VERSION = 1;
 
 type Stored = {

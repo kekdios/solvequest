@@ -9,8 +9,6 @@ import {
   PERP_META,
   PERP_SYMBOLS,
 } from "../engine/perps";
-import type { InsuranceTierId } from "../engine/insuranceTiers";
-import { getInsuranceTier } from "../engine/insuranceTiers";
 import { QusdAmount, QusdIcon } from "../Qusd";
 
 type Props = {
@@ -23,21 +21,12 @@ type Props = {
     leverage: number;
   }) => void;
   onClose: (positionId: string) => void;
-  insuranceTierId: InsuranceTierId;
-  /** Wired to the same `handleLoss` path as losing perp closes—pitch stats. */
-  insurance?: {
-    coveredLosses: number;
-    premiumAccrued: number;
-    coverageUsed: number;
-    coverageLimit: number;
-  };
   /** Live index feed (e.g. Hyperliquid allMids). */
   priceFeed?: {
     status: "connecting" | "live" | "partial";
     intervalMs: number;
     sourceLabel: string;
   };
-  onNavigateToInsurance: () => void;
   onNavigateToAccount: () => void;
   qusdUnlocked: number;
   qusdLocked: number;
@@ -52,10 +41,7 @@ export default function PerpsTradeScreen({
   positions,
   onOpen,
   onClose,
-  insuranceTierId,
-  insurance,
   priceFeed,
-  onNavigateToInsurance,
   onNavigateToAccount,
   qusdUnlocked,
   qusdLocked,
@@ -94,8 +80,6 @@ export default function PerpsTradeScreen({
       }, 0),
     [positions, marks],
   );
-
-  const activeTier = getInsuranceTier(insuranceTierId);
 
   const place = () => {
     if (allocateQusd <= 0) return;
@@ -404,55 +388,6 @@ export default function PerpsTradeScreen({
           </div>
         )}
       </div>
-
-      {insurance && (
-        <div style={s.insuranceStrip}>
-          <div style={s.insuranceStripInner}>
-            <p style={s.insuranceStripTitle}>Smart Pool Insurance</p>
-            <p style={s.insuranceStripBody}>
-              Winning closes contribute to the pool by tier. Change tier on the{" "}
-              <button type="button" style={s.insuranceNavLink} onClick={onNavigateToInsurance}>
-                Insurance
-              </button>{" "}
-              tab when you have no open positions.{" "}
-              {showMechanics && (
-                <span style={{ color: "var(--muted)" }}>
-                  Engine: pool covers losses up to your tier cap; then you pay; at cap, remaining positions close.
-                </span>
-              )}
-            </p>
-            <div style={s.activeTierOnly}>
-              <p style={s.activeTierLabel}>Active coverage</p>
-              <div style={s.activeTierRow}>
-                <span style={s.activeTierBadge}>Tier {activeTier.id}</span>
-                <span style={s.activeTierDetail}>
-                  <strong>{(activeTier.winningsPct * 100).toFixed(0)}%</strong> of winnings to pool ·{" "}
-                  <QusdIcon size={14} />
-                  <span className="mono">{activeTier.maxLossCoveredQusd.toLocaleString()} QUSD</span> max insured losses
-                </span>
-              </div>
-            </div>
-            <div className="mono" style={s.insuranceMetrics}>
-              <span style={s.insuranceMetricItem}>
-                Pool paid for you:{" "}
-                <QusdAmount value={insurance.coveredLosses} strong color="var(--ok)" />
-              </span>
-              <span style={{ color: "var(--muted)" }}>·</span>
-              <span style={s.insuranceMetricItem}>
-                Your contribution to pool:{" "}
-                <QusdAmount value={insurance.premiumAccrued} strong color="var(--accent)" />
-              </span>
-              <span style={{ color: "var(--muted)" }}>·</span>
-              <span style={{ ...s.insuranceMetricItem, alignItems: "center" }}>
-                <QusdIcon size={14} />
-                <span>
-                  Coverage {formatUsd(insurance.coverageUsed)} / {formatUsd(insurance.coverageLimit)} QUSD
-                </span>
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -498,95 +433,6 @@ const s: Record<string, CSSProperties> = {
   qusdPageStripInner: { display: "inline-flex", flexWrap: "wrap", alignItems: "baseline", gap: 6 },
   qusdPageStripQ: { fontWeight: 600, color: "var(--text)" },
   qusdPageStripSep: { opacity: 0.45, userSelect: "none" },
-  insuranceStrip: {
-    background: "linear-gradient(135deg, color-mix(in srgb, var(--ok) 8%, var(--panel)) 0%, var(--surface) 100%)",
-    border: "1px solid color-mix(in srgb, var(--ok) 22%, var(--border))",
-    borderRadius: 12,
-    padding: "14px 18px",
-  },
-  insuranceStripInner: { maxWidth: 900 },
-  insuranceStripTitle: {
-    margin: "0 0 8px",
-    fontSize: 12,
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    color: "var(--ok)",
-  },
-  insuranceStripBody: {
-    margin: "0 0 12px",
-    fontSize: 13,
-    lineHeight: 1.55,
-    color: "var(--muted)",
-  },
-  insuranceCode: {
-    fontFamily: "var(--mono)",
-    fontSize: 12,
-    color: "var(--accent)",
-  },
-  insuranceNavLink: {
-    background: "none",
-    border: "none",
-    padding: 0,
-    margin: 0,
-    font: "inherit",
-    fontWeight: 700,
-    color: "var(--accent)",
-    textDecoration: "underline",
-    cursor: "pointer",
-  },
-  insuranceMetrics: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px 14px",
-    fontSize: 12,
-    alignItems: "center",
-    marginTop: 12,
-  },
-  activeTierOnly: {
-    marginTop: 14,
-    padding: "12px 14px",
-    borderRadius: 10,
-    border: "1px solid color-mix(in srgb, var(--accent) 28%, var(--border))",
-    background: "color-mix(in srgb, var(--accent) 6%, var(--bg))",
-  },
-  activeTierLabel: {
-    margin: "0 0 8px",
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    color: "var(--accent)",
-  },
-  activeTierRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "10px 14px",
-  },
-  activeTierBadge: {
-    fontSize: 12,
-    fontWeight: 700,
-    padding: "4px 10px",
-    borderRadius: 8,
-    background: "color-mix(in srgb, var(--accent) 18%, transparent)",
-    color: "var(--text)",
-  },
-  activeTierDetail: {
-    fontSize: 13,
-    color: "var(--muted)",
-    lineHeight: 1.5,
-    display: "inline-flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 6,
-  },
-  insuranceMetricItem: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 5,
-    flexWrap: "wrap",
-  },
   chartHeaderActions: {
     display: "flex",
     flexWrap: "wrap",

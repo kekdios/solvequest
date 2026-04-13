@@ -3,24 +3,25 @@
  * Keep in sync with the root reducer in `App.tsx`.
  */
 import type { Account } from "../engine/types";
-import type { CoverageWarnFlags } from "../engine/coverageWarnings";
-import type { InsuranceTierId } from "../engine/insuranceTiers";
 import type { PerpPosition, PerpSymbol } from "../engine/perps";
+
+export type SessionWarnFlags = { w10: boolean; w5: boolean; w1: boolean };
+
+export const INITIAL_SESSION_WARN_FLAGS: SessionWarnFlags = { w10: false, w5: false, w1: false };
 
 export type DemoLogEntry = {
   id: string;
   t: number;
-  kind: "info" | "loss" | "premium" | "block" | "coverage";
+  kind: "info" | "loss" | "premium" | "block" | "alert";
   message: string;
 };
 
 export type DemoAppState = {
   account: Account;
-  insuranceTierId: InsuranceTierId;
   log: DemoLogEntry[];
   perpPositions: PerpPosition[];
   marks: Record<PerpSymbol, number>;
-  coverageWarnFlags: CoverageWarnFlags;
+  sessionWarnFlags: SessionWarnFlags;
   accumulatedLossesQusd: number;
   qusd: { unlocked: number; locked: number };
   bonusRepaidUsdc: number;

@@ -11,7 +11,7 @@ import { Keypair } from "@solana/web3.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
-const outPath = process.argv[2] ?? path.join(root, "data", "insured.db");
+const outPath = process.argv[2] ?? path.join(root, "data", "solvequest.db");
 
 const id = crypto.randomUUID();
 const now = Date.now();
@@ -36,12 +36,12 @@ try {
     INSERT INTO accounts (
       id, created_at, updated_at, label, email,
       usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd, coverage_used_qusd,
-      insurance_tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd,
+      tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd,
       sol_receive_address
     ) VALUES (
       @id, @created_at, @updated_at, NULL, NULL,
       @usdc_balance, @coverage_limit_qusd, 0, 0, 0,
-      @insurance_tier_id, @qusd_unlocked, 0, 0,
+      @tier_id, @qusd_unlocked, 0, 0,
       @sol_receive_address
     )
   `);
@@ -51,7 +51,7 @@ try {
     updated_at: now,
     usdc_balance: 0,
     coverage_limit_qusd: 50_000,
-    insurance_tier_id: 3,
+    tier_id: 3,
     qusd_unlocked: 10_000,
     sol_receive_address: solAddr,
   });

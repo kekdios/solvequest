@@ -1,6 +1,5 @@
-import { syncEquity } from "../engine/insurance";
+import { syncEquity } from "../engine/accountCore";
 import type { Account } from "../engine/types";
-import type { InsuranceTierId } from "../engine/insuranceTiers";
 import type { PersistedAccountRow } from "../db/persistedAccount";
 
 /** Reducer slice from GET /api/account/me (SQLite row JSON). */
@@ -8,7 +7,6 @@ export function persistedRowToAppSlice(row: PersistedAccountRow) {
   const userId = row.email ?? row.id;
   return {
     account: accountRowToAccount(row, userId),
-    insuranceTierId: accountRowToInsuranceTierId(row),
     qusd: {
       unlocked: Number(row.qusd_unlocked),
       locked: Number(row.qusd_locked),
@@ -19,7 +17,7 @@ export function persistedRowToAppSlice(row: PersistedAccountRow) {
 
 /**
  * Maps a SQLite `accounts` row (from GET /api/account/me) into engine `Account` + app fields.
- * `coverage_limit_qusd` is authoritative (tier + premium extensions).
+ * `coverage_limit_qusd` is authoritative (tier + cap extensions).
  */
 export function accountRowToAccount(row: PersistedAccountRow, userId: string): Account {
   const balance = Number(row.usdc_balance);
@@ -35,10 +33,4 @@ export function accountRowToAccount(row: PersistedAccountRow, userId: string): A
     coveredLosses: Number(row.covered_losses_qusd),
     coverageUsed: Number(row.coverage_used_qusd),
   });
-}
-
-export function accountRowToInsuranceTierId(row: PersistedAccountRow): InsuranceTierId {
-  const t = Number(row.insurance_tier_id);
-  if (t === 1 || t === 2 || t === 3) return t;
-  return 3;
 }

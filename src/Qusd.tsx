@@ -19,7 +19,7 @@ export function QusdIcon({ size = 14, style }: { size?: number; style?: CSSPrope
   );
 }
 
-/** Formatted insurance / pool amounts in QUSD with icon (numbers are still plain floats in state). */
+/** Formatted pool / vault amounts in QUSD with icon (numbers are still plain floats in state). */
 export function QusdAmount({
   value,
   maximumFractionDigits = 2,

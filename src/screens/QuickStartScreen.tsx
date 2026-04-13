@@ -4,7 +4,6 @@ import { uiBtnGhost, uiBtnPrimary, uiPosCard } from "../ui/appSurface";
 type Props = {
   onGoToPerps: () => void;
   onGoToAccount: () => void;
-  onGoToInsurance: () => void;
 };
 
 const STEPS: { title: string; body: string }[] = [
@@ -36,12 +35,7 @@ const STEPS: { title: string; body: string }[] = [
   {
     title: "Manage the trade",
     body:
-      "On **Perpetuals**, your open positions appear in the table below the order form. Use **Close** to exit. Wins and losses settle in QUSD; insurance rules apply per your tier (see **Insurance**).",
-  },
-  {
-    title: "Insurance (before you size up)",
-    body:
-      "Pick a **Smart Pool Insurance** tier when you have **no** open positions. Tier sets max insured losses and how much of winning closes go to the pool.",
+      "On **Perpetuals**, your open positions appear in the table below the order form. Use **Close** to exit. Settlement is **margin + PnL** back to unlocked QUSD.",
   },
 ];
 
@@ -62,7 +56,7 @@ function renderBody(text: string) {
   return out;
 }
 
-export default function QuickStartScreen({ onGoToPerps, onGoToAccount, onGoToInsurance }: Props) {
+export default function QuickStartScreen({ onGoToPerps, onGoToAccount }: Props) {
   return (
     <div className="app-page" style={s.wrap}>
       <p style={s.lead}>
@@ -90,9 +84,6 @@ export default function QuickStartScreen({ onGoToPerps, onGoToAccount, onGoToIns
         </button>
         <button type="button" style={s.btnGhost} onClick={onGoToAccount}>
           Account
-        </button>
-        <button type="button" style={s.btnGhost} onClick={onGoToInsurance}>
-          Insurance
         </button>
       </div>
 

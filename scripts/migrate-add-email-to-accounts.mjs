@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Adds `email` + unique index to existing insured.db (idempotent).
+ * Adds `email` + unique index to existing account DB (idempotent).
  * Usage: node scripts/migrate-add-email-to-accounts.mjs [path/to/db.sqlite]
  */
 import fs from "node:fs";
@@ -10,7 +10,7 @@ import Database from "better-sqlite3";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
-const outPath = process.argv[2] ?? path.join(root, "data", "insured.db");
+const outPath = process.argv[2] ?? path.join(root, "data", "solvequest.db");
 
 if (!fs.existsSync(outPath)) {
   console.error(`No database at ${outPath} — run npm run db:init first`);

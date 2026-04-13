@@ -1,6 +1,6 @@
 /**
  * GET /api/account/me — loads SQLite `accounts` row for JWT email (dev/preview).
- * Env: JWT_SECRET (same as user auth), optional INSURED_DB_PATH (default data/insured.db).
+ * Env: JWT_SECRET (same as user auth), optional SOLVEQUEST_DB_PATH (default data/solvequest.db).
  * Creates a row on first login if none exists for that email.
  */
 import { randomUUID } from "node:crypto";
@@ -20,6 +20,10 @@ const USER_COOKIE = "auth_token";
 const DEFAULT_TIER_ID = 3;
 const DEFAULT_COVERAGE_LIMIT_QUSD = 50_000;
 const DEFAULT_QUSD_UNLOCKED = 10_000;
+
+function resolveAccountDbPath(root: string, env: Record<string, string>): string {
+  return env.SOLVEQUEST_DB_PATH?.trim() || path.join(root, "data", "solvequest.db");
+}
 
 function parseCookies(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
@@ -45,7 +49,7 @@ type AccountRow = Record<string, unknown>;
 export function createAccountApiMiddleware(env: Record<string, string>, root: string): Connect.NextHandleFunction {
   const jwtSecret = env.JWT_SECRET;
   const jwtOk = Boolean(jwtSecret && jwtSecret !== "change-this-secret-key");
-  const dbPath = env.INSURED_DB_PATH?.trim() || path.join(root, "data", "insured.db");
+  const dbPath = resolveAccountDbPath(root, env);
 
   let db: SqliteDb | null = null;
 
@@ -81,7 +85,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           `INSERT INTO accounts (
             id, created_at, updated_at, label, email,
             usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd, coverage_used_qusd,
-            insurance_tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd
+            tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd
           ) VALUES (?, ?, ?, NULL, ?, 0, ?, 0, 0, 0, ?, ?, 0, 0)`,
         )
         .run(
@@ -168,7 +172,7 @@ export function accountApiPlugin(): Plugin {
   };
 
   return {
-    name: "insured-account-api",
+    name: "solvequest-account-api",
     configureServer(server) {
       attach(server);
     },

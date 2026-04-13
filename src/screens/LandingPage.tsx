@@ -61,9 +61,7 @@ export default function LandingPage({ onStartNow }: Props) {
           <h1 id="lp-hero-heading" className="lp-title">
             Turn Market Direction Into Daily Profits
           </h1>
-          <p className="lp-sub">
-            Powered by AI. Synced with Hyperliquid. Protected by Smart Insurance.
-          </p>
+          <p className="lp-sub">Powered by AI. Synced with Hyperliquid. QUSD margin and vault tools in one place.</p>
           <div className="lp-qusd-ribbon">
             <img
               src="/icon-qusd.png"
@@ -163,8 +161,8 @@ export default function LandingPage({ onStartNow }: Props) {
               <IconShield />
             </span>
             <div>
-              <h3>Downside Protection</h3>
-              <p>Our insurance pool covers losses so you stay protected when markets move</p>
+              <h3>Risk-aware design</h3>
+              <p>See unrealized PnL and liquidation-style remaining balance before you close</p>
             </div>
           </div>
           <div className="lp-feature">
@@ -211,28 +209,23 @@ export default function LandingPage({ onStartNow }: Props) {
             </div>
           </div>
           <div className="lp-example-totals">
-            <div className="gain">Profit: +120 USD</div>
-            <div className="cost lp-example-qusd">
-              <img src="/icon-qusd.png" alt="" width={14} height={14} />
-              Insurance Cost: −10 QUSD
-            </div>
-            <div className="net">Net Gain: +110 USD</div>
+            <div className="gain">Illustrative P/L: +120 USD</div>
           </div>
         </div>
       </section>
 
       <section className="lp-section" aria-labelledby="lp-protect-heading">
         <h2 id="lp-protect-heading" className="lp-section-title">
-          Your Capital Is Protected
+          Understand the risk
         </h2>
         <p className="lp-section-lead" style={{ marginBottom: 20 }}>
-          Even if the market moves against you:
+          Perpetuals use leverage: adverse moves can reduce or wipe allocated margin quickly.
         </p>
         <div className="lp-shield">
           <ul>
-            <li>Losses draw against a tier max insured amount (QUSD cap)</li>
-            <li>Above the cap you pay from balance; at 100% cap, positions close</li>
-            <li>Optional premium: 1 USDC adds 200 QUSD to your max cover</li>
+            <li>Allocation is QUSD from your unlocked balance</li>
+            <li>Closing settles margin + PnL back to unlocked QUSD</li>
+            <li>Past performance does not guarantee future results—this is a demo-style experience</li>
           </ul>
         </div>
       </section>

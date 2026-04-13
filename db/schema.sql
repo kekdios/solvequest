@@ -1,4 +1,4 @@
--- Insured demo — SQLite schema
+-- Solve Quest — SQLite schema
 -- Persisted fields match engine Account + app vault state (no computed equity / uPnL / marks).
 
 PRAGMA foreign_keys = ON;
@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   premium_accrued_usdc REAL NOT NULL DEFAULT 0,
   covered_losses_qusd REAL NOT NULL DEFAULT 0,
   coverage_used_qusd REAL NOT NULL DEFAULT 0,
-  -- Smart Pool Insurance tier (1 / 2 / 3); coverage_limit_qusd is authoritative after tier + premium extensions
-  insurance_tier_id INTEGER NOT NULL CHECK (insurance_tier_id IN (1, 2, 3)),
+  -- Account tier (1 / 2 / 3); coverage_limit_qusd is authoritative after tier + cap extensions
+  tier_id INTEGER NOT NULL CHECK (tier_id IN (1, 2, 3)),
   -- QUSD vault (app state)
   qusd_unlocked REAL NOT NULL DEFAULT 0,
   qusd_locked REAL NOT NULL DEFAULT 0,

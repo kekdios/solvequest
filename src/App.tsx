@@ -3,7 +3,6 @@ import {
   Suspense,
   useCallback,
   useEffect,
-  useMemo,
   useReducer,
   useRef,
   useState,
@@ -13,21 +12,8 @@ import { SessionAuthProvider, useAuthMode, isDemoMode, useSessionAuth } from "./
 import { getDefaultDemoAppState, loadDemoAppState, saveDemoAppState } from "./lib/demoPersistence";
 import { loadUserPerpPositions, saveUserPerpPositions } from "./lib/userSessionPersistence";
 import type { DemoAppState, DemoLogEntry } from "./lib/demoSessionTypes";
-import {
-  createAccount,
-  handleLoss,
-  canWithdraw,
-  syncEquity,
-  purchaseCoverageExtension,
-} from "./engine/insurance";
-import { INITIAL_COVERAGE_WARN_FLAGS, nextCoverageWarnings } from "./engine/coverageWarnings";
-import { forceCloseAllPerps } from "./engine/perpsForceClose";
-import {
-  applyTierToAccount,
-  DEFAULT_INSURANCE_TIER_ID,
-  getInsuranceTier,
-  type InsuranceTierId,
-} from "./engine/insuranceTiers";
+import { INITIAL_SESSION_WARN_FLAGS } from "./lib/demoSessionTypes";
+import { syncEquity } from "./engine/accountCore";
 import { fetchHyperliquidMids, HL_POLL_INTERVAL_MS } from "./engine/hyperliquid";
 import {
   BONUS_REPAYMENT_USDC,
@@ -45,7 +31,6 @@ import type { PersistedAccountRow } from "./db/persistedAccount";
 import { persistedRowToAppSlice } from "./lib/accountHydration";
 import PerpsTradeScreen from "./screens/PerpsTradeScreen";
 import LandingPage from "./screens/LandingPage";
-import InsuranceScreen from "./screens/InsuranceScreen";
 import AccountScreen from "./screens/AccountScreen";
 import QuickStartScreen from "./screens/QuickStartScreen";
 import AuthScreen from "./screens/AuthScreen";
@@ -55,12 +40,8 @@ const AdminScreen = lazy(() => import("./screens/AdminScreen"));
 type State = DemoAppState;
 
 type Action =
-  | { type: "reset"; deposit: number }
   | { type: "deposit"; amount: number }
-  | { type: "loss"; amount: number }
-  | { type: "withdrawTry" }
   | { type: "setMarks"; marks: Record<PerpSymbol, number> }
-  | { type: "purchaseCoveragePremium" }
   | {
       type: "perpOpen";
       symbol: PerpSymbol;
@@ -69,7 +50,6 @@ type Action =
       leverage: number;
     }
   | { type: "perpClose"; positionId: string }
-  | { type: "setInsuranceTier"; tierId: InsuranceTierId }
   | { type: "lockQusd"; amount: number }
   | { type: "unlockQusd"; amount: number }
   | { type: "qusdInterestMinute" }
@@ -90,23 +70,6 @@ function reducer(state: State, action: Action): State {
   const { account, log } = state;
 
   switch (action.type) {
-    case "reset":
-      return {
-        ...state,
-        insuranceTierId: DEFAULT_INSURANCE_TIER_ID,
-        account: applyTierToAccount(createAccount("demo", action.deposit), DEFAULT_INSURANCE_TIER_ID),
-        perpPositions: [],
-        marks: { ...INITIAL_MARKS },
-        coverageWarnFlags: INITIAL_COVERAGE_WARN_FLAGS,
-        accumulatedLossesQusd: 0,
-        qusd: { unlocked: 10_000, locked: 0 },
-        bonusRepaidUsdc: 0,
-        vaultActivityAt: null,
-        log: pushLog(log, {
-          kind: "info",
-          message: `New session: ${action.deposit} USDC · Smart Pool Insurance Tier ${DEFAULT_INSURANCE_TIER_ID}`,
-        }),
-      };
     case "deposit": {
       if (action.amount <= 0) return state;
       const next = {
@@ -117,53 +80,6 @@ function reducer(state: State, action: Action): State {
         ...state,
         account: { ...next, equity: next.balance + next.unrealizedPnL },
         log: pushLog(log, { kind: "info", message: `Deposit +${action.amount} USDC` }),
-      };
-    }
-    case "loss": {
-      if (action.amount <= 0) return state;
-      const { account: next, breakdown } = handleLoss(account, action.amount);
-      const lines = [
-        `Loss ${breakdown.loss} USDC`,
-        `Pool covered ${breakdown.poolCovered.toFixed(2)} QUSD`,
-        `You paid ${breakdown.userPays.toFixed(2)} USDC`,
-      ];
-      return {
-        ...state,
-        account: next,
-        log: pushLog(log, { kind: "loss", message: lines.join(" · ") }),
-      };
-    }
-    case "purchaseCoveragePremium": {
-      const { account: next, ok } = purchaseCoverageExtension(account);
-      if (!ok) {
-        return {
-          ...state,
-          log: pushLog(log, { kind: "block", message: "Need at least 1 USDC to buy +200 QUSD loss cover." }),
-        };
-      }
-      return {
-        ...state,
-        account: next,
-        coverageWarnFlags: INITIAL_COVERAGE_WARN_FLAGS,
-        log: pushLog(log, {
-          kind: "premium",
-          message: `Premium: paid 1 USDC · max insured loss cover +200 QUSD (now ${next.plan.coverageLimit.toLocaleString()} QUSD cap)`,
-        }),
-      };
-    }
-    case "setInsuranceTier": {
-      if (state.perpPositions.length > 0) return state;
-      const { tierId } = action;
-      const t = getInsuranceTier(tierId);
-      return {
-        ...state,
-        insuranceTierId: tierId,
-        coverageWarnFlags: INITIAL_COVERAGE_WARN_FLAGS,
-        account: applyTierToAccount(account, tierId),
-        log: pushLog(log, {
-          kind: "info",
-          message: `Smart Pool Insurance: Tier ${tierId} — ${(t.winningsPct * 100).toFixed(0)}% of winnings to pool · ${t.maxLossCoveredQusd.toLocaleString()} QUSD max insured losses`,
-        }),
       };
     }
     case "lockQusd": {
@@ -254,22 +170,6 @@ function reducer(state: State, action: Action): State {
         qusd: { ...state.qusd, locked: locked + interest },
       };
     }
-    case "withdrawTry": {
-      const w = canWithdraw(account);
-      if (w.ok) {
-        return {
-          ...state,
-          log: pushLog(log, { kind: "info", message: "Withdrawal allowed — policy conditions satisfied" }),
-        };
-      }
-      return {
-        ...state,
-        log: pushLog(log, {
-          kind: "block",
-          message: `${w.reason}${w.topUpNeeded ? ` · Top-up needed: ${w.topUpNeeded.toFixed(2)} USDC` : ""}`,
-        }),
-      };
-    }
     case "setMarks":
       return { ...state, marks: action.marks };
     case "perpOpen": {
@@ -314,7 +214,7 @@ function reducer(state: State, action: Action): State {
         },
         perpPositions: positions,
         marks: { ...INITIAL_MARKS },
-        coverageWarnFlags: INITIAL_COVERAGE_WARN_FLAGS,
+        sessionWarnFlags: INITIAL_SESSION_WARN_FLAGS,
         bonusRepaidUsdc: 0,
         vaultActivityAt: null,
         log: pushLog([], {
@@ -332,97 +232,20 @@ function reducer(state: State, action: Action): State {
       const upl = computeUnrealizedPnl(pos, mark);
       const margin = pos.marginUsdc;
       const nextPositions = state.perpPositions.filter((p) => p.id !== action.positionId);
-
-      if (upl >= 0) {
-        const tier = getInsuranceTier(state.insuranceTierId);
-        const poolContribution = upl * tier.winningsPct;
-        const creditQusd = margin + upl - poolContribution;
-        const nextAccount = syncEquity({
-          ...account,
-          premiumAccrued: account.premiumAccrued + poolContribution,
-        });
-        return {
-          ...state,
-          account: nextAccount,
-          qusd: { ...state.qusd, unlocked: state.qusd.unlocked + creditQusd },
-          perpPositions: nextPositions,
-          log: pushLog(log, {
-            kind: "info",
-            message: `Closed ${pos.symbol} ${pos.side} · Realized +${upl.toFixed(2)} QUSD · Pool contribution ${poolContribution.toFixed(2)} QUSD (${(tier.winningsPct * 100).toFixed(0)}% of win, Tier ${tier.id})`,
-          }),
-        };
-      }
-
-      const loss = Math.abs(upl);
-      const remainingCov = Math.max(0, account.plan.coverageLimit - account.coverageUsed);
-      const poolCovered = Math.min(loss, remainingCov);
-      const userPays = loss - poolCovered;
-
-      let afterLoss = syncEquity({
-        ...account,
-        coverageUsed: account.coverageUsed + poolCovered,
-        coveredLosses: account.coveredLosses + poolCovered,
-      });
-
-      let qusdUnlocked = state.qusd.unlocked + margin - userPays;
-      if (qusdUnlocked < 0) qusdUnlocked = 0;
-
-      const breakdown = { loss, poolCovered, userPays };
-
-      let wf = state.coverageWarnFlags;
-      let nextLog = log;
-      const warn = nextCoverageWarnings(
-        afterLoss.coverageUsed,
-        afterLoss.plan.coverageLimit,
-        wf,
-      );
-      wf = warn.flags;
-      for (const m of warn.messages) {
-        nextLog = pushLog(nextLog, { kind: "coverage", message: m });
-      }
-
-      let acc = afterLoss;
-      let positionsAfter = nextPositions;
-      let forcedLossAccum = 0;
-      let qusdAfter = { ...state.qusd, unlocked: qusdUnlocked };
-
-      if (acc.coverageUsed >= acc.plan.coverageLimit - 1e-9 && positionsAfter.length > 0) {
-        const fc = forceCloseAllPerps({
-          account: acc,
-          qusd: qusdAfter,
-          positions: positionsAfter,
-          marks: state.marks,
-          insuranceTierId: state.insuranceTierId,
-        });
-        acc = fc.account;
-        qusdAfter = fc.qusd;
-        forcedLossAccum = fc.lossesQusd;
-        positionsAfter = [];
-        nextLog = pushLog(nextLog, {
-          kind: "coverage",
-          message: "Max insured loss cover reached — all remaining positions were closed.",
-        });
-      }
-
-      const extra =
-        breakdown.userPays > 0
-          ? ` · You paid ${breakdown.userPays.toFixed(2)} QUSD (above pool cover)`
-          : "";
-
-      const lossThisClose = loss;
-      const accumulatedLossesQusd = state.accumulatedLossesQusd + lossThisClose + forcedLossAccum;
-
+      /** Settlement: return margin + realized PnL to unlocked QUSD. */
+      const creditQusd = margin + upl;
+      let nextUnlocked = state.qusd.unlocked + creditQusd;
+      if (nextUnlocked < 0) nextUnlocked = 0;
+      const msg =
+        upl >= 0
+          ? `Closed ${pos.symbol} ${pos.side} · Realized +${upl.toFixed(2)} QUSD (margin + PnL)`
+          : `Closed ${pos.symbol} ${pos.side} · Realized ${upl.toFixed(2)} QUSD (margin + PnL)`;
       return {
         ...state,
-        account: acc,
-        qusd: qusdAfter,
-        perpPositions: positionsAfter,
-        coverageWarnFlags: wf,
-        accumulatedLossesQusd,
-        log: pushLog(nextLog, {
-          kind: "loss",
-          message: `Pool covered ${breakdown.poolCovered.toFixed(2)} QUSD · ${breakdown.userPays.toFixed(2)} QUSD from allocation${extra} · Closed ${pos.symbol}`,
-        }),
+        account: syncEquity({ ...account }),
+        qusd: { ...state.qusd, unlocked: nextUnlocked },
+        perpPositions: nextPositions,
+        log: pushLog(log, { kind: upl >= 0 ? "info" : "loss", message: msg }),
       };
     }
     default:
@@ -430,7 +253,7 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-type AppScreen = "landing" | "quickstart" | "trade" | "insurance" | "account" | "auth" | "admin";
+type AppScreen = "landing" | "quickstart" | "trade" | "account" | "auth" | "admin";
 
 const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   landing: {
@@ -444,10 +267,6 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   trade: {
     title: "Perpetuals",
     lead: "",
-  },
-    insurance: {
-    title: "Insurance",
-    lead: "Pick a tier for max insured losses and win skim. Losses draw from your cap; at 100%, all positions close. Pay 1 USDC for +200 QUSD cap.",
   },
   account: {
     title: "Account",
@@ -607,9 +426,6 @@ function AppInner() {
     dispatch({ type: "unlockQusd", amount });
   }, []);
 
-  const [depositStr, setDepositStr] = useState("0");
-  const [addStr, setAddStr] = useState("100");
-
   const [hlFeedStatus, setHlFeedStatus] = useState<"connecting" | "live" | "partial">("connecting");
 
   useEffect(() => {
@@ -636,17 +452,10 @@ function AppInner() {
     };
   }, []);
 
-  const w = useMemo(() => canWithdraw(state.account), [state.account]);
-
-  const fmt = useCallback((n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 4 }), []);
-
-  const logPreview = useMemo(() => [...state.log].slice(-18).reverse(), [state.log]);
-
   const pageStyle =
     screen === "landing" ||
     screen === "quickstart" ||
     screen === "trade" ||
-    screen === "insurance" ||
     screen === "account" ||
     screen === "auth" ||
     screen === "admin"
@@ -701,14 +510,6 @@ function AppInner() {
                 onClick={() => setScreen("trade")}
               >
                 Perpetuals
-              </button>
-              <button
-                type="button"
-                className={`app-nav-tab${screen === "insurance" ? " app-nav-tab--on" : ""}`}
-                style={styles.navBtn}
-                onClick={() => setScreen("insurance")}
-              >
-                Insurance
               </button>
               <button
                 type="button"
@@ -780,7 +581,6 @@ function AppInner() {
         <QuickStartScreen
           onGoToPerps={() => setScreen("trade")}
           onGoToAccount={() => setScreen("account")}
-          onGoToInsurance={() => setScreen("insurance")}
         />
       )}
 
@@ -790,43 +590,14 @@ function AppInner() {
           positions={state.perpPositions}
           onOpen={(args) => dispatch({ type: "perpOpen", ...args })}
           onClose={(positionId) => dispatch({ type: "perpClose", positionId })}
-          insuranceTierId={state.insuranceTierId}
-          insurance={{
-            coveredLosses: state.account.coveredLosses,
-            premiumAccrued: state.account.premiumAccrued,
-            coverageUsed: state.account.coverageUsed,
-            coverageLimit: state.account.plan.coverageLimit,
-          }}
           priceFeed={{
             status: hlFeedStatus,
             intervalMs: HL_POLL_INTERVAL_MS,
             sourceLabel: "Hyperliquid",
           }}
-          onNavigateToInsurance={() => setScreen("insurance")}
           onNavigateToAccount={() => setScreen("account")}
           qusdUnlocked={state.qusd.unlocked}
           qusdLocked={state.qusd.locked}
-        />
-      )}
-
-      {screen === "insurance" && (
-        <InsuranceScreen
-          account={state.account}
-          fmt={fmt}
-          insuranceTierId={state.insuranceTierId}
-          canChangeInsuranceTier={state.perpPositions.length === 0}
-          onSelectInsuranceTier={(tierId) => dispatch({ type: "setInsuranceTier", tierId })}
-          depositStr={depositStr}
-          setDepositStr={setDepositStr}
-          addStr={addStr}
-          setAddStr={setAddStr}
-          onReset={() => dispatch({ type: "reset", deposit: Number(depositStr) || 0 })}
-          onDeposit={() => dispatch({ type: "deposit", amount: Number(addStr) || 0 })}
-          onPurchaseCoveragePremium={() => dispatch({ type: "purchaseCoveragePremium" })}
-          canPurchaseCoveragePremium={state.account.balance >= 1}
-          withdrawOk={w.ok}
-          onWithdrawTry={() => dispatch({ type: "withdrawTry" })}
-          logPreview={logPreview}
         />
       )}
 
