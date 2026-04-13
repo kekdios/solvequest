@@ -22,7 +22,12 @@ import { INITIAL_SESSION_WARN_FLAGS } from "./lib/demoSessionTypes";
 import { syncEquity } from "./engine/accountCore";
 import { fetchHyperliquidMids, HL_POLL_INTERVAL_MS } from "./engine/hyperliquid";
 import { LOCKED_QUSD_COOLDOWN_MS, QUSD_INTEREST_PER_MINUTE_FACTOR } from "./engine/qusdVault";
-import { computeUnrealizedPnl, type PerpPosition, type PerpSymbol } from "./engine/perps";
+import {
+  computeUnrealizedPnl,
+  isLiquidatedAtMark,
+  type PerpPosition,
+  type PerpSymbol,
+} from "./engine/perps";
 import type { PersistedAccountRow } from "./db/persistedAccount";
 import { persistedRowToAppSlice } from "./lib/accountHydration";
 import PerpsTradeScreen from "./screens/PerpsTradeScreen";
@@ -52,7 +57,7 @@ type Action =
       notionalUsdc: number;
       leverage: number;
     }
-  | { type: "perpClose"; positionId: string }
+  | { type: "perpClose"; positionId: string; reason?: "liquidation" }
   | { type: "lockQusd"; amount: number }
   | { type: "unlockQusd"; amount: number }
   | { type: "qusdInterestMinute" }
@@ -233,8 +238,12 @@ function reducer(state: State, action: Action): State {
       const creditQusd = margin + upl;
       let nextUnlocked = state.qusd.unlocked + creditQusd;
       if (nextUnlocked < 0) nextUnlocked = 0;
-      const msg =
-        upl >= 0
+      const liquidated = action.reason === "liquidation";
+      const msg = liquidated
+        ? upl >= 0
+          ? `Liquidated ${pos.symbol} ${pos.side} · margin exhausted · +${upl.toFixed(2)} QUSD`
+          : `Liquidated ${pos.symbol} ${pos.side} · margin exhausted · ${upl.toFixed(2)} QUSD`
+        : upl >= 0
           ? `Closed ${pos.symbol} ${pos.side} · Realized +${upl.toFixed(2)} QUSD (margin + PnL)`
           : `Closed ${pos.symbol} ${pos.side} · Realized ${upl.toFixed(2)} QUSD (margin + PnL)`;
       const closedAt = Date.now();
@@ -635,6 +644,21 @@ function AppInner() {
       window.clearInterval(id);
     };
   }, []);
+
+  /** Auto-close when remaining margin at the current mark is exhausted (same math as manual close). Only while HL marks are live — avoids acting on stale prices if the feed errors. */
+  useEffect(() => {
+    if (hlFeedStatus !== "live") return;
+    if (state.perpPositions.length === 0) return;
+    const ids: string[] = [];
+    for (const p of state.perpPositions) {
+      const m = state.marks[p.symbol];
+      if (isLiquidatedAtMark(p, m)) ids.push(p.id);
+    }
+    if (ids.length === 0) return;
+    for (const positionId of ids) {
+      dispatch({ type: "perpClose", positionId, reason: "liquidation" });
+    }
+  }, [hlFeedStatus, state.marks, state.perpPositions, dispatch]);
 
   return (
     <div

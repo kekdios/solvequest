@@ -92,6 +92,15 @@ export function positionNetQusd(position: PerpPosition, mark: number): number {
   return remainingMarginQusd(position, mark);
 }
 
+/** Treat near-zero as flat (floating-point). */
+export const PERP_LIQUIDATION_NET_EPS = 1e-8;
+
+/** True when remaining margin at this mark is exhausted (auto-close / liquidation). */
+export function isLiquidatedAtMark(position: PerpPosition, mark: number): boolean {
+  if (!(mark > 0) || !(position.entryPrice > 0) || !(position.marginUsdc > 0)) return false;
+  return positionNetQusd(position, mark) <= PERP_LIQUIDATION_NET_EPS;
+}
+
 /** Index mid change vs entry, in percent — same `p` as PnL: `indexReturnDecimal × 100` (unsigned index move). */
 export function marketPriceChangeSinceEntryPct(position: PerpPosition, mark: number): number {
   return indexReturnDecimal(position.entryPrice, mark) * 100;
