@@ -72,8 +72,7 @@ export default function LandingPage({ onStartNow }: Props) {
             />
             <div className="lp-qusd-ribbon-copy">
               <p className="lp-qusd-ribbon-lead">
-                You receive <strong>$100 worth of QUSD</strong> (10,000 QUSD) as a free{" "}
-                <strong>BONUS</strong> to test the app.
+                You receive <strong>10,000 QUSD</strong> as a free <strong>BONUS</strong> to test the app.
               </p>
               <p className="lp-qusd-ribbon-lock">
                 Lock QUSD anytime to earn <strong>1% interest per day</strong>—stack yield while you trade or
