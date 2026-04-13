@@ -474,13 +474,14 @@ function AppInner() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  /** 1% / day on locked QUSD; credited to locked balance every minute. */
+  /** 1% / day on locked QUSD; demo: credit every minute in-browser. Registered: server compounds on GET /api/account/me. */
   useEffect(() => {
+    if (!demo) return;
     const id = window.setInterval(() => {
       dispatch({ type: "qusdInterestMinute" });
     }, 60_000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [demo]);
 
   const lockQusd = useCallback((amount: number) => {
     dispatch({ type: "lockQusd", amount });

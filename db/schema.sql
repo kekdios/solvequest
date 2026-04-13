@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   bonus_repaid_usdc REAL NOT NULL DEFAULT 0,
   -- Last vault lock/unlock activity (cooldown); epoch ms or NULL
   vault_activity_at INTEGER,
+  -- Minute-boundary checkpoint for compounding interest on qusd_locked (epoch ms); server + demo client
+  qusd_vault_interest_at INTEGER,
   -- Deposit address (assigned at account creation; sync from app / provision script)
   sol_receive_address TEXT,
   -- Optimistic concurrency: incremented on PUT /api/account/state and on-chain deposit credits

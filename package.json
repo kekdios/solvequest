@@ -18,6 +18,7 @@
     "db:migrate:tier": "node scripts/migrate-tier-column.mjs",
     "db:migrate:account-sync": "node scripts/migrate-account-sync-state.mjs",
     "db:migrate:deposit-worker": "node scripts/migrate-deposit-worker.mjs",
+    "db:migrate:vault-interest": "node scripts/migrate-vault-interest.mjs",
     "db:provision": "node scripts/provision-account.mjs"
   },
   "dependencies": {

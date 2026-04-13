@@ -15,6 +15,7 @@ import Database from "better-sqlite3";
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
+import { applyLockedQusdInterest } from "./vaultInterest";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -162,6 +163,16 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
     const sel = database.prepare(`SELECT * FROM accounts WHERE email = ?`);
     const existing = sel.get(email) as AccountRow | undefined;
     if (existing) {
+      try {
+        applyLockedQusdInterest(database, String(existing.id));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("no such column: qusd_vault_interest_at")) {
+          console.error("[account-api] run: npm run db:migrate:vault-interest");
+          return null;
+        }
+        throw e;
+      }
       database.prepare(`UPDATE accounts SET updated_at = ? WHERE id = ?`).run(Date.now(), existing.id);
       return database.prepare(`SELECT * FROM accounts WHERE email = ?`).get(email) as AccountRow;
     }
@@ -175,8 +186,8 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
             id, created_at, updated_at, label, email,
             usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd, coverage_used_qusd,
             tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd,
-            bonus_repaid_usdc, vault_activity_at, sync_version
-          ) VALUES (?, ?, ?, NULL, ?, 0, ?, 0, 0, 0, ?, ?, 0, 0, 0, NULL, 0)`,
+            bonus_repaid_usdc, vault_activity_at, qusd_vault_interest_at, sync_version
+          ) VALUES (?, ?, ?, NULL, ?, 0, ?, 0, 0, 0, ?, ?, 0, 0, 0, NULL, NULL, 0)`,
         )
         .run(
           id,
@@ -197,6 +208,10 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       }
       if (msg.includes("no column named sync_version")) {
         console.error("[account-api] run: npm run db:migrate:deposit-worker");
+        return null;
+      }
+      if (msg.includes("no column named qusd_vault_interest_at")) {
+        console.error("[account-api] run: npm run db:migrate:vault-interest");
         return null;
       }
       throw e;
@@ -386,6 +401,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                     accumulated_losses_qusd = ?,
                     bonus_repaid_usdc = ?,
                     vault_activity_at = ?,
+                    qusd_vault_interest_at = ?,
                     sync_version = sync_version + 1
                   WHERE id = ? AND sync_version = ?`,
                 )
@@ -401,6 +417,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                   body.accumulated_losses_qusd,
                   body.bonus_repaid_usdc,
                   body.vault_activity_at,
+                  now,
                   accountId,
                   body.sync_version,
                 );
