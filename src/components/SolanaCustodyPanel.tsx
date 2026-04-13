@@ -108,10 +108,10 @@ export default function SolanaCustodyPanel({ accountId, onUsdcCredited }: Props)
       <h4 style={s.h4}>Solana custody (mainnet)</h4>
       <p style={s.p}>
         Unique deposit keypair per account; USDC SPL uses the standard ATA for mint{" "}
-        <code style={s.code}>{MAINNET_USDC_MINT.toBase58().slice(0, 6)}…</code>. Polls every{" "}
-        {CUSTODY_POLL_INTERVAL_MS / 1000}s. Signatures are recorded once (
-        <strong style={{ color: "var(--text)" }}>no double credit</strong>). Production should use
-        server-side listeners, encrypted keys or HD derivation, and a treasury sweep worker.
+        <code style={s.code}>{MAINNET_USDC_MINT.toBase58().slice(0, 6)}…</code>.         Polls every{" "}
+        {CUSTODY_POLL_INTERVAL_MS / 1000}s. In production, USDC→QUSD credits are recorded by the{" "}
+        <strong style={{ color: "var(--text)" }}>server deposit worker</strong> (SQLite{" "}
+        <code style={s.code}>deposit_credits</code>). This panel is for debugging / treasury sweep only.
       </p>
       {errMsg && /403|forbidden/i.test(errMsg) ? (
         <p style={s.rpcHint}>

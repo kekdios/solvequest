@@ -3,6 +3,7 @@ import type { PerpPosition } from "../engine/perps";
 
 /** Body for PUT /api/account/state (matches server zod schema). */
 export type AccountStatePutBody = {
+  sync_version: number;
   usdc_balance: number;
   coverage_limit_qusd: number;
   premium_accrued_usdc: number;
@@ -21,9 +22,10 @@ export type AccountStatePutBody = {
  * Maps client reducer state → DB row + open positions.
  * `qusd_unlocked` in DB is pre-margin pool (same convention as hydrate).
  */
-export function buildAccountStatePutBody(state: DemoAppState): AccountStatePutBody {
+export function buildAccountStatePutBody(state: DemoAppState, syncVersion: number): AccountStatePutBody {
   const marginInPos = state.perpPositions.reduce((s, p) => s + p.marginUsdc, 0);
   return {
+    sync_version: syncVersion,
     usdc_balance: state.account.balance,
     coverage_limit_qusd: state.account.plan.coverageLimit,
     premium_accrued_usdc: state.account.premiumAccrued,
@@ -38,13 +40,38 @@ export function buildAccountStatePutBody(state: DemoAppState): AccountStatePutBo
   };
 }
 
-export async function putAccountState(body: AccountStatePutBody): Promise<boolean> {
+export type PutAccountStateResult =
+  | { ok: true; sync_version: number }
+  | { ok: false; conflict: true; sync_version: number }
+  | { ok: false };
+
+export async function putAccountState(body: AccountStatePutBody): Promise<PutAccountStateResult> {
   try {
     const r = await fetch("/api/account/state", {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+    });
+    if (r.status === 409) {
+      const j = (await r.json()) as { sync_version?: number };
+      return { ok: false, conflict: true, sync_version: Number(j.sync_version ?? 0) };
+    }
+    if (!r.ok) return { ok: false };
+    const j = (await r.json()) as { sync_version?: number };
+    return { ok: true, sync_version: Number(j.sync_version ?? 0) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function putSolReceiveAddress(solReceiveAddress: string): Promise<boolean> {
+  try {
+    const r = await fetch("/api/account/sol-receive-address", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sol_receive_address: solReceiveAddress }),
     });
     return r.ok;
   } catch {

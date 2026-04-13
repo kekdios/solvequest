@@ -29,11 +29,37 @@ CREATE TABLE IF NOT EXISTS accounts (
   -- Last vault lock/unlock activity (cooldown); epoch ms or NULL
   vault_activity_at INTEGER,
   -- Deposit address (assigned at account creation; sync from app / provision script)
-  sol_receive_address TEXT
+  sol_receive_address TEXT,
+  -- Optimistic concurrency: incremented on PUT /api/account/state and on-chain deposit credits
+  sync_version INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_accounts_updated ON accounts (updated_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_email ON accounts (email) WHERE email IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_sol_receive_unique
+  ON accounts (sol_receive_address)
+  WHERE sol_receive_address IS NOT NULL AND TRIM(sol_receive_address) != '';
+
+-- On-chain USDC deposit audit (server worker inserts; UNIQUE(chain, signature) is global idempotency).
+CREATE TABLE IF NOT EXISTS deposit_credits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  chain TEXT NOT NULL CHECK (chain IN ('solana')),
+  signature TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('usdc', 'sol')),
+  amount_human REAL,
+  lamports INTEGER,
+  credited_at INTEGER NOT NULL,
+  UNIQUE (chain, signature)
+);
+
+CREATE INDEX IF NOT EXISTS idx_deposit_credits_account ON deposit_credits (account_id);
+
+CREATE TABLE IF NOT EXISTS deposit_scan_state (
+  account_id TEXT PRIMARY KEY REFERENCES accounts (id) ON DELETE CASCADE,
+  watermark_signature TEXT
+);
 
 -- Append-only perp events: one row per open; one row per close (same position_id).
 CREATE TABLE IF NOT EXISTS perp_transactions (

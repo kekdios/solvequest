@@ -12,6 +12,7 @@ import type { Plugin } from "vite";
 import { loadEnv } from "vite";
 import jwt from "jsonwebtoken";
 import Database from "better-sqlite3";
+import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
 
@@ -37,6 +38,7 @@ const perpPositionPutZ = z.object({
 });
 
 const accountStatePutZ = z.object({
+  sync_version: z.number().int().min(0),
   usdc_balance: z.number().finite(),
   coverage_limit_qusd: z.number().finite(),
   premium_accrued_usdc: z.number().finite(),
@@ -48,6 +50,10 @@ const accountStatePutZ = z.object({
   bonus_repaid_usdc: z.number().finite(),
   vault_activity_at: z.number().finite().nullable(),
   open_perp_positions: z.array(perpPositionPutZ),
+});
+
+const solReceivePutZ = z.object({
+  sol_receive_address: z.string().min(32).max(88),
 });
 
 type DbOpenPos = {
@@ -155,8 +161,8 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
             id, created_at, updated_at, label, email,
             usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd, coverage_used_qusd,
             tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd,
-            bonus_repaid_usdc, vault_activity_at
-          ) VALUES (?, ?, ?, NULL, ?, 0, ?, 0, 0, 0, ?, ?, 0, 0, 0, NULL)`,
+            bonus_repaid_usdc, vault_activity_at, sync_version
+          ) VALUES (?, ?, ?, NULL, ?, 0, ?, 0, 0, 0, ?, ?, 0, 0, 0, NULL, 0)`,
         )
         .run(
           id,
@@ -173,6 +179,10 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         console.error(
           "[account-api] accounts.email missing — run: npm run db:migrate:email",
         );
+        return null;
+      }
+      if (msg.includes("no column named sync_version")) {
+        console.error("[account-api] run: npm run db:migrate:deposit-worker");
         return null;
       }
       throw e;
@@ -235,10 +245,76 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           });
           return;
         }
-        sendJson(res, 200, { ...row, open_perp_positions: openPerp });
+        const mePayload = { ...row, open_perp_positions: openPerp } as Record<string, unknown>;
+        mePayload.sync_version = Number((row as AccountRow).sync_version ?? 0);
+        sendJson(res, 200, mePayload);
       } catch {
         sendJson(res, 401, { error: "Invalid token" });
       }
+      return;
+    }
+
+    if (req.method === "PUT" && url === "/api/account/sol-receive-address") {
+      void (async () => {
+        const token = parseCookies(req.headers.cookie)[USER_COOKIE];
+        if (!token) {
+          sendJson(res, 401, { error: "Not authenticated" });
+          return;
+        }
+        try {
+          const payload = jwt.verify(token, jwtSecret!) as { email?: string };
+          if (!payload.email || typeof payload.email !== "string") {
+            sendJson(res, 401, { error: "Invalid token" });
+            return;
+          }
+          const email = payload.email.toLowerCase();
+          let body: z.infer<typeof solReceivePutZ>;
+          try {
+            body = solReceivePutZ.parse(JSON.parse((await readBody(req)) || "{}"));
+          } catch (e) {
+            sendJson(res, 400, {
+              error: "invalid_body",
+              message: e instanceof Error ? e.message : String(e),
+            });
+            return;
+          }
+          try {
+            new PublicKey(body.sol_receive_address.trim());
+          } catch {
+            sendJson(res, 400, { error: "invalid_sol_address" });
+            return;
+          }
+          const row = loadOrCreateRow(email);
+          if (!row?.id) {
+            sendJson(res, 503, { error: "no_account" });
+            return;
+          }
+          const accountId = String(row.id);
+          const database = getDb();
+          if (!database) {
+            sendJson(res, 503, { error: "db_missing" });
+            return;
+          }
+          const addr = body.sol_receive_address.trim();
+          try {
+            database
+              .prepare(
+                `UPDATE accounts SET sol_receive_address = ?, updated_at = ? WHERE id = ?`,
+              )
+              .run(addr, Date.now(), accountId);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (msg.includes("UNIQUE") || msg.includes("constraint")) {
+              sendJson(res, 409, { error: "sol_receive_address_taken" });
+              return;
+            }
+            throw e;
+          }
+          sendJson(res, 200, { ok: true, sol_receive_address: addr });
+        } catch {
+          sendJson(res, 401, { error: "Invalid token" });
+        }
+      })();
       return;
     }
 
@@ -280,7 +356,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           const now = Date.now();
           try {
             const run = database.transaction(() => {
-              database
+              const upd = database
                 .prepare(
                   `UPDATE accounts SET
                     updated_at = ?,
@@ -293,8 +369,9 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                     qusd_locked = ?,
                     accumulated_losses_qusd = ?,
                     bonus_repaid_usdc = ?,
-                    vault_activity_at = ?
-                  WHERE id = ?`,
+                    vault_activity_at = ?,
+                    sync_version = sync_version + 1
+                  WHERE id = ? AND sync_version = ?`,
                 )
                 .run(
                   now,
@@ -309,7 +386,11 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                   body.bonus_repaid_usdc,
                   body.vault_activity_at,
                   accountId,
+                  body.sync_version,
                 );
+              if (upd.changes !== 1) {
+                throw Object.assign(new Error("sync_conflict"), { code: "SYNC_CONFLICT" as const });
+              }
               database.prepare(`DELETE FROM perp_open_positions WHERE account_id = ?`).run(accountId);
               const ins = database.prepare(
                 `INSERT INTO perp_open_positions (
@@ -331,12 +412,25 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
               }
             });
             run();
-          } catch (e) {
+          } catch (e: unknown) {
+            if (e && typeof e === "object" && (e as { code?: string }).code === "SYNC_CONFLICT") {
+              const cur = database
+                .prepare(`SELECT sync_version FROM accounts WHERE id = ?`)
+                .get(accountId) as { sync_version: number } | undefined;
+              sendJson(res, 409, {
+                error: "sync_conflict",
+                sync_version: Number(cur?.sync_version ?? 0),
+              });
+              return;
+            }
             console.error("[account-api] PUT /api/account/state:", e);
             sendJson(res, 500, { error: "persist_failed" });
             return;
           }
-          sendJson(res, 200, { ok: true });
+          const nv = database
+            .prepare(`SELECT sync_version FROM accounts WHERE id = ?`)
+            .get(accountId) as { sync_version: number };
+          sendJson(res, 200, { ok: true, sync_version: Number(nv.sync_version) });
         } catch {
           sendJson(res, 401, { error: "Invalid token" });
         }

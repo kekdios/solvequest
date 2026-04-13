@@ -26,4 +26,6 @@ interface ImportMetaEnv {
   readonly VITE_MAIN_SITE_ORIGIN: string;
   /** Full origin of admin subdomain (default derived). */
   readonly VITE_ADMIN_ORIGIN: string;
+  /** QUSD per $1 USDC (from `QUSD_MULTIPLIER` in `.env` via Vite define). */
+  readonly QUSD_MULTIPLIER: string;
 }

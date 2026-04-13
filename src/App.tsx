@@ -10,7 +10,12 @@ import {
 } from "react";
 import { SessionAuthProvider, useAuthMode, isDemoMode, useSessionAuth } from "./auth/sessionAuth";
 import { getDefaultDemoAppState, loadDemoAppState, saveDemoAppState } from "./lib/demoPersistence";
-import { buildAccountStatePutBody, putAccountState } from "./lib/accountSync";
+import {
+  buildAccountStatePutBody,
+  putAccountState,
+  putSolReceiveAddress,
+} from "./lib/accountSync";
+import { getOrCreateAccountReceiveWallet } from "./lib/accountReceiveAddresses";
 import type { DemoAppState, DemoLogEntry } from "./lib/demoSessionTypes";
 import { INITIAL_SESSION_WARN_FLAGS } from "./lib/demoSessionTypes";
 import { syncEquity } from "./engine/accountCore";
@@ -304,6 +309,8 @@ function AppInner() {
 
   const demoPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accountSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Server `sync_version` — must match PUT /api/account/state; deposit worker bumps it too. */
+  const syncVersionRef = useRef(0);
 
   useEffect(() => {
     if (!demo) return;
@@ -322,13 +329,32 @@ function AppInner() {
     if (demo || !user?.email || authLoading || !ledgerAccountRow) return;
     if (accountSyncTimer.current) clearTimeout(accountSyncTimer.current);
     accountSyncTimer.current = setTimeout(() => {
-      void putAccountState(buildAccountStatePutBody(stateRef.current));
-      accountSyncTimer.current = null;
+      void (async () => {
+        const body = buildAccountStatePutBody(stateRef.current, syncVersionRef.current);
+        const result = await putAccountState(body);
+        accountSyncTimer.current = null;
+        if (result.ok) {
+          syncVersionRef.current = result.sync_version;
+          return;
+        }
+        if (!("conflict" in result) || !result.conflict) return;
+        syncVersionRef.current = result.sync_version;
+        const r = await fetch("/api/account/me", { credentials: "include" });
+        if (!r.ok) return;
+        const data = (await r.json()) as PersistedAccountRow;
+        setLedgerAccountRow(data);
+        dispatch({ type: "hydrateFromAccountRow", row: data });
+        syncVersionRef.current = Number(data.sync_version ?? 0);
+        const retry = await putAccountState(
+          buildAccountStatePutBody(stateRef.current, syncVersionRef.current),
+        );
+        if (retry.ok) syncVersionRef.current = retry.sync_version;
+      })();
     }, 450);
     return () => {
       if (accountSyncTimer.current) clearTimeout(accountSyncTimer.current);
     };
-  }, [demo, user?.email, authLoading, state]);
+  }, [demo, user?.email, authLoading, state, ledgerAccountRow]);
 
   useEffect(() => {
     if (!demo) return;
@@ -339,7 +365,14 @@ function AppInner() {
 
   useEffect(() => {
     if (demo || !user?.email || !ledgerAccountRow) return;
-    const flush = () => void putAccountState(buildAccountStatePutBody(stateRef.current));
+    const flush = () => {
+      void (async () => {
+        const result = await putAccountState(
+          buildAccountStatePutBody(stateRef.current, syncVersionRef.current),
+        );
+        if (result.ok) syncVersionRef.current = result.sync_version;
+      })();
+    };
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
   }, [demo, user?.email, ledgerAccountRow]);
@@ -366,6 +399,7 @@ function AppInner() {
         const data = (await r.json()) as PersistedAccountRow;
         if (cancelled) return;
         setLedgerAccountRow(data);
+        syncVersionRef.current = Number(data.sync_version ?? 0);
         dispatch({ type: "hydrateFromAccountRow", row: data });
       } catch {
         if (!cancelled) setLedgerAccountRow(null);
@@ -375,6 +409,53 @@ function AppInner() {
       cancelled = true;
     };
   }, [authLoading, demo, user?.email]);
+
+  /** Sync custodial Solana receive pubkey to SQLite so the server deposit worker can credit QUSD. */
+  useEffect(() => {
+    if (demo || !user?.email || !ledgerAccountRow || authLoading) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const w = getOrCreateAccountReceiveWallet();
+        if (ledgerAccountRow.sol_receive_address === w.solAddress) return;
+        const ok = await putSolReceiveAddress(w.solAddress);
+        if (!ok || cancelled) return;
+        const r = await fetch("/api/account/me", { credentials: "include" });
+        if (!r.ok || cancelled) return;
+        const data = (await r.json()) as PersistedAccountRow;
+        setLedgerAccountRow(data);
+        syncVersionRef.current = Number(data.sync_version ?? 0);
+        dispatch({ type: "hydrateFromAccountRow", row: data });
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [demo, user?.email, authLoading, ledgerAccountRow?.id, ledgerAccountRow?.sol_receive_address]);
+
+  /** Pick up on-chain deposit credits (server bumps sync_version). */
+  useEffect(() => {
+    if (demo || !user?.email || authLoading || !ledgerAccountRow) return;
+    const id = window.setInterval(() => {
+      void (async () => {
+        try {
+          const r = await fetch("/api/account/me", { credentials: "include" });
+          if (!r.ok) return;
+          const data = (await r.json()) as PersistedAccountRow;
+          const sv = Number(data.sync_version ?? 0);
+          if (sv <= syncVersionRef.current) return;
+          setLedgerAccountRow(data);
+          dispatch({ type: "hydrateFromAccountRow", row: data });
+          syncVersionRef.current = sv;
+        } catch {
+          /* ignore */
+        }
+      })();
+    }, 25_000);
+    return () => window.clearInterval(id);
+  }, [demo, user?.email, authLoading, ledgerAccountRow?.id]);
 
   const lastNonAdminScreen = useRef<AppScreen>("landing");
 
@@ -578,7 +659,9 @@ function AppInner() {
                 onNavigateHome={() => {
                   window.location.href = getMainSitePublicOrigin();
                 }}
-                onCustodialUsdcCredited={(amount) => dispatch({ type: "deposit", amount })}
+                onCustodialUsdcCredited={() => {
+                  /* USDC → QUSD credits run server-side (deposit worker); avoid double-counting. */
+                }}
               />
             </Suspense>
           )}

@@ -10,6 +10,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import { createUserAuthMiddleware } from "../plugins/userAuthApiPlugin";
 import { createAccountApiMiddleware } from "../plugins/accountApiPlugin";
 import { createAdminApiMiddleware } from "../plugins/adminApiPlugin";
+import { startDepositScanWorker } from "./depositScanWorker";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -106,4 +107,5 @@ app.listen(port, () => {
       `[server] API + Solana proxy on http://127.0.0.1:${port} — Vite proxies /api and /solana-rpc here`,
     );
   }
+  startDepositScanWorker(root, process.env);
 });

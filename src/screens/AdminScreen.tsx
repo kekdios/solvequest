@@ -23,7 +23,7 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 
 type Props = {
   onNavigateHome: () => void;
-  /** When mainnet USDC SPL is detected at the custodial ATA, credit in-app wallet (same as Account). */
+  /** Legacy hook — USDC→QUSD credits are applied server-side by the deposit worker. */
   onCustodialUsdcCredited: (amountUsdc: number) => void;
 };
 

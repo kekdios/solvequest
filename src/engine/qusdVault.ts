@@ -1,6 +1,8 @@
 /** Demo vault: 1% interest per day on locked QUSD. */
-/** $1 USD converts to 100 QUSD for vault deposit/withdraw amounts (same as perpetual magnification). */
-export const QUSD_PER_USD = 100;
+import { parseQusdMultiplier } from "../lib/qusdMultiplier";
+
+/** $1 USDC converts to this many QUSD (vault top-up/withdraw; from `QUSD_MULTIPLIER` in `.env`). */
+export const QUSD_PER_USD = parseQusdMultiplier(import.meta.env.QUSD_MULTIPLIER);
 /** QUSD granted as “free” at session start — excluded from externally sendable stablecoin. */
 export const INITIAL_FREE_QUSD_GRANT = 10_000;
 /** USDC/USDT required to repay the bonus before external Send is unlocked. */
