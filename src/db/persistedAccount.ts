@@ -18,7 +18,11 @@ export type PersistedAccountRow = {
   qusd_unlocked: number;
   qusd_locked: number;
   accumulated_losses_qusd: number;
+  bonus_repaid_usdc?: number;
+  vault_activity_at?: number | null;
   sol_receive_address: string | null;
+  /** Present on GET /api/account/me JSON only (joined from `perp_open_positions`). */
+  open_perp_positions?: import("../engine/perps").PerpPosition[];
 };
 
 export type PerpTxnType = "open" | "close";

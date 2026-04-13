@@ -10,7 +10,7 @@ import {
 } from "react";
 import { SessionAuthProvider, useAuthMode, isDemoMode, useSessionAuth } from "./auth/sessionAuth";
 import { getDefaultDemoAppState, loadDemoAppState, saveDemoAppState } from "./lib/demoPersistence";
-import { loadUserPerpPositions, saveUserPerpPositions } from "./lib/userSessionPersistence";
+import { buildAccountStatePutBody, putAccountState } from "./lib/accountSync";
 import type { DemoAppState, DemoLogEntry } from "./lib/demoSessionTypes";
 import { INITIAL_SESSION_WARN_FLAGS } from "./lib/demoSessionTypes";
 import { syncEquity } from "./engine/accountCore";
@@ -62,7 +62,7 @@ type Action =
   | { type: "repayBonusUsdc"; amount: number }
   | { type: "unlockedTopUpUsdc"; usdc: number }
   | { type: "unlockedWithdrawUsdc"; usdc: number }
-  | { type: "hydrateFromAccountRow"; row: PersistedAccountRow; restoredPerpPositions: PerpPosition[] }
+  | { type: "hydrateFromAccountRow"; row: PersistedAccountRow }
   | { type: "replaceAll"; state: DemoAppState };
 
 function pushLog(log: DemoLogEntry[], entry: Omit<DemoLogEntry, "id" | "t">): DemoLogEntry[] {
@@ -208,7 +208,7 @@ function reducer(state: State, action: Action): State {
     }
     case "hydrateFromAccountRow": {
       const slice = persistedRowToAppSlice(action.row);
-      const positions = action.restoredPerpPositions;
+      const positions = action.row.open_perp_positions ?? [];
       const marginLocked = positions.reduce((s, p) => s + p.marginUsdc, 0);
       const baseUnlocked = slice.qusd.unlocked;
       return {
@@ -221,8 +221,8 @@ function reducer(state: State, action: Action): State {
         perpPositions: positions,
         marks: { ...INITIAL_MARKS },
         sessionWarnFlags: INITIAL_SESSION_WARN_FLAGS,
-        bonusRepaidUsdc: 0,
-        vaultActivityAt: null,
+        bonusRepaidUsdc: slice.bonusRepaidUsdc,
+        vaultActivityAt: slice.vaultActivityAt,
         log: pushLog([], {
           kind: "info",
           message: "Loaded account balances from the server database.",
@@ -303,7 +303,8 @@ function AppInner() {
   stateRef.current = state;
 
   const demoPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const userPerpPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const accountSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!demo) return;
     if (demoPersistTimer.current) clearTimeout(demoPersistTimer.current);
@@ -316,18 +317,18 @@ function AppInner() {
     };
   }, [demo, state]);
 
-  /** Logged-in: persist simulated perps (server DB has no open-position rows). */
+  /** Registered: persist full trading + vault state to SQLite (debounced). */
   useEffect(() => {
-    if (demo || !user?.email) return;
-    if (userPerpPersistTimer.current) clearTimeout(userPerpPersistTimer.current);
-    userPerpPersistTimer.current = setTimeout(() => {
-      saveUserPerpPositions(user.email, stateRef.current.perpPositions);
-      userPerpPersistTimer.current = null;
-    }, 400);
+    if (demo || !user?.email || authLoading || !ledgerAccountRow) return;
+    if (accountSyncTimer.current) clearTimeout(accountSyncTimer.current);
+    accountSyncTimer.current = setTimeout(() => {
+      void putAccountState(buildAccountStatePutBody(stateRef.current));
+      accountSyncTimer.current = null;
+    }, 450);
     return () => {
-      if (userPerpPersistTimer.current) clearTimeout(userPerpPersistTimer.current);
+      if (accountSyncTimer.current) clearTimeout(accountSyncTimer.current);
     };
-  }, [demo, user?.email, state.perpPositions]);
+  }, [demo, user?.email, authLoading, state]);
 
   useEffect(() => {
     if (!demo) return;
@@ -337,11 +338,11 @@ function AppInner() {
   }, [demo]);
 
   useEffect(() => {
-    if (demo || !user?.email) return;
-    const flush = () => saveUserPerpPositions(user.email, stateRef.current.perpPositions);
+    if (demo || !user?.email || !ledgerAccountRow) return;
+    const flush = () => void putAccountState(buildAccountStatePutBody(stateRef.current));
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
-  }, [demo, user?.email]);
+  }, [demo, user?.email, ledgerAccountRow]);
 
   /** Anonymous session: restore demo from localStorage. Signed-in uses SQLite via hydrate effect. */
   useEffect(() => {
@@ -365,9 +366,7 @@ function AppInner() {
         const data = (await r.json()) as PersistedAccountRow;
         if (cancelled) return;
         setLedgerAccountRow(data);
-        const email = (data.email ?? "").trim().toLowerCase();
-        const restoredPerpPositions = email ? loadUserPerpPositions(email) ?? [] : [];
-        dispatch({ type: "hydrateFromAccountRow", row: data, restoredPerpPositions });
+        dispatch({ type: "hydrateFromAccountRow", row: data });
       } catch {
         if (!cancelled) setLedgerAccountRow(null);
       }

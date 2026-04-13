@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS accounts (
   qusd_locked REAL NOT NULL DEFAULT 0,
   -- Cumulative realized perp loss notionals tracked in app reducer
   accumulated_losses_qusd REAL NOT NULL DEFAULT 0,
+  -- Bonus repayment progress (Send unlock); synced from client for registered users
+  bonus_repaid_usdc REAL NOT NULL DEFAULT 0,
+  -- Last vault lock/unlock activity (cooldown); epoch ms or NULL
+  vault_activity_at INTEGER,
   -- Deposit address (assigned at account creation; sync from app / provision script)
   sol_receive_address TEXT
 );
@@ -55,3 +59,18 @@ CREATE TABLE IF NOT EXISTS perp_transactions (
 CREATE INDEX IF NOT EXISTS idx_perp_txn_account ON perp_transactions (account_id);
 CREATE INDEX IF NOT EXISTS idx_perp_txn_position ON perp_transactions (account_id, position_id);
 CREATE INDEX IF NOT EXISTS idx_perp_txn_type ON perp_transactions (account_id, txn_type);
+
+-- Open perp positions (authoritative for logged-in users; replaced on each sync).
+CREATE TABLE IF NOT EXISTS perp_open_positions (
+  position_id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL CHECK (side IN ('long', 'short')),
+  entry_price REAL NOT NULL,
+  notional_usdc REAL NOT NULL,
+  leverage REAL NOT NULL,
+  margin_usdc REAL NOT NULL,
+  opened_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_perp_open_account ON perp_open_positions (account_id);

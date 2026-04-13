@@ -1,6 +1,6 @@
 /**
- * Persists simulated perp positions for logged-in users (browser localStorage).
- * Server SQLite does not store open perps — without this, refresh/deploy clears positions.
+ * Legacy localStorage for perps; logged-in state now lives in SQLite `perp_open_positions`.
+ * Kept for optional migration tooling; the app does not hydrate from this anymore.
  */
 import { DEFAULT_PERP_LEVERAGE } from "../engine/perps";
 import type { PerpPosition } from "../engine/perps";

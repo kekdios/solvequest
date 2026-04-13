@@ -16,6 +16,7 @@
     "db:migrate:receive": "node scripts/migrate-receive-addresses.mjs",
     "db:migrate:email": "node scripts/migrate-add-email-to-accounts.mjs",
     "db:migrate:tier": "node scripts/migrate-tier-column.mjs",
+    "db:migrate:account-sync": "node scripts/migrate-account-sync-state.mjs",
     "db:provision": "node scripts/provision-account.mjs"
   },
   "dependencies": {

@@ -12,6 +12,8 @@ import type { Plugin } from "vite";
 import { loadEnv } from "vite";
 import jwt from "jsonwebtoken";
 import Database from "better-sqlite3";
+import { z } from "zod";
+import { PERP_SYMBOLS } from "../src/engine/perps";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -20,6 +22,73 @@ const USER_COOKIE = "auth_token";
 const DEFAULT_TIER_ID = 3;
 const DEFAULT_COVERAGE_LIMIT_QUSD = 50_000;
 const DEFAULT_QUSD_UNLOCKED = 10_000;
+
+const perpSymbolZ = z.enum(PERP_SYMBOLS as unknown as [string, ...string[]]);
+
+const perpPositionPutZ = z.object({
+  id: z.string().min(1),
+  symbol: perpSymbolZ,
+  side: z.enum(["long", "short"]),
+  entryPrice: z.number(),
+  notionalUsdc: z.number(),
+  leverage: z.number().finite(),
+  marginUsdc: z.number(),
+  openedAt: z.number(),
+});
+
+const accountStatePutZ = z.object({
+  usdc_balance: z.number().finite(),
+  coverage_limit_qusd: z.number().finite(),
+  premium_accrued_usdc: z.number().finite(),
+  covered_losses_qusd: z.number().finite(),
+  coverage_used_qusd: z.number().finite(),
+  qusd_unlocked: z.number().finite(),
+  qusd_locked: z.number().finite(),
+  accumulated_losses_qusd: z.number().finite(),
+  bonus_repaid_usdc: z.number().finite(),
+  vault_activity_at: z.number().finite().nullable(),
+  open_perp_positions: z.array(perpPositionPutZ),
+});
+
+type DbOpenPos = {
+  position_id: string;
+  account_id: string;
+  symbol: string;
+  side: string;
+  entry_price: number;
+  notional_usdc: number;
+  leverage: number;
+  margin_usdc: number;
+  opened_at: number;
+};
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
+function loadOpenPositions(database: SqliteDb, accountId: string): z.infer<typeof perpPositionPutZ>[] {
+  const rows = database
+    .prepare(
+      `SELECT position_id, symbol, side, entry_price, notional_usdc, leverage, margin_usdc, opened_at
+       FROM perp_open_positions WHERE account_id = ?`,
+    )
+    .all(accountId) as DbOpenPos[];
+  return rows.map((r) => ({
+    id: r.position_id,
+    symbol: r.symbol,
+    side: r.side as "long" | "short",
+    entryPrice: r.entry_price,
+    notionalUsdc: r.notional_usdc,
+    leverage: r.leverage,
+    marginUsdc: r.margin_usdc,
+    openedAt: r.opened_at,
+  }));
+}
 
 function resolveAccountDbPath(root: string, env: Record<string, string>): string {
   return env.SOLVEQUEST_DB_PATH?.trim() || path.join(root, "data", "solvequest.db");
@@ -85,8 +154,9 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           `INSERT INTO accounts (
             id, created_at, updated_at, label, email,
             usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd, coverage_used_qusd,
-            tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd
-          ) VALUES (?, ?, ?, NULL, ?, 0, ?, 0, 0, 0, ?, ?, 0, 0)`,
+            tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd,
+            bonus_repaid_usdc, vault_activity_at
+          ) VALUES (?, ?, ?, NULL, ?, 0, ?, 0, 0, 0, ?, ?, 0, 0, 0, NULL)`,
         )
         .run(
           id,
@@ -151,10 +221,126 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           });
           return;
         }
-        sendJson(res, 200, row);
+        const database = getDb();
+        const accountId = String(row.id);
+        let openPerp: ReturnType<typeof loadOpenPositions> = [];
+        try {
+          openPerp =
+            database && accountId ? loadOpenPositions(database, accountId) : [];
+        } catch (e) {
+          console.error("[account-api] load open positions:", e);
+          sendJson(res, 503, {
+            error: "db_schema",
+            message: "Run: npm run db:migrate:account-sync (perp_open_positions).",
+          });
+          return;
+        }
+        sendJson(res, 200, { ...row, open_perp_positions: openPerp });
       } catch {
         sendJson(res, 401, { error: "Invalid token" });
       }
+      return;
+    }
+
+    if (req.method === "PUT" && url === "/api/account/state") {
+      void (async () => {
+        const token = parseCookies(req.headers.cookie)[USER_COOKIE];
+        if (!token) {
+          sendJson(res, 401, { error: "Not authenticated" });
+          return;
+        }
+        try {
+          const payload = jwt.verify(token, jwtSecret!) as { email?: string };
+          if (!payload.email || typeof payload.email !== "string") {
+            sendJson(res, 401, { error: "Invalid token" });
+            return;
+          }
+          const email = payload.email.toLowerCase();
+          let body: z.infer<typeof accountStatePutZ>;
+          try {
+            body = accountStatePutZ.parse(JSON.parse((await readBody(req)) || "{}"));
+          } catch (e) {
+            sendJson(res, 400, {
+              error: "invalid_body",
+              message: e instanceof Error ? e.message : String(e),
+            });
+            return;
+          }
+          const row = loadOrCreateRow(email);
+          if (!row?.id) {
+            sendJson(res, 503, { error: "no_account" });
+            return;
+          }
+          const accountId = String(row.id);
+          const database = getDb();
+          if (!database) {
+            sendJson(res, 503, { error: "db_missing" });
+            return;
+          }
+          const now = Date.now();
+          try {
+            const run = database.transaction(() => {
+              database
+                .prepare(
+                  `UPDATE accounts SET
+                    updated_at = ?,
+                    usdc_balance = ?,
+                    coverage_limit_qusd = ?,
+                    premium_accrued_usdc = ?,
+                    covered_losses_qusd = ?,
+                    coverage_used_qusd = ?,
+                    qusd_unlocked = ?,
+                    qusd_locked = ?,
+                    accumulated_losses_qusd = ?,
+                    bonus_repaid_usdc = ?,
+                    vault_activity_at = ?
+                  WHERE id = ?`,
+                )
+                .run(
+                  now,
+                  body.usdc_balance,
+                  body.coverage_limit_qusd,
+                  body.premium_accrued_usdc,
+                  body.covered_losses_qusd,
+                  body.coverage_used_qusd,
+                  body.qusd_unlocked,
+                  body.qusd_locked,
+                  body.accumulated_losses_qusd,
+                  body.bonus_repaid_usdc,
+                  body.vault_activity_at,
+                  accountId,
+                );
+              database.prepare(`DELETE FROM perp_open_positions WHERE account_id = ?`).run(accountId);
+              const ins = database.prepare(
+                `INSERT INTO perp_open_positions (
+                  position_id, account_id, symbol, side, entry_price, notional_usdc, leverage, margin_usdc, opened_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              );
+              for (const p of body.open_perp_positions) {
+                ins.run(
+                  p.id,
+                  accountId,
+                  p.symbol,
+                  p.side,
+                  p.entryPrice,
+                  p.notionalUsdc,
+                  p.leverage,
+                  p.marginUsdc,
+                  p.openedAt,
+                );
+              }
+            });
+            run();
+          } catch (e) {
+            console.error("[account-api] PUT /api/account/state:", e);
+            sendJson(res, 500, { error: "persist_failed" });
+            return;
+          }
+          sendJson(res, 200, { ok: true });
+        } catch {
+          sendJson(res, 401, { error: "Invalid token" });
+        }
+      })();
       return;
     }
 

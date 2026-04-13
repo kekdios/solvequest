@@ -37,11 +37,13 @@ try {
       id, created_at, updated_at, label, email,
       usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd, coverage_used_qusd,
       tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd,
+      bonus_repaid_usdc, vault_activity_at,
       sol_receive_address
     ) VALUES (
       @id, @created_at, @updated_at, NULL, NULL,
       @usdc_balance, @coverage_limit_qusd, 0, 0, 0,
       @tier_id, @qusd_unlocked, 0, 0,
+      0, NULL,
       @sol_receive_address
     )
   `);
