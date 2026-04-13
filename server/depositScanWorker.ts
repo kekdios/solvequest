@@ -26,10 +26,67 @@ function rpcUrl(env: NodeJS.ProcessEnv): string {
   );
 }
 
+/**
+ * One full pass over all accounts with a deposit address (USDC scan + optional custodial sweep).
+ * Used by POST /api/admin/deposit-scan. Opens and closes the DB for each run.
+ */
+export async function runDepositScanOnce(
+  root: string,
+  env: NodeJS.ProcessEnv,
+): Promise<{ ok: true; accountsScanned: number } | { ok: false; error: string }> {
+  const dbPath = resolveDbPath(root, env);
+  if (!fs.existsSync(dbPath)) {
+    return { ok: false, error: `database missing at ${dbPath}` };
+  }
+
+  let database: SqliteDb;
+  try {
+    database = new Database(dbPath);
+    database.pragma("foreign_keys = ON");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+
+  const qusdPerUsdc = parseQusdMultiplier(env.QUSD_MULTIPLIER ?? env.VITE_QUSD_MULTIPLIER);
+  const connection = new Connection(rpcUrl(env), "confirmed");
+
+  try {
+    let rows: { id: string; sol_receive_address: string }[];
+    try {
+      rows = database
+        .prepare(
+          `SELECT id, sol_receive_address FROM accounts
+           WHERE sol_receive_address IS NOT NULL AND TRIM(sol_receive_address) != ''`,
+        )
+        .all() as { id: string; sol_receive_address: string }[];
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, error: msg };
+    }
+
+    for (const { id: accountId, sol_receive_address: addr } of rows) {
+      try {
+        await processAccount(database, connection, accountId, addr, qusdPerUsdc, env);
+      } catch (e) {
+        console.error(`[deposit-scan] account ${accountId}:`, e);
+      }
+    }
+    return { ok: true, accountsScanned: rows.length };
+  } finally {
+    try {
+      database.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Opt-in background polling: set SOLVEQUEST_DEPOSIT_SCAN=1 (or true). Default is off — use admin “Scan now” or this env. */
 export function startDepositScanWorker(root: string, env: NodeJS.ProcessEnv): void {
-  const disabled = env.SOLVEQUEST_DEPOSIT_SCAN === "0" || env.SOLVEQUEST_DEPOSIT_SCAN === "false";
-  if (disabled) {
-    console.log("[deposit-scan] disabled (SOLVEQUEST_DEPOSIT_SCAN=0)");
+  const enabled = env.SOLVEQUEST_DEPOSIT_SCAN === "1" || env.SOLVEQUEST_DEPOSIT_SCAN === "true";
+  if (!enabled) {
+    console.log("[deposit-scan] background polling disabled (set SOLVEQUEST_DEPOSIT_SCAN=1 to enable)");
     return;
   }
 

@@ -9,6 +9,7 @@ import type { Plugin } from "vite";
 import { loadEnv } from "vite";
 import { PublicKey } from "@solana/web3.js";
 import nacl from "tweetnacl";
+import { runDepositScanOnce } from "../server/depositScanWorker";
 
 const COOKIE = "sq_admin_session";
 const NONCE_TTL_MS = 10 * 60 * 1000;
@@ -58,9 +59,24 @@ function buildMessage(nonce: string): string {
   ].join("\n");
 }
 
+function adminSessionOk(
+  cookieHeader: string | undefined,
+  sessions: Map<string, SessionEntry>,
+): SessionEntry | null {
+  const sid = parseCookies(cookieHeader)[COOKIE];
+  if (!sid || !sessions.has(sid)) return null;
+  const s = sessions.get(sid)!;
+  if (s.exp <= Date.now()) {
+    sessions.delete(sid);
+    return null;
+  }
+  return s;
+}
+
 export function createAdminApiMiddleware(
   env: Record<string, string>,
   mode: string,
+  appRoot: string,
 ): Connect.NextHandleFunction {
   const raw = env.ADMIN_SOLANA_ADDRESS ?? "";
   const allow = new Set<string>();
@@ -121,18 +137,30 @@ export function createAdminApiMiddleware(
     }
 
     if (req.method === "GET" && url === "/api/admin/me") {
-      const sid = parseCookies(req.headers.cookie)[COOKIE];
-      if (!sid || !sessions.has(sid)) {
-        sendJson(res, 200, { ok: false, authenticated: false });
-        return;
-      }
-      const s = sessions.get(sid)!;
-      if (s.exp <= Date.now()) {
-        sessions.delete(sid);
+      const s = adminSessionOk(req.headers.cookie, sessions);
+      if (!s) {
         sendJson(res, 200, { ok: false, authenticated: false });
         return;
       }
       sendJson(res, 200, { ok: true, authenticated: true, pubkey: s.pubkey });
+      return;
+    }
+
+    if (req.method === "POST" && url === "/api/admin/deposit-scan") {
+      if (!adminSessionOk(req.headers.cookie, sessions)) {
+        sendJson(res, 401, { ok: false, error: "unauthorized" });
+        return;
+      }
+      void runDepositScanOnce(appRoot, process.env).then((result) => {
+        if (result.ok) {
+          sendJson(res, 200, {
+            ok: true,
+            accountsScanned: result.accountsScanned,
+          });
+        } else {
+          sendJson(res, 500, { ok: false, error: result.error });
+        }
+      });
       return;
     }
 
@@ -237,7 +265,7 @@ export function adminApiPlugin(): Plugin {
       server.config.logger.warn("solvequest-admin-api: set ADMIN_SOLANA_ADDRESS in .env to enable /api/admin");
       return;
     }
-    server.middlewares.use(createAdminApiMiddleware(env, server.config.mode));
+    server.middlewares.use(createAdminApiMiddleware(env, server.config.mode, server.config.root));
   };
 
   return {

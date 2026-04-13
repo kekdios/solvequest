@@ -6,6 +6,7 @@ import express from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { PublicKey } from "@solana/web3.js";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { createUserAuthMiddleware } from "../plugins/userAuthApiPlugin";
 import { createAccountApiMiddleware } from "../plugins/accountApiPlugin";
@@ -47,9 +48,26 @@ app.get("/version", (_req, res) => {
   res.json({ version: appVersion });
 });
 
+/** Public: lets the admin custody sweep UI use SOLANA_TREASURY_ADDRESS without a Vite rebuild. */
+app.get("/api/config/treasury", (_req, res) => {
+  const raw =
+    process.env.SOLANA_TREASURY_ADDRESS?.trim() ||
+    process.env.VITE_SOLANA_TREASURY_ADDRESS?.trim();
+  res.setHeader("Cache-Control", "no-store");
+  if (!raw) {
+    res.json({ address: null });
+    return;
+  }
+  try {
+    res.json({ address: new PublicKey(raw).toBase58() });
+  } catch {
+    res.status(500).json({ error: "invalid_treasury_env" });
+  }
+});
+
 app.use(createUserAuthMiddleware(env, mode));
 app.use(createAccountApiMiddleware(env, root));
-app.use(createAdminApiMiddleware(env, mode));
+app.use(createAdminApiMiddleware(env, mode, root));
 
 const solanaTarget =
   env.SOLANA_RPC_PROXY_TARGET?.trim() || "https://api.mainnet-beta.solana.com";

@@ -66,3 +66,21 @@ export function treasuryPubkey(): PublicKey | null {
     return null;
   }
 }
+
+/**
+ * Treasury for browser-side sweeps: `VITE_SOLANA_TREASURY_ADDRESS` at build time, else
+ * `GET /api/config/treasury` (reads server `SOLANA_TREASURY_ADDRESS` — no rebuild needed).
+ */
+export async function resolveTreasuryPubkey(): Promise<PublicKey | null> {
+  const fromVite = treasuryPubkey();
+  if (fromVite) return fromVite;
+  try {
+    const r = await fetch("/api/config/treasury", { credentials: "same-origin" });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { address?: string | null };
+    if (!j.address || typeof j.address !== "string") return null;
+    return new PublicKey(j.address.trim());
+  } catch {
+    return null;
+  }
+}

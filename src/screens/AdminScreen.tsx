@@ -10,6 +10,7 @@ import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import {
   fetchAdminMe,
   fetchAdminNonce,
+  postAdminDepositScan,
   postAdminLogout,
   postAdminVerify,
   uint8ToBase64,
@@ -64,6 +65,8 @@ function AdminScreenInner({ onNavigateHome, onCustodialUsdcCredited }: Props) {
   const [loadingMe, setLoadingMe] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serverScanBusy, setServerScanBusy] = useState(false);
+  const [serverScanMsg, setServerScanMsg] = useState<string | null>(null);
 
   const refreshMe = useCallback(() => {
     setLoadingMe(true);
@@ -139,6 +142,30 @@ function AdminScreenInner({ onNavigateHome, onCustodialUsdcCredited }: Props) {
             This session is stored in an httpOnly cookie for this origin. Add operational tools here (metrics, user
             list, etc.).
           </p>
+          <div style={{ ...s.row, alignItems: "flex-start", flexDirection: "column" }}>
+            <button
+              type="button"
+              style={s.btn}
+              disabled={serverScanBusy}
+              onClick={() => {
+                setServerScanMsg(null);
+                setServerScanBusy(true);
+                void postAdminDepositScan()
+                  .then((r) => {
+                    setServerScanMsg(`Server scan finished · ${r.accountsScanned} account(s) with deposit addresses checked.`);
+                  })
+                  .catch((e: unknown) => {
+                    setServerScanMsg(e instanceof Error ? e.message : "Server scan failed");
+                  })
+                  .finally(() => setServerScanBusy(false));
+              }}
+            >
+              {serverScanBusy ? "Scanning…" : "Run server deposit scan"}
+            </button>
+            {serverScanMsg ? (
+              <p style={{ ...s.muted, margin: "8px 0 0", fontSize: 13 }}>{serverScanMsg}</p>
+            ) : null}
+          </div>
           <div style={s.row}>
             <button type="button" style={s.btnGhost} onClick={() => void onLogout()}>
               Sign out

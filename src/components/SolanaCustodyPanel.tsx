@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAccount } from "@solana/spl-token";
-import { CUSTODY_POLL_INTERVAL_MS } from "../deposit/custodyPollMs";
 import { getUsdcAta, runUsdcDepositScan } from "../deposit/scanIncoming";
 import { loadLedger, saveLedger, type CustodyLedger } from "../deposit/depositLedger";
 import { MAINNET_USDC_MINT, READ_COMMITMENT, makeConnection } from "../deposit/chainConfig";
@@ -64,6 +63,7 @@ export default function SolanaCustodyPanel({ accountId, onUsdcCredited }: Props)
     setLedger(loadLedger(accountId));
   }, [accountId]);
 
+  /** Load SOL/USDC balances only — deposit scan runs when you click “Scan now”. */
   useEffect(() => {
     const kp = getSolanaKeypairFromStorage();
     if (!kp) return;
@@ -71,20 +71,16 @@ export default function SolanaCustodyPanel({ accountId, onUsdcCredited }: Props)
     void (async () => {
       try {
         await refreshBalances(kp.publicKey);
-        if (!alive) return;
-        await runScan();
       } catch (e) {
         if (!alive) return;
         setStatus("error");
         setErrMsg(e instanceof Error ? e.message : "RPC error");
       }
     })();
-    const id = window.setInterval(() => void runScan(), CUSTODY_POLL_INTERVAL_MS);
     return () => {
       alive = false;
-      window.clearInterval(id);
     };
-  }, [accountId, refreshBalances, runScan]);
+  }, [accountId, refreshBalances]);
 
   const sweep = async () => {
     setSweepMsg(null);
@@ -108,10 +104,10 @@ export default function SolanaCustodyPanel({ accountId, onUsdcCredited }: Props)
       <h4 style={s.h4}>Solana custody (mainnet)</h4>
       <p style={s.p}>
         Unique deposit keypair per account; USDC SPL uses the standard ATA for mint{" "}
-        <code style={s.code}>{MAINNET_USDC_MINT.toBase58().slice(0, 6)}…</code>.         Polls every{" "}
-        {CUSTODY_POLL_INTERVAL_MS / 1000}s. In production, USDC→QUSD credits are recorded by the{" "}
-        <strong style={{ color: "var(--text)" }}>server deposit worker</strong> (SQLite{" "}
-        <code style={s.code}>deposit_credits</code>). This panel is for debugging / treasury sweep only.
+        <code style={s.code}>{MAINNET_USDC_MINT.toBase58().slice(0, 6)}…</code>. Use <strong>Scan now</strong> to check
+        for new deposits. In production, USDC→QUSD credits are applied when an admin runs{" "}
+        <strong>Run server deposit scan</strong> (or enable background{" "}
+        <code style={s.code}>SOLVEQUEST_DEPOSIT_SCAN=1</code>). This panel is for debugging / treasury sweep only.
       </p>
       {errMsg && /403|forbidden/i.test(errMsg) ? (
         <p style={s.rpcHint}>

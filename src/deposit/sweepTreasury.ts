@@ -5,7 +5,7 @@ import {
   getAssociatedTokenAddressSync,
   getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
-import { MAINNET_USDC_MINT, READ_COMMITMENT, makeConnection, treasuryPubkey } from "./chainConfig";
+import { MAINNET_USDC_MINT, READ_COMMITMENT, makeConnection, resolveTreasuryPubkey } from "./chainConfig";
 
 /** Keep this many lamports for fees + rent after sweeping SOL. */
 const SOL_BUFFER_LAMPORTS = 1_000_000;
@@ -16,12 +16,17 @@ export type SweepResult =
 
 /**
  * Moves USDC (full balance) from the user ATA to the treasury USDC ATA, and optionally excess SOL
- * (above buffer) to the treasury SOL address. Requires `VITE_SOLANA_TREASURY_ADDRESS`.
+ * (above buffer) to the treasury SOL address. Uses `VITE_SOLANA_TREASURY_ADDRESS` or server `SOLANA_TREASURY_ADDRESS`
+ * via `/api/config/treasury`.
  */
 export async function sweepCustodialToTreasury(owner: Keypair): Promise<SweepResult> {
-  const treasury = treasuryPubkey();
+  const treasury = await resolveTreasuryPubkey();
   if (!treasury) {
-    return { ok: false, reason: "Set VITE_SOLANA_TREASURY_ADDRESS to enable sweeps." };
+    return {
+      ok: false,
+      reason:
+        "Treasury not configured. Set SOLANA_TREASURY_ADDRESS in server .env (or VITE_SOLANA_TREASURY_ADDRESS for the build) and restart.",
+    };
   }
 
   const connection = makeConnection();

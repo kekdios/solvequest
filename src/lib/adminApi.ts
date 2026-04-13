@@ -44,6 +44,24 @@ export async function postAdminLogout(): Promise<void> {
   await fetch(`${base}/logout`, { method: "POST", credentials: "include" });
 }
 
+/** Runs one server-side Solana USDC deposit scan for all accounts (admin session required). */
+export async function postAdminDepositScan(): Promise<{ ok: true; accountsScanned: number }> {
+  const r = await fetch(`${base}/deposit-scan`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  const data = (await r.json().catch(() => ({}))) as { ok?: boolean; accountsScanned?: number; error?: string };
+  if (!r.ok) {
+    throw new Error(data.error ?? r.statusText);
+  }
+  if (!data.ok || typeof data.accountsScanned !== "number") {
+    throw new Error("unexpected_response");
+  }
+  return { ok: true, accountsScanned: data.accountsScanned };
+}
+
 export function uint8ToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
