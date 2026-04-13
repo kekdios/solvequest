@@ -150,6 +150,15 @@
   }
 }
 
+.lp-leverage-tagline {
+  margin: 0 auto 24px;
+  max-width: 36ch;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--accent) 88%, var(--text));
+}
+
 .lp-cta-row {
   display: flex;
   flex-wrap: wrap;
@@ -374,72 +383,6 @@
   font-size: 0.875rem;
   color: var(--muted);
   line-height: 1.5;
-}
-
-.lp-example {
-  background: linear-gradient(145deg, #141416 0%, var(--panel) 100%);
-  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
-  border-radius: var(--lp-radius);
-  padding: 28px 24px;
-  max-width: 520px;
-  margin: 0 auto;
-}
-
-.lp-example-flow {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.lp-example-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 0.9375rem;
-  color: var(--muted);
-}
-
-.lp-example-row strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.lp-example-arrow {
-  color: var(--accent);
-  font-size: 0.75rem;
-  padding-left: 4px;
-  opacity: 0.85;
-}
-
-.lp-example-totals {
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
-  display: grid;
-  gap: 8px;
-  font-family: var(--mono);
-  font-size: 0.9rem;
-}
-
-.lp-example-totals .gain {
-  color: var(--ok);
-}
-
-.lp-example-totals .cost {
-  color: var(--warn);
-}
-
-.lp-example-qusd {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.lp-example-totals .net {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--accent);
-  padding-top: 4px;
 }
 
 .lp-shield {

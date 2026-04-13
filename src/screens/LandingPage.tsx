@@ -80,6 +80,7 @@ export default function LandingPage({ onStartNow }: Props) {
               </p>
             </div>
           </div>
+          <p className="lp-leverage-tagline">Automatic 100x Leverage</p>
           <div className="lp-cta-row">
             <button type="button" className="lp-btn-primary" onClick={onStartNow}>
               Start Now
@@ -184,31 +185,6 @@ export default function LandingPage({ onStartNow }: Props) {
                 accrual you can unlock when you&apos;re ready.
               </p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="lp-section" aria-labelledby="lp-example-heading">
-        <h2 id="lp-example-heading" className="lp-section-title">
-          Example Trade
-        </h2>
-        <div className="lp-example">
-          <div className="lp-example-flow">
-            <div className="lp-example-row">
-              <span className="lp-example-arrow">→</span>
-              User selects <strong>LONG</strong> on ETH
-            </div>
-            <div className="lp-example-row">
-              <span className="lp-example-arrow">→</span>
-              AI executes trade
-            </div>
-            <div className="lp-example-row">
-              <span className="lp-example-arrow">→</span>
-              Market moves up
-            </div>
-          </div>
-          <div className="lp-example-totals">
-            <div className="gain">Illustrative P/L: +120 USD</div>
           </div>
         </div>
       </section>
