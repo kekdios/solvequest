@@ -216,11 +216,11 @@ export default function LandingPage({ onStartNow }: Props) {
           </div>
           <div className="lp-stat">
             <div className="lp-stat-value">87%</div>
-            <div className="lp-stat-label">Win rate</div>
+            <div className="lp-stat-label">Success Rate</div>
           </div>
           <div className="lp-stat">
-            <div className="lp-stat-value">42,000+</div>
-            <div className="lp-stat-label">Active users</div>
+            <div className="lp-stat-value">Thousands</div>
+            <div className="lp-stat-label">Successful Trades</div>
           </div>
         </div>
       </section>
