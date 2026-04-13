@@ -155,6 +155,66 @@ select {
   max-width: 100%;
 }
 
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.app-sidebar {
+  width: 15rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: #121214;
+}
+
+.app-sidebar-nav {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-sidebar-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--text) 72%, var(--muted));
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.app-sidebar-item:hover:not(.app-sidebar-item--on) {
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.app-sidebar-item--on {
+  color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 20%, transparent) !important;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  overflow-x: clip;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .app-page-title {
   overflow-wrap: anywhere;
 }
@@ -165,24 +225,34 @@ select {
     align-items: stretch !important;
     gap: 12px;
   }
+}
 
-  .app-nav {
-    flex-wrap: nowrap !important;
-    justify-content: flex-start !important;
+@media (max-width: 768px) {
+  .app-body {
+    flex-direction: column;
+  }
+
+  .app-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app-sidebar-nav {
+    flex-direction: row;
+    flex-wrap: nowrap;
     overflow-x: auto;
     overflow-y: hidden;
+    gap: 4px;
+    padding: 8px var(--app-pad-x);
     -webkit-overflow-scrolling: touch;
-    gap: 8px;
-    padding-bottom: 6px;
-    margin-left: -2px;
-    margin-right: -2px;
-    padding-left: 2px;
-    padding-right: 2px;
     scrollbar-width: thin;
   }
 
-  .app-nav::-webkit-scrollbar {
-    height: 4px;
+  .app-sidebar-item {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
   }
 }
 
@@ -236,20 +306,6 @@ select {
     flex: 0 0 auto !important;
     min-width: 3rem;
   }
-}
-
-/* Primary nav — active tab (classNames from App.tsx) */
-.app-nav-tab {
-  border-radius: 8px;
-}
-
-.app-nav-tab--on {
-  color: var(--text) !important;
-  background: color-mix(in srgb, var(--accent) 14%, transparent) !important;
-}
-
-.app-nav-tab:hover:not(.app-nav-tab--on) {
-  color: rgba(255, 255, 255, 0.85);
 }
 
 /* App pages (Account, Auth, Quick Start, Admin, etc.) — log rows + shared root */

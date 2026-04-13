@@ -34,6 +34,7 @@ import LandingPage from "./screens/LandingPage";
 import AccountScreen from "./screens/AccountScreen";
 import QuickStartScreen from "./screens/QuickStartScreen";
 import AuthScreen from "./screens/AuthScreen";
+import AppSidebar, { type AppScreen } from "./components/AppSidebar";
 
 const AdminScreen = lazy(() => import("./screens/AdminScreen"));
 
@@ -253,8 +254,6 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-type AppScreen = "landing" | "quickstart" | "trade" | "account" | "auth" | "admin";
-
 const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   landing: {
     title: "",
@@ -452,22 +451,12 @@ function AppInner() {
     };
   }, []);
 
-  const pageStyle =
-    screen === "landing" ||
-    screen === "quickstart" ||
-    screen === "trade" ||
-    screen === "account" ||
-    screen === "auth" ||
-    screen === "admin"
-      ? styles.pageWide
-      : styles.page;
-
   return (
     <div
       className={screen === "landing" ? "app-shell app-shell--landing" : "app-shell"}
-      style={screen === "landing" ? styles.pageLanding : pageStyle}
+      style={screen === "landing" ? styles.shellLanding : styles.shell}
     >
-      <header style={screen === "landing" ? { ...styles.header, marginBottom: 0 } : styles.header}>
+      <header className="app-top-header" style={styles.topHeader}>
         <div className="app-header-top" style={styles.headerTop}>
           <div style={styles.logoRow}>
             <button type="button" style={styles.logoBtn} onClick={() => setScreen("landing")} aria-label="Home">
@@ -485,140 +474,102 @@ function AppInner() {
               </span>
             ) : null}
           </div>
-          <nav className="app-nav" style={styles.nav} aria-label="Primary">
-            <div style={styles.navMain}>
-              <button
-                type="button"
-                className={`app-nav-tab${screen === "landing" ? " app-nav-tab--on" : ""}`}
-                style={styles.navBtn}
-                onClick={() => setScreen("landing")}
-              >
-                Home
-              </button>
-              <button
-                type="button"
-                className={`app-nav-tab${screen === "quickstart" ? " app-nav-tab--on" : ""}`}
-                style={styles.navBtn}
-                onClick={() => setScreen("quickstart")}
-              >
-                Quick Start
-              </button>
-              <button
-                type="button"
-                className={`app-nav-tab${screen === "trade" ? " app-nav-tab--on" : ""}`}
-                style={styles.navBtn}
-                onClick={() => setScreen("trade")}
-              >
-                Perpetuals
-              </button>
-              <button
-                type="button"
-                className={`app-nav-tab${screen === "account" ? " app-nav-tab--on" : ""}`}
-                style={styles.navBtn}
-                onClick={() => setScreen("account")}
-              >
-                Account
-              </button>
-              <button
-                type="button"
-                className={`app-nav-tab${screen === "admin" ? " app-nav-tab--on" : ""}`}
-                style={styles.navBtn}
-                onClick={() => setScreen("admin")}
-              >
-                Admin
-              </button>
-            </div>
-            <div style={styles.navRight}>
-              {user ? (
-                <div style={styles.navAuthSignedIn}>
-                  <span style={styles.navUser} title={user.email}>
-                    {user.email.length > 22 ? `${user.email.slice(0, 20)}…` : user.email}
-                  </span>
-                  <button type="button" style={styles.navAuthBtn} onClick={() => void logout()}>
-                    Sign out
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  style={screen === "auth" ? styles.navAuthBtnOn : styles.navAuthBtn}
-                  onClick={() => setScreen("auth")}
-                >
-                  Login / Register
+          <div style={styles.navRight}>
+            {user ? (
+              <div style={styles.navAuthSignedIn}>
+                <span style={styles.navUser} title={user.email}>
+                  {user.email.length > 22 ? `${user.email.slice(0, 20)}…` : user.email}
+                </span>
+                <button type="button" style={styles.navAuthBtn} onClick={() => void logout()}>
+                  Sign out
                 </button>
-              )}
-            </div>
-          </nav>
+              </div>
+            ) : (
+              <button
+                type="button"
+                style={screen === "auth" ? styles.navAuthBtnOn : styles.navAuthBtn}
+                onClick={() => setScreen("auth")}
+              >
+                Login / Register
+              </button>
+            )}
+          </div>
         </div>
-        {screen !== "landing" && (
-          <>
-            <h1 className="app-page-title" style={styles.h1}>
-              {SCREEN_HEADER[screen].title}
-            </h1>
-            {SCREEN_HEADER[screen].lead ? (
-              <p style={styles.lead}>{SCREEN_HEADER[screen].lead}</p>
-            ) : null}
-          </>
-        )}
       </header>
 
-      {screen === "landing" && <LandingPage onStartNow={() => setScreen("trade")} />}
+      <div className="app-body">
+        <AppSidebar screen={screen} onNavigate={setScreen} />
+        <main
+          className="app-main"
+          style={screen === "landing" ? styles.mainLanding : styles.main}
+        >
+          {screen !== "landing" && (
+            <header style={styles.mainHeader}>
+              <h1 className="app-page-title" style={styles.h1}>
+                {SCREEN_HEADER[screen].title}
+              </h1>
+              {SCREEN_HEADER[screen].lead ? <p style={styles.lead}>{SCREEN_HEADER[screen].lead}</p> : null}
+            </header>
+          )}
 
-      {screen === "admin" && (
-        <Suspense fallback={<p style={styles.muted}>Loading admin…</p>}>
-          <AdminScreen
-            onNavigateHome={() => setScreen("landing")}
-            onCustodialUsdcCredited={(amount) => dispatch({ type: "deposit", amount })}
-          />
-        </Suspense>
-      )}
+          {screen === "landing" && <LandingPage onStartNow={() => setScreen("trade")} />}
 
-      {screen === "auth" && (
-        <AuthScreen onSuccess={() => setScreen("trade")} onContinueDemo={() => setScreen("trade")} />
-      )}
+          {screen === "admin" && (
+            <Suspense fallback={<p style={styles.muted}>Loading admin…</p>}>
+              <AdminScreen
+                onNavigateHome={() => setScreen("landing")}
+                onCustodialUsdcCredited={(amount) => dispatch({ type: "deposit", amount })}
+              />
+            </Suspense>
+          )}
 
-      {screen === "quickstart" && (
-        <QuickStartScreen
-          onGoToPerps={() => setScreen("trade")}
-          onGoToAccount={() => setScreen("account")}
-        />
-      )}
+          {screen === "auth" && (
+            <AuthScreen onSuccess={() => setScreen("trade")} onContinueDemo={() => setScreen("trade")} />
+          )}
 
-      {screen === "trade" && (
-        <PerpsTradeScreen
-          marks={state.marks}
-          positions={state.perpPositions}
-          onOpen={(args) => dispatch({ type: "perpOpen", ...args })}
-          onClose={(positionId) => dispatch({ type: "perpClose", positionId })}
-          priceFeed={{
-            status: hlFeedStatus,
-            intervalMs: HL_POLL_INTERVAL_MS,
-            sourceLabel: "Hyperliquid",
-          }}
-          onNavigateToAccount={() => setScreen("account")}
-          qusdUnlocked={state.qusd.unlocked}
-          qusdLocked={state.qusd.locked}
-        />
-      )}
+          {screen === "quickstart" && (
+            <QuickStartScreen
+              onGoToPerps={() => setScreen("trade")}
+              onGoToAccount={() => setScreen("account")}
+            />
+          )}
 
-      {screen === "account" && (
-        <AccountScreen
-          isDemo={demo}
-          ledgerAccountRow={ledgerAccountRow}
-          qusdUnlocked={state.qusd.unlocked}
-          qusdLocked={state.qusd.locked}
-          onLockQusd={lockQusd}
-          onUnlockQusd={unlockQusd}
-          bonusRepaidUsdc={state.bonusRepaidUsdc}
-          usdcBalance={state.account.balance}
-          sendUnlocked={state.bonusRepaidUsdc >= BONUS_REPAYMENT_USDC}
-          vaultActivityAt={state.vaultActivityAt}
-          onRepayBonusUsdc={(amount) => dispatch({ type: "repayBonusUsdc", amount })}
-          onUnlockedTopUpUsdc={(usdc) => dispatch({ type: "unlockedTopUpUsdc", usdc })}
-          onUnlockedWithdrawUsdc={(usdc) => dispatch({ type: "unlockedWithdrawUsdc", usdc })}
-        />
-      )}
+          {screen === "trade" && (
+            <PerpsTradeScreen
+              marks={state.marks}
+              positions={state.perpPositions}
+              onOpen={(args) => dispatch({ type: "perpOpen", ...args })}
+              onClose={(positionId) => dispatch({ type: "perpClose", positionId })}
+              priceFeed={{
+                status: hlFeedStatus,
+                intervalMs: HL_POLL_INTERVAL_MS,
+                sourceLabel: "Hyperliquid",
+              }}
+              onNavigateToAccount={() => setScreen("account")}
+              qusdUnlocked={state.qusd.unlocked}
+              qusdLocked={state.qusd.locked}
+            />
+          )}
 
+          {screen === "account" && (
+            <AccountScreen
+              isDemo={demo}
+              ledgerAccountRow={ledgerAccountRow}
+              qusdUnlocked={state.qusd.unlocked}
+              qusdLocked={state.qusd.locked}
+              onLockQusd={lockQusd}
+              onUnlockQusd={unlockQusd}
+              bonusRepaidUsdc={state.bonusRepaidUsdc}
+              usdcBalance={state.account.balance}
+              sendUnlocked={state.bonusRepaidUsdc >= BONUS_REPAYMENT_USDC}
+              vaultActivityAt={state.vaultActivityAt}
+              onRepayBonusUsdc={(amount) => dispatch({ type: "repayBonusUsdc", amount })}
+              onUnlockedTopUpUsdc={(usdc) => dispatch({ type: "unlockedTopUpUsdc", usdc })}
+              onUnlockedWithdrawUsdc={(usdc) => dispatch({ type: "unlockedWithdrawUsdc", usdc })}
+            />
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -632,20 +583,44 @@ export default function App() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: {
-    maxWidth: 920,
-    margin: "0 auto",
-    padding: "var(--app-pad-y) var(--app-pad-x) var(--app-pad-bottom)",
+  shell: {
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100vh",
+    boxSizing: "border-box",
   },
-  pageWide: {
+  shellLanding: {
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100vh",
+    boxSizing: "border-box",
+  },
+  topHeader: {
+    flexShrink: 0,
+    borderBottom: "1px solid var(--border)",
+    background: "#121214",
+    padding: "0 var(--app-pad-x)",
+  },
+  main: {
+    flex: 1,
+    minWidth: 0,
     maxWidth: 1120,
     margin: "0 auto",
+    width: "100%",
     padding: "var(--app-pad-y) var(--app-pad-x) var(--app-pad-bottom)",
+    boxSizing: "border-box",
   },
-  pageLanding: {
+  mainLanding: {
+    flex: 1,
+    minWidth: 0,
     maxWidth: 1200,
     margin: "0 auto",
+    width: "100%",
     padding: "var(--app-pad-y) var(--app-pad-x) var(--app-pad-bottom)",
+    boxSizing: "border-box",
+  },
+  mainHeader: {
+    marginBottom: 24,
   },
   logoBtn: {
     background: "transparent",
@@ -660,7 +635,8 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: 16,
-    marginBottom: 16,
+    minHeight: 56,
+    padding: "10px 0",
   },
   logoRow: {
     display: "flex",
@@ -686,17 +662,6 @@ const styles: Record<string, CSSProperties> = {
     objectFit: "contain",
     display: "block",
   },
-  nav: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 0,
-    justifyContent: "flex-end",
-    flex: 1,
-    minWidth: 0,
-  },
-  navMain: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", flex: 1, minWidth: 0 },
   navRight: {
     display: "flex",
     flexWrap: "wrap",
@@ -743,16 +708,6 @@ const styles: Record<string, CSSProperties> = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  navBtn: {
-    background: "transparent",
-    border: "none",
-    color: "var(--muted)",
-    borderRadius: 8,
-    padding: "10px 14px",
-    fontWeight: 600,
-    fontSize: 14,
-  },
-  header: { marginBottom: 28 },
   h1: {
     fontSize: "clamp(1.2rem, 4.2vw, 1.75rem)",
     fontWeight: 700,
