@@ -38,6 +38,21 @@ const perpPositionPutZ = z.object({
   openedAt: z.number(),
 });
 
+/** Client-queued close events → append-only `perp_transactions` (idempotent per position_id). */
+const perpCloseEventPutZ = z.object({
+  positionId: z.string().min(1),
+  symbol: perpSymbolZ,
+  side: z.enum(["long", "short"]),
+  entryPrice: z.number().finite(),
+  exitPrice: z.number().finite(),
+  notionalUsdc: z.number().finite(),
+  leverage: z.number().finite(),
+  marginUsdc: z.number().finite(),
+  openedAt: z.number(),
+  realizedPnlQusd: z.number().finite(),
+  closedAt: z.number(),
+});
+
 const accountStatePutZ = z.object({
   sync_version: z.number().int().min(0),
   usdc_balance: z.number().finite(),
@@ -51,6 +66,7 @@ const accountStatePutZ = z.object({
   bonus_repaid_usdc: z.number().finite(),
   vault_activity_at: z.number().finite().nullable(),
   open_perp_positions: z.array(perpPositionPutZ),
+  perp_close_events: z.array(perpCloseEventPutZ).optional().default([]),
 });
 
 const solReceivePutZ = z.object({
@@ -285,6 +301,62 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       return;
     }
 
+    if (req.method === "GET" && url === "/api/account/perp-closes") {
+      const token = parseCookies(req.headers.cookie)[USER_COOKIE];
+      if (!token) {
+        sendJson(res, 401, { error: "Not authenticated" });
+        return;
+      }
+      try {
+        const payload = jwt.verify(token, jwtSecret!) as { email?: string };
+        if (!payload.email || typeof payload.email !== "string") {
+          sendJson(res, 401, { error: "Invalid token" });
+          return;
+        }
+        const email = payload.email.toLowerCase();
+        const row = loadOrCreateRow(email);
+        if (!row?.id) {
+          sendJson(res, 503, { error: "no_account" });
+          return;
+        }
+        const database = getDb();
+        if (!database) {
+          sendJson(res, 503, { error: "db_missing" });
+          return;
+        }
+        const accountId = String(row.id);
+        const qs = new URL(req.url ?? "", "http://localhost").searchParams;
+        const page = Math.max(1, Number.parseInt(qs.get("page") ?? "1", 10) || 1);
+        const pageSize = Math.min(100, Math.max(1, Number.parseInt(qs.get("page_size") ?? "20", 10) || 20));
+        const offset = (page - 1) * pageSize;
+        const countRow = database
+          .prepare(
+            `SELECT COUNT(*) AS c FROM perp_transactions WHERE account_id = ? AND txn_type = 'close'`,
+          )
+          .get(accountId) as { c: number };
+        const total = Number(countRow.c) || 0;
+        const rows = database
+          .prepare(
+            `SELECT id, position_id, symbol, side, entry_price, exit_price, notional_usdc, leverage, margin_usdc,
+                    opened_at, realized_pnl_qusd, closed_at, inserted_at
+             FROM perp_transactions
+             WHERE account_id = ? AND txn_type = 'close'
+             ORDER BY closed_at DESC
+             LIMIT ? OFFSET ?`,
+          )
+          .all(accountId, pageSize, offset) as Record<string, unknown>[];
+        sendJson(res, 200, {
+          closes: rows,
+          total,
+          page,
+          page_size: pageSize,
+        });
+      } catch {
+        sendJson(res, 401, { error: "Invalid token" });
+      }
+      return;
+    }
+
     if (req.method === "PUT" && url === "/api/account/sol-receive-address") {
       void (async () => {
         const token = parseCookies(req.headers.cookie)[USER_COOKIE];
@@ -441,6 +513,30 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                   p.leverage,
                   p.marginUsdc,
                   p.openedAt,
+                );
+              }
+              const insClose = database.prepare(
+                `INSERT OR IGNORE INTO perp_transactions (
+                  account_id, position_id, txn_type, symbol, side,
+                  entry_price, notional_usdc, leverage, margin_usdc, opened_at,
+                  exit_price, realized_pnl_qusd, closed_at, inserted_at
+                ) VALUES (?, ?, 'close', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              );
+              for (const e of body.perp_close_events) {
+                insClose.run(
+                  accountId,
+                  e.positionId,
+                  e.symbol,
+                  e.side,
+                  e.entryPrice,
+                  e.notionalUsdc,
+                  e.leverage,
+                  e.marginUsdc,
+                  e.openedAt,
+                  e.exitPrice,
+                  e.realizedPnlQusd,
+                  e.closedAt,
+                  now,
                 );
               }
             });

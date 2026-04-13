@@ -16,6 +16,21 @@ export type DemoLogEntry = {
   message: string;
 };
 
+/** Queued for PUT /api/account/state → `perp_transactions` (txn_type = close). */
+export type PerpCloseSyncEvent = {
+  positionId: string;
+  symbol: PerpSymbol;
+  side: "long" | "short";
+  entryPrice: number;
+  exitPrice: number;
+  notionalUsdc: number;
+  leverage: number;
+  marginUsdc: number;
+  openedAt: number;
+  realizedPnlQusd: number;
+  closedAt: number;
+};
+
 export type DemoAppState = {
   account: Account;
   log: DemoLogEntry[];
@@ -26,4 +41,6 @@ export type DemoAppState = {
   qusd: { unlocked: number; locked: number };
   bonusRepaidUsdc: number;
   vaultActivityAt: number | null;
+  /** Registered users: appended on close, cleared after successful account sync. */
+  pendingPerpCloses: PerpCloseSyncEvent[];
 };

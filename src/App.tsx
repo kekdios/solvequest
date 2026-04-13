@@ -16,7 +16,7 @@ import {
   putSolReceiveAddress,
 } from "./lib/accountSync";
 import { getOrCreateAccountReceiveWallet } from "./lib/accountReceiveAddresses";
-import type { DemoAppState, DemoLogEntry } from "./lib/demoSessionTypes";
+import type { DemoAppState, DemoLogEntry, PerpCloseSyncEvent } from "./lib/demoSessionTypes";
 import { INITIAL_SESSION_WARN_FLAGS } from "./lib/demoSessionTypes";
 import { syncEquity } from "./engine/accountCore";
 import { fetchHyperliquidMids, HL_POLL_INTERVAL_MS } from "./engine/hyperliquid";
@@ -33,6 +33,7 @@ import PerpsTradeScreen from "./screens/PerpsTradeScreen";
 import LandingPage from "./screens/LandingPage";
 import AccountScreen from "./screens/AccountScreen";
 import QuickStartScreen from "./screens/QuickStartScreen";
+import HistoryScreen from "./screens/HistoryScreen";
 import AuthScreen from "./screens/AuthScreen";
 import AppSidebar, { type AppScreen } from "./components/AppSidebar";
 import {
@@ -59,8 +60,9 @@ type Action =
   | { type: "lockQusd"; amount: number }
   | { type: "unlockQusd"; amount: number }
   | { type: "qusdInterestMinute" }
-  | { type: "hydrateFromAccountRow"; row: PersistedAccountRow }
-  | { type: "replaceAll"; state: DemoAppState };
+  | { type: "hydrateFromAccountRow"; row: PersistedAccountRow; keepLocalPendingPerpCloses?: boolean }
+  | { type: "replaceAll"; state: DemoAppState }
+  | { type: "perpClosesSynced" };
 
 function pushLog(log: DemoLogEntry[], entry: Omit<DemoLogEntry, "id" | "t">): DemoLogEntry[] {
   return [
@@ -172,6 +174,7 @@ function reducer(state: State, action: Action): State {
         marks: { ...INITIAL_MARKS },
         sessionWarnFlags: INITIAL_SESSION_WARN_FLAGS,
         vaultActivityAt: slice.vaultActivityAt,
+        pendingPerpCloses: action.keepLocalPendingPerpCloses ? (state.pendingPerpCloses ?? []) : [],
         log: pushLog([], {
           kind: "info",
           message: "Loaded account balances from the server database.",
@@ -180,6 +183,8 @@ function reducer(state: State, action: Action): State {
     }
     case "replaceAll":
       return action.state;
+    case "perpClosesSynced":
+      return { ...state, pendingPerpCloses: [] };
     case "perpClose": {
       const pos = state.perpPositions.find((p) => p.id === action.positionId);
       if (!pos) return state;
@@ -195,11 +200,26 @@ function reducer(state: State, action: Action): State {
         upl >= 0
           ? `Closed ${pos.symbol} ${pos.side} · Realized +${upl.toFixed(2)} QUSD (margin + PnL)`
           : `Closed ${pos.symbol} ${pos.side} · Realized ${upl.toFixed(2)} QUSD (margin + PnL)`;
+      const closedAt = Date.now();
+      const closeEvt: PerpCloseSyncEvent = {
+        positionId: pos.id,
+        symbol: pos.symbol,
+        side: pos.side,
+        entryPrice: pos.entryPrice,
+        exitPrice: mark,
+        notionalUsdc: pos.notionalUsdc,
+        leverage: pos.leverage,
+        marginUsdc: pos.marginUsdc,
+        openedAt: pos.openedAt,
+        realizedPnlQusd: upl,
+        closedAt,
+      };
       return {
         ...state,
         account: syncEquity({ ...account }),
         qusd: { ...state.qusd, unlocked: nextUnlocked },
         perpPositions: nextPositions,
+        pendingPerpCloses: [...(state.pendingPerpCloses ?? []), closeEvt],
         log: pushLog(log, { kind: upl >= 0 ? "info" : "loss", message: msg }),
       };
     }
@@ -220,6 +240,10 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   trade: {
     title: "Perpetuals",
     lead: "",
+  },
+  history: {
+    title: "History",
+    lead: "Closed perpetual trades (newest first).",
   },
   account: {
     title: "Account",
@@ -279,6 +303,7 @@ function AppInner() {
         accountSyncTimer.current = null;
         if (result.ok) {
           syncVersionRef.current = result.sync_version;
+          dispatch({ type: "perpClosesSynced" });
           return;
         }
         if (!("conflict" in result) || !result.conflict) return;
@@ -287,12 +312,15 @@ function AppInner() {
         if (!r.ok) return;
         const data = (await r.json()) as PersistedAccountRow;
         setLedgerAccountRow(data);
-        dispatch({ type: "hydrateFromAccountRow", row: data });
+        dispatch({ type: "hydrateFromAccountRow", row: data, keepLocalPendingPerpCloses: true });
         syncVersionRef.current = Number(data.sync_version ?? 0);
         const retry = await putAccountState(
           buildAccountStatePutBody(stateRef.current, syncVersionRef.current),
         );
-        if (retry.ok) syncVersionRef.current = retry.sync_version;
+        if (retry.ok) {
+          syncVersionRef.current = retry.sync_version;
+          dispatch({ type: "perpClosesSynced" });
+        }
       })();
     }, 450);
     return () => {
@@ -314,7 +342,10 @@ function AppInner() {
         const result = await putAccountState(
           buildAccountStatePutBody(stateRef.current, syncVersionRef.current),
         );
-        if (result.ok) syncVersionRef.current = result.sync_version;
+        if (result.ok) {
+          syncVersionRef.current = result.sync_version;
+          dispatch({ type: "perpClosesSynced" });
+        }
       })();
     };
     window.addEventListener("pagehide", flush);
@@ -369,7 +400,7 @@ function AppInner() {
         const data = (await r.json()) as PersistedAccountRow;
         setLedgerAccountRow(data);
         syncVersionRef.current = Number(data.sync_version ?? 0);
-        dispatch({ type: "hydrateFromAccountRow", row: data });
+        dispatch({ type: "hydrateFromAccountRow", row: data, keepLocalPendingPerpCloses: true });
       } catch {
         /* ignore */
       }
@@ -391,7 +422,7 @@ function AppInner() {
           const sv = Number(data.sync_version ?? 0);
           if (sv <= syncVersionRef.current) return;
           setLedgerAccountRow(data);
-          dispatch({ type: "hydrateFromAccountRow", row: data });
+          dispatch({ type: "hydrateFromAccountRow", row: data, keepLocalPendingPerpCloses: true });
           syncVersionRef.current = sv;
         } catch {
           /* ignore */
@@ -629,6 +660,8 @@ function AppInner() {
               onGoToAccount={() => setScreen("account")}
             />
           )}
+
+          {screen === "history" && <HistoryScreen isDemo={demo} />}
 
           {screen === "trade" && (
             <PerpsTradeScreen

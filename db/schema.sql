@@ -87,6 +87,9 @@ CREATE TABLE IF NOT EXISTS perp_transactions (
 CREATE INDEX IF NOT EXISTS idx_perp_txn_account ON perp_transactions (account_id);
 CREATE INDEX IF NOT EXISTS idx_perp_txn_position ON perp_transactions (account_id, position_id);
 CREATE INDEX IF NOT EXISTS idx_perp_txn_type ON perp_transactions (account_id, txn_type);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_perp_txn_close_once
+  ON perp_transactions (account_id, position_id)
+  WHERE txn_type = 'close';
 
 -- Open perp positions (authoritative for logged-in users; replaced on each sync).
 CREATE TABLE IF NOT EXISTS perp_open_positions (

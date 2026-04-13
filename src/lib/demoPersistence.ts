@@ -26,6 +26,7 @@ export function getDefaultDemoAppState(): DemoAppState {
     qusd: { unlocked: 10_000, locked: 0 },
     bonusRepaidUsdc: 0,
     vaultActivityAt: null,
+    pendingPerpCloses: [],
   };
 }
 
@@ -40,6 +41,7 @@ export function loadDemoAppState(): DemoAppState | null {
     }
     const s = parsed.state as DemoAppState;
     if (!s.account || !s.qusd || !Array.isArray(s.log)) return null;
+    if (!Array.isArray(s.pendingPerpCloses)) s.pendingPerpCloses = [];
     /** Leverage is fixed at 100×; legacy saves may differ — normalize exposure + multiplier. */
     if (Array.isArray(s.perpPositions) && s.perpPositions.length > 0) {
       s.perpPositions = s.perpPositions.map((p) => ({

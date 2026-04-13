@@ -1,4 +1,4 @@
-import type { DemoAppState } from "./demoSessionTypes";
+import type { DemoAppState, PerpCloseSyncEvent } from "./demoSessionTypes";
 import type { PerpPosition } from "../engine/perps";
 
 /** Body for PUT /api/account/state (matches server zod schema). */
@@ -16,6 +16,8 @@ export type AccountStatePutBody = {
   bonus_repaid_usdc: number;
   vault_activity_at: number | null;
   open_perp_positions: PerpPosition[];
+  /** Append-only closes to persist in `perp_transactions` (cleared client-side after successful PUT). */
+  perp_close_events: PerpCloseSyncEvent[];
 };
 
 /**
@@ -37,6 +39,7 @@ export function buildAccountStatePutBody(state: DemoAppState, syncVersion: numbe
     bonus_repaid_usdc: state.bonusRepaidUsdc,
     vault_activity_at: state.vaultActivityAt,
     open_perp_positions: state.perpPositions,
+    perp_close_events: state.pendingPerpCloses,
   };
 }
 

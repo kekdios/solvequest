@@ -1,1 +1,1 @@
-export type AppScreen = "landing" | "quickstart" | "trade" | "account" | "auth" | "admin";
+export type AppScreen = "landing" | "quickstart" | "trade" | "history" | "account" | "auth" | "admin";
