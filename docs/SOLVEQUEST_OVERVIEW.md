@@ -1,6 +1,8 @@
 # Solve Quest — project overview & operations
 
-This document describes what the **current** Solve Quest app does, how it is structured, where configuration lives, and how database / Solana / deploy pieces fit together. It complements any older “website replacement” notes (e.g. exports about migrating from a legacy frontend to another repo).
+This document describes what the **current** Solve Quest app does, how it is structured, where configuration lives, and how database / Solana / deploy pieces fit together.
+
+**Scope:** This repository implements **trading UI, QUSD ledger, deposits, and auth**. Older docs or chat exports may describe unrelated legacy products; ignore those when reading this codebase.
 
 ---
 
@@ -133,6 +135,6 @@ npm run db:init      # create DB from db/schema.sql (default data/solvequest.db)
 
 ---
 
-## Reviewing the archived “website replacement” Markdown
+## Reviewing archived “website replacement” exports
 
-The file **`cursor_website_replacement_recommendati.md`** (and similar exports) discusses replacing an **older** Solve Quest frontend with another project (**`/Users/private/insured`**), merging Express + React, and env strategy. The **current** repo is already **React + Express in one tree**; use this **`SOLVEQUEST_OVERVIEW.md`** as the accurate description of **today’s** layout. Treat the export as **historical migration discussion**, not as the live architecture document unless you are actively repeating that migration.
+Exports such as **`cursor_website_replacement_recommendati.md`** may discuss merging another frontend repo (**e.g. `/Users/private/insured`**) with Express and env layout. The **current** tree is already **React + Express** in one project. Use this file as the description of **today’s** layout. Ignore product assumptions in those exports that don’t match perps + QUSD + deposits.
