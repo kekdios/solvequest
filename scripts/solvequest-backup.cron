@@ -1,0 +1,11 @@
+# Install on the droplet (adjust paths if APP_DIR is not /opt/solvequest):
+#   sudo cp scripts/solvequest-backup.cron /etc/cron.d/solvequest-backup
+#   sudo chmod 644 /etc/cron.d/solvequest-backup
+#
+# Log file must be writable by root (default) or change user below and log path.
+# Time is server local; edit the schedule (15 3 = 03:15 daily) as needed.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+15 3 * * * root /opt/solvequest/scripts/backup-db.sh >> /var/log/solvequest-backup.log 2>&1
