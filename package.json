@@ -13,6 +13,7 @@
     "test": "tsc -b && tsc -p tsconfig.node.json && npm run test:hl",
     "test:hl": "node scripts/test-hl-feeds.mjs",
     "db:init": "node scripts/init-db.mjs",
+    "db:migrate": "node scripts/migrate-all.mjs",
     "db:migrate:receive": "node scripts/migrate-receive-addresses.mjs",
     "db:migrate:email": "node scripts/migrate-add-email-to-accounts.mjs",
     "db:migrate:tier": "node scripts/migrate-tier-column.mjs",

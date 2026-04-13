@@ -70,7 +70,7 @@ export default function HistoryScreen() {
               /* ignore */
             }
             setError(
-              `Could not load history from the server${detail}. If you recently deployed, run database migrations (e.g. perp_transactions / unique index).`,
+              `Could not load history from the server${detail}. On the host, run: npm run db:migrate (or at least npm run db:migrate:account-sync) against your SQLite file (see SOLVEQUEST_DB_PATH).`,
             );
           } else {
             setError("Could not load history.");
