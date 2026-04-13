@@ -55,7 +55,13 @@ type Action =
   | { type: "lockQusd"; amount: number }
   | { type: "unlockQusd"; amount: number }
   | { type: "qusdInterestMinute" }
-  | { type: "hydrateFromAccountRow"; row: PersistedAccountRow; keepLocalPendingPerpCloses?: boolean }
+  | {
+      type: "hydrateFromAccountRow";
+      row: PersistedAccountRow;
+      keepLocalPendingPerpCloses?: boolean;
+      /** When true, keep local open positions not yet in SQLite (debounced PUT). First login should use false so demo/local junk is not merged. */
+      mergeUnsyncedLocalOpens: boolean;
+    }
   | { type: "replaceAll"; state: DemoAppState }
   | { type: "perpClosesSynced" };
 
@@ -155,7 +161,21 @@ function reducer(state: State, action: Action): State {
     }
     case "hydrateFromAccountRow": {
       const slice = persistedRowToAppSlice(action.row);
-      const positions = action.row.open_perp_positions ?? [];
+      const fromServer = action.row.open_perp_positions ?? [];
+      const pendingCloseIds = new Set(
+        (action.keepLocalPendingPerpCloses ? state.pendingPerpCloses : []).map((e) => e.positionId),
+      );
+      const fromServerFiltered = fromServer.filter((p) => !pendingCloseIds.has(p.id));
+
+      let positions: PerpPosition[];
+      if (action.mergeUnsyncedLocalOpens) {
+        const serverIds = new Set(fromServerFiltered.map((p) => p.id));
+        const pendingLocal = state.perpPositions.filter((p) => !serverIds.has(p.id));
+        positions = [...fromServerFiltered, ...pendingLocal];
+      } else {
+        positions = fromServerFiltered;
+      }
+
       const marginLocked = positions.reduce((s, p) => s + p.marginUsdc, 0);
       const baseUnlocked = slice.qusd.unlocked;
       return {
@@ -308,7 +328,12 @@ function AppInner() {
         if (!r.ok) return;
         const data = (await r.json()) as PersistedAccountRow;
         setLedgerAccountRow(data);
-        dispatch({ type: "hydrateFromAccountRow", row: data, keepLocalPendingPerpCloses: true });
+        dispatch({
+          type: "hydrateFromAccountRow",
+          row: data,
+          keepLocalPendingPerpCloses: true,
+          mergeUnsyncedLocalOpens: true,
+        });
         syncVersionRef.current = Number(data.sync_version ?? 0);
         const retry = await putAccountState(
           buildAccountStatePutBody(stateRef.current, syncVersionRef.current),
@@ -371,7 +396,11 @@ function AppInner() {
         if (cancelled) return;
         setLedgerAccountRow(data);
         syncVersionRef.current = Number(data.sync_version ?? 0);
-        dispatch({ type: "hydrateFromAccountRow", row: data });
+        dispatch({
+          type: "hydrateFromAccountRow",
+          row: data,
+          mergeUnsyncedLocalOpens: false,
+        });
       } catch {
         if (!cancelled) setLedgerAccountRow(null);
       }
@@ -396,7 +425,12 @@ function AppInner() {
         const data = (await r.json()) as PersistedAccountRow;
         setLedgerAccountRow(data);
         syncVersionRef.current = Number(data.sync_version ?? 0);
-        dispatch({ type: "hydrateFromAccountRow", row: data, keepLocalPendingPerpCloses: true });
+        dispatch({
+          type: "hydrateFromAccountRow",
+          row: data,
+          keepLocalPendingPerpCloses: true,
+          mergeUnsyncedLocalOpens: true,
+        });
       } catch {
         /* ignore */
       }
@@ -418,7 +452,12 @@ function AppInner() {
           const sv = Number(data.sync_version ?? 0);
           if (sv <= syncVersionRef.current) return;
           setLedgerAccountRow(data);
-          dispatch({ type: "hydrateFromAccountRow", row: data, keepLocalPendingPerpCloses: true });
+          dispatch({
+            type: "hydrateFromAccountRow",
+            row: data,
+            keepLocalPendingPerpCloses: true,
+            mergeUnsyncedLocalOpens: true,
+          });
           syncVersionRef.current = sv;
         } catch {
           /* ignore */
