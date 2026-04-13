@@ -69,28 +69,37 @@ const items: { id: AppScreen; label: string; Icon: () => ReactNode }[] = [
   { id: "admin", label: "Admin", Icon: NavIconAdmin },
 ];
 
+/** Shown in sidebar footer: semver + release stamp (d-mmm-yy). */
+const APP_VERSION_SEMVER = "1.0.0";
+const APP_VERSION_DATE = "12-Apr-26";
+
 export default function AppSidebar({ screen, onNavigate }: Props) {
   return (
     <aside className="app-sidebar" aria-label="Primary">
-      <nav className="app-sidebar-nav">
-        {items.map(({ id, label, Icon }) => {
-          const on = screen === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              className={`app-sidebar-item${on ? " app-sidebar-item--on" : ""}`}
-              title={label}
-              onClick={() => onNavigate(id)}
-            >
-              <span style={iconWrap} aria-hidden>
-                <Icon />
-              </span>
-              {label}
-            </button>
-          );
-        })}
-      </nav>
+      <div className="app-sidebar-top">
+        <nav className="app-sidebar-nav">
+          {items.map(({ id, label, Icon }) => {
+            const on = screen === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`app-sidebar-item${on ? " app-sidebar-item--on" : ""}`}
+                title={label}
+                onClick={() => onNavigate(id)}
+              >
+                <span style={iconWrap} aria-hidden>
+                  <Icon />
+                </span>
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+      <footer className="app-sidebar-footer" title={`Solve Quest ${APP_VERSION_SEMVER}`}>
+        v{APP_VERSION_SEMVER} · {APP_VERSION_DATE}
+      </footer>
     </aside>
   );
 }
