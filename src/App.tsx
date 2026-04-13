@@ -20,12 +20,7 @@ import type { DemoAppState, DemoLogEntry } from "./lib/demoSessionTypes";
 import { INITIAL_SESSION_WARN_FLAGS } from "./lib/demoSessionTypes";
 import { syncEquity } from "./engine/accountCore";
 import { fetchHyperliquidMids, HL_POLL_INTERVAL_MS } from "./engine/hyperliquid";
-import {
-  BONUS_REPAYMENT_USDC,
-  LOCKED_QUSD_COOLDOWN_MS,
-  QUSD_INTEREST_PER_MINUTE_FACTOR,
-  QUSD_PER_USD,
-} from "./engine/qusdVault";
+import { LOCKED_QUSD_COOLDOWN_MS, QUSD_INTEREST_PER_MINUTE_FACTOR } from "./engine/qusdVault";
 import {
   computeUnrealizedPnl,
   INITIAL_MARKS,
@@ -64,9 +59,6 @@ type Action =
   | { type: "lockQusd"; amount: number }
   | { type: "unlockQusd"; amount: number }
   | { type: "qusdInterestMinute" }
-  | { type: "repayBonusUsdc"; amount: number }
-  | { type: "unlockedTopUpUsdc"; usdc: number }
-  | { type: "unlockedWithdrawUsdc"; usdc: number }
   | { type: "hydrateFromAccountRow"; row: PersistedAccountRow }
   | { type: "replaceAll"; state: DemoAppState };
 
@@ -125,53 +117,6 @@ function reducer(state: State, action: Action): State {
         },
       };
     }
-    case "repayBonusUsdc": {
-      const maxOwed = BONUS_REPAYMENT_USDC - state.bonusRepaidUsdc;
-      if (maxOwed <= 0) return state;
-      const pay = Math.min(action.amount, maxOwed, state.account.balance);
-      if (pay <= 0) return state;
-      const nextBal = state.account.balance - pay;
-      return {
-        ...state,
-        bonusRepaidUsdc: state.bonusRepaidUsdc + pay,
-        account: syncEquity({ ...state.account, balance: nextBal }),
-        log: pushLog(log, {
-          kind: "info",
-          message: `Bonus repayment +${pay.toFixed(2)} USDC (${(state.bonusRepaidUsdc + pay).toFixed(2)} / ${BONUS_REPAYMENT_USDC} toward unlocking Send)`,
-        }),
-      };
-    }
-    case "unlockedTopUpUsdc": {
-      const u = action.usdc;
-      if (u <= 0 || u > state.account.balance + 1e-9) return state;
-      const qusdIn = u * QUSD_PER_USD;
-      const nextBal = state.account.balance - u;
-      return {
-        ...state,
-        account: syncEquity({ ...state.account, balance: nextBal }),
-        qusd: { ...state.qusd, unlocked: state.qusd.unlocked + qusdIn },
-        log: pushLog(log, {
-          kind: "info",
-          message: `Top up +${u.toFixed(4)} USDC → +${qusdIn.toFixed(2)} QUSD unlocked`,
-        }),
-      };
-    }
-    case "unlockedWithdrawUsdc": {
-      const u = action.usdc;
-      if (u <= 0) return state;
-      const qusdOut = u * QUSD_PER_USD;
-      if (qusdOut > state.qusd.unlocked + 1e-9) return state;
-      const nextBal = state.account.balance + u;
-      return {
-        ...state,
-        account: syncEquity({ ...state.account, balance: nextBal }),
-        qusd: { ...state.qusd, unlocked: state.qusd.unlocked - qusdOut },
-        log: pushLog(log, {
-          kind: "info",
-          message: `Withdraw −${qusdOut.toFixed(2)} QUSD → +${u.toFixed(4)} USDC wallet`,
-        }),
-      };
-    }
     case "qusdInterestMinute": {
       const { locked } = state.qusd;
       if (locked <= 1e-12) return state;
@@ -226,7 +171,6 @@ function reducer(state: State, action: Action): State {
         perpPositions: positions,
         marks: { ...INITIAL_MARKS },
         sessionWarnFlags: INITIAL_SESSION_WARN_FLAGS,
-        bonusRepaidUsdc: slice.bonusRepaidUsdc,
         vaultActivityAt: slice.vaultActivityAt,
         log: pushLog([], {
           kind: "info",
@@ -705,13 +649,7 @@ function AppInner() {
               qusdLocked={state.qusd.locked}
               onLockQusd={lockQusd}
               onUnlockQusd={unlockQusd}
-              bonusRepaidUsdc={state.bonusRepaidUsdc}
-              usdcBalance={state.account.balance}
-              sendUnlocked={state.bonusRepaidUsdc >= BONUS_REPAYMENT_USDC}
               vaultActivityAt={state.vaultActivityAt}
-              onRepayBonusUsdc={(amount) => dispatch({ type: "repayBonusUsdc", amount })}
-              onUnlockedTopUpUsdc={(usdc) => dispatch({ type: "unlockedTopUpUsdc", usdc })}
-              onUnlockedWithdrawUsdc={(usdc) => dispatch({ type: "unlockedWithdrawUsdc", usdc })}
             />
           )}
         </main>

@@ -10,7 +10,7 @@ const STEPS: { title: string; body: string }[] = [
   {
     title: "Know your QUSD",
     body:
-      "Perps use **unlocked QUSD** for margin. Open **Account** to see Unlocked / Locked / Bonus, move USDC ↔ QUSD (Top up / Withdraw), or lock QUSD for yield. You need enough Unlocked QUSD before you open a position.",
+      "Perps use **unlocked QUSD** for margin. Open **Account** to deposit USDC on Solana (credited as QUSD), see Unlocked / Locked totals, and lock QUSD for yield. You need enough Unlocked QUSD before you open a position.",
   },
   {
     title: "Open Perpetuals",
