@@ -21,12 +21,7 @@ import { INITIAL_SESSION_WARN_FLAGS } from "./lib/demoSessionTypes";
 import { syncEquity } from "./engine/accountCore";
 import { fetchHyperliquidMids, HL_POLL_INTERVAL_MS } from "./engine/hyperliquid";
 import { LOCKED_QUSD_COOLDOWN_MS, QUSD_INTEREST_PER_MINUTE_FACTOR } from "./engine/qusdVault";
-import {
-  computeUnrealizedPnl,
-  INITIAL_MARKS,
-  type PerpPosition,
-  type PerpSymbol,
-} from "./engine/perps";
+import { computeUnrealizedPnl, type PerpPosition, type PerpSymbol } from "./engine/perps";
 import type { PersistedAccountRow } from "./db/persistedAccount";
 import { persistedRowToAppSlice } from "./lib/accountHydration";
 import PerpsTradeScreen from "./screens/PerpsTradeScreen";
@@ -171,7 +166,8 @@ function reducer(state: State, action: Action): State {
           locked: slice.qusd.locked,
         },
         perpPositions: positions,
-        marks: { ...INITIAL_MARKS },
+        /** HL index marks come only from {@link fetchHyperliquidMids}; keep them when syncing SQLite so we never show seed prices under a "live" feed badge. */
+        marks: state.marks,
         sessionWarnFlags: INITIAL_SESSION_WARN_FLAGS,
         vaultActivityAt: slice.vaultActivityAt,
         pendingPerpCloses: action.keepLocalPendingPerpCloses ? (state.pendingPerpCloses ?? []) : [],
