@@ -1,10 +1,14 @@
 import type { CSSProperties, ReactNode } from "react";
+import type { AppScreen } from "./AppSidebar.types";
 
-export type AppScreen = "landing" | "quickstart" | "trade" | "account" | "auth" | "admin";
+export type { AppScreen } from "./AppSidebar.types";
 
 type Props = {
   screen: AppScreen;
   onNavigate: (screen: AppScreen) => void;
+  /** Main app: full nav without Admin. Admin host: link home + Admin only. */
+  variant: "mainApp" | "adminSubdomain";
+  mainSiteOrigin: string;
 };
 
 const iconWrap: CSSProperties = {
@@ -61,24 +65,53 @@ function NavIconAdmin() {
   );
 }
 
-const items: { id: AppScreen; label: string; Icon: () => ReactNode }[] = [
+const mainAppItems: { id: AppScreen; label: string; Icon: () => ReactNode }[] = [
   { id: "landing", label: "Home", Icon: NavIconHome },
   { id: "quickstart", label: "Quick start", Icon: NavIconBook },
   { id: "trade", label: "Perpetuals", Icon: NavIconPerps },
   { id: "account", label: "Account", Icon: NavIconAccount },
-  { id: "admin", label: "Admin", Icon: NavIconAdmin },
 ];
 
 /** Shown in sidebar footer: semver + release stamp (d-mmm-yy). */
 const APP_VERSION_SEMVER = "1.0.0";
 const APP_VERSION_DATE = "12-Apr-26";
 
-export default function AppSidebar({ screen, onNavigate }: Props) {
+export default function AppSidebar({ screen, onNavigate, variant, mainSiteOrigin }: Props) {
+  if (variant === "adminSubdomain") {
+    return (
+      <aside className="app-sidebar" aria-label="Admin">
+        <div className="app-sidebar-top">
+          <nav className="app-sidebar-nav">
+            <a
+              href={mainSiteOrigin}
+              className="app-sidebar-item"
+              rel="noopener noreferrer"
+            >
+              <span style={iconWrap} aria-hidden>
+                <NavIconHome />
+              </span>
+              Main site
+            </a>
+            <div className="app-sidebar-item app-sidebar-item--on app-sidebar-item--static" role="presentation">
+              <span style={iconWrap} aria-hidden>
+                <NavIconAdmin />
+              </span>
+              Admin
+            </div>
+          </nav>
+        </div>
+        <footer className="app-sidebar-footer" title={`Solve Quest ${APP_VERSION_SEMVER}`}>
+          v{APP_VERSION_SEMVER} · {APP_VERSION_DATE}
+        </footer>
+      </aside>
+    );
+  }
+
   return (
     <aside className="app-sidebar" aria-label="Primary">
       <div className="app-sidebar-top">
         <nav className="app-sidebar-nav">
-          {items.map(({ id, label, Icon }) => {
+          {mainAppItems.map(({ id, label, Icon }) => {
             const on = screen === id;
             return (
               <button

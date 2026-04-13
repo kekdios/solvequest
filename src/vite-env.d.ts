@@ -20,4 +20,10 @@ interface ImportMetaEnv {
   readonly VITE_SOLANA_TEST_SECRET_KEY_B64: string;
   /** Account id used with the test secret (default `test-env`). */
   readonly VITE_SOLANA_TEST_ACCOUNT_ID: string;
+  /** Hostname for admin-only UI (default `admin.solvequest.io`). */
+  readonly VITE_ADMIN_HOST: string;
+  /** Public origin of main site (default derived; set for local dev). */
+  readonly VITE_MAIN_SITE_ORIGIN: string;
+  /** Full origin of admin subdomain (default derived). */
+  readonly VITE_ADMIN_ORIGIN: string;
 }

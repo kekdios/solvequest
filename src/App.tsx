@@ -35,6 +35,11 @@ import AccountScreen from "./screens/AccountScreen";
 import QuickStartScreen from "./screens/QuickStartScreen";
 import AuthScreen from "./screens/AuthScreen";
 import AppSidebar, { type AppScreen } from "./components/AppSidebar";
+import {
+  getAdminPublicOrigin,
+  getMainSitePublicOrigin,
+  isAdminSubdomainHost,
+} from "./lib/appHost";
 
 const AdminScreen = lazy(() => import("./screens/AdminScreen"));
 
@@ -375,12 +380,40 @@ function AppInner() {
   const lastNonAdminScreen = useRef<AppScreen>("landing");
 
   const [screen, setScreen] = useState<AppScreen>(() => {
-    if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) return "admin";
+    if (typeof window === "undefined") return "landing";
+    if (isAdminSubdomainHost()) return "admin";
     return "landing";
   });
 
+  /** Main site: /admin URL → admin subdomain only. */
   useEffect(() => {
-    if (screen === "auth" && user) setScreen("trade");
+    if (typeof window === "undefined") return;
+    if (isAdminSubdomainHost()) return;
+    if (window.location.pathname.startsWith("/admin")) {
+      window.location.replace(
+        `${getAdminPublicOrigin()}${window.location.pathname}${window.location.search}${window.location.hash}`,
+      );
+    }
+  }, []);
+
+  /** Main site must never keep Admin screen (menu removed; deep links redirect). */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (isAdminSubdomainHost()) return;
+    if (screen === "admin") {
+      window.location.replace(getAdminPublicOrigin());
+    }
+  }, [screen]);
+
+  /** Admin subdomain: only Admin (or Auth). */
+  useEffect(() => {
+    if (!isAdminSubdomainHost()) return;
+    if (screen === "auth") return;
+    if (screen !== "admin") setScreen("admin");
+  }, [screen]);
+
+  useEffect(() => {
+    if (screen === "auth" && user) setScreen(isAdminSubdomainHost() ? "admin" : "trade");
   }, [screen, user]);
 
   useEffect(() => {
@@ -389,6 +422,10 @@ function AppInner() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (isAdminSubdomainHost()) {
+      window.history.replaceState({}, "", "/");
+      return;
+    }
     const pathAdmin = window.location.pathname.startsWith("/admin");
     if (screen === "admin" && !pathAdmin) {
       window.history.replaceState({}, "", "/admin");
@@ -399,11 +436,15 @@ function AppInner() {
 
   useEffect(() => {
     const onPop = () => {
-      if (window.location.pathname.startsWith("/admin")) {
+      if (isAdminSubdomainHost()) {
         setScreen("admin");
-      } else {
-        setScreen(lastNonAdminScreen.current);
+        return;
       }
+      if (window.location.pathname.startsWith("/admin")) {
+        window.location.href = getAdminPublicOrigin();
+        return;
+      }
+      setScreen(lastNonAdminScreen.current);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -428,6 +469,8 @@ function AppInner() {
   const [hlFeedStatus, setHlFeedStatus] = useState<"connecting" | "live" | "partial">("connecting");
 
   useEffect(() => {
+    if (typeof window !== "undefined" && isAdminSubdomainHost()) return;
+
     const ac = new AbortController();
 
     const pull = () => {
@@ -459,7 +502,18 @@ function AppInner() {
       <header className="app-top-header" style={styles.topHeader}>
         <div className="app-header-top" style={styles.headerTop}>
           <div style={styles.logoRow}>
-            <button type="button" style={styles.logoBtn} onClick={() => setScreen("landing")} aria-label="Home">
+            <button
+              type="button"
+              style={styles.logoBtn}
+              onClick={() => {
+                if (isAdminSubdomainHost()) {
+                  window.location.href = getMainSitePublicOrigin();
+                } else {
+                  setScreen("landing");
+                }
+              }}
+              aria-label="Home"
+            >
               <img
                 src="/logo-solve-quest.png"
                 alt=""
@@ -468,7 +522,7 @@ function AppInner() {
                 height={44}
               />
             </button>
-            {demo ? (
+            {demo && !isAdminSubdomainHost() ? (
               <span style={styles.demoBadge} title="Anonymous demo — state saved in this browser only">
                 Demo
               </span>
@@ -498,7 +552,12 @@ function AppInner() {
       </header>
 
       <div className="app-body">
-        <AppSidebar screen={screen} onNavigate={setScreen} />
+        <AppSidebar
+          screen={screen}
+          onNavigate={setScreen}
+          variant={isAdminSubdomainHost() ? "adminSubdomain" : "mainApp"}
+          mainSiteOrigin={getMainSitePublicOrigin()}
+        />
         <main
           className="app-main"
           style={screen === "landing" ? styles.mainLanding : styles.main}
@@ -517,14 +576,19 @@ function AppInner() {
           {screen === "admin" && (
             <Suspense fallback={<p style={styles.muted}>Loading admin…</p>}>
               <AdminScreen
-                onNavigateHome={() => setScreen("landing")}
+                onNavigateHome={() => {
+                  window.location.href = getMainSitePublicOrigin();
+                }}
                 onCustodialUsdcCredited={(amount) => dispatch({ type: "deposit", amount })}
               />
             </Suspense>
           )}
 
           {screen === "auth" && (
-            <AuthScreen onSuccess={() => setScreen("trade")} onContinueDemo={() => setScreen("trade")} />
+            <AuthScreen
+              onSuccess={() => setScreen(isAdminSubdomainHost() ? "admin" : "trade")}
+              onContinueDemo={() => setScreen(isAdminSubdomainHost() ? "admin" : "trade")}
+            />
           )}
 
           {screen === "quickstart" && (

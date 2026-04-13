@@ -249,6 +249,15 @@ select {
   background: color-mix(in srgb, var(--accent) 20%, transparent) !important;
 }
 
+.app-sidebar a.app-sidebar-item {
+  text-decoration: none;
+}
+
+.app-sidebar-item--static {
+  cursor: default;
+  pointer-events: none;
+}
+
 .app-main {
   flex: 1;
   min-width: 0;
