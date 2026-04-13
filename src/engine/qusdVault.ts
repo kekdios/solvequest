@@ -2,7 +2,9 @@
 import { parseQusdMultiplier } from "../lib/qusdMultiplier";
 
 /** $1 USDC converts to this many QUSD (vault top-up/withdraw; from `QUSD_MULTIPLIER` in `.env`). */
-export const QUSD_PER_USD = parseQusdMultiplier(import.meta.env.QUSD_MULTIPLIER);
+export const QUSD_PER_USD = parseQusdMultiplier(
+  (typeof process !== "undefined" ? process.env.QUSD_MULTIPLIER : undefined) ?? import.meta.env?.QUSD_MULTIPLIER,
+);
 /** QUSD granted as “free” at session start — excluded from externally sendable stablecoin. */
 export const INITIAL_FREE_QUSD_GRANT = 10_000;
 /** USDC/USDT required to repay the bonus before external Send is unlocked. */

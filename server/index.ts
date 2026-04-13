@@ -1,7 +1,7 @@
 /**
  * Express server: /api/* (auth, account, admin), Solana RPC proxy, static SPA + fallback.
  */
-import dotenv from "dotenv";
+import "./loadEnv";
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
@@ -14,11 +14,6 @@ import { startDepositScanWorker } from "./depositScanWorker";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
-
-// Default dotenv cwd is process.cwd(); on droplets `.env` may still live under `backend/` (old layout).
-// Load root first, then legacy path; dotenv does not override existing env keys.
-dotenv.config({ path: path.join(root, ".env") });
-dotenv.config({ path: path.join(root, "backend", ".env") });
 
 const appVersion = (() => {
   try {
