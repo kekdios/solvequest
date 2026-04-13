@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useSessionAuth } from "../auth/sessionAuth";
 import { uiBtnGhost, uiOrderCard } from "../ui/appSurface";
 import { PERP_META, type PerpSymbol } from "../engine/perps";
 
@@ -17,10 +18,6 @@ type CloseRow = {
   closed_at: number | null;
 };
 
-type Props = {
-  isDemo: boolean;
-};
-
 const PAGE_SIZE = 20;
 
 function fmtNum(n: number | null | undefined, d = 2): string {
@@ -36,52 +33,87 @@ function fmtTs(ms: number | null | undefined): string {
   });
 }
 
-export default function HistoryScreen({ isDemo }: Props) {
+async function fetchClosesPage(p: number): Promise<Response> {
+  return fetch(`/api/account/perp-closes?page=${p}&page_size=${PAGE_SIZE}`, {
+    credentials: "include",
+  });
+}
+
+export default function HistoryScreen() {
+  const { authLoading, user, refreshUser } = useSessionAuth();
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [rows, setRows] = useState<CloseRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (p: number) => {
-    if (isDemo) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetch(`/api/account/perp-closes?page=${p}&page_size=${PAGE_SIZE}`, {
-        credentials: "include",
-      });
-      if (!r.ok) {
-        setError(r.status === 401 ? "Sign in to view trade history." : "Could not load history.");
+  const load = useCallback(
+    async (p: number) => {
+      if (authLoading || !user) return;
+      setLoading(true);
+      setError(null);
+      try {
+        let r = await fetchClosesPage(p);
+        if (r.status === 401) {
+          await refreshUser();
+          r = await fetchClosesPage(p);
+        }
+        if (!r.ok) {
+          if (r.status === 401) {
+            setError("Session expired or not signed in. Use Login / Register in the header, then open History again.");
+          } else if (r.status >= 500) {
+            let detail = "";
+            try {
+              const j = (await r.json()) as { message?: string };
+              if (j.message) detail = ` (${j.message})`;
+            } catch {
+              /* ignore */
+            }
+            setError(
+              `Could not load history from the server${detail}. If you recently deployed, run database migrations (e.g. perp_transactions / unique index).`,
+            );
+          } else {
+            setError("Could not load history.");
+          }
+          setRows([]);
+          setTotal(0);
+          return;
+        }
+        const data = (await r.json()) as {
+          closes: CloseRow[];
+          total: number;
+          page: number;
+          page_size: number;
+        };
+        setRows(data.closes ?? []);
+        setTotal(Number(data.total) || 0);
+        setPage(Number(data.page) || p);
+      } catch {
+        setError("Network error.");
         setRows([]);
         setTotal(0);
-        return;
+      } finally {
+        setLoading(false);
       }
-      const data = (await r.json()) as {
-        closes: CloseRow[];
-        total: number;
-        page: number;
-        page_size: number;
-      };
-      setRows(data.closes ?? []);
-      setTotal(Number(data.total) || 0);
-      setPage(Number(data.page) || p);
-    } catch {
-      setError("Network error.");
-      setRows([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [isDemo]);
+    },
+    [authLoading, user, refreshUser],
+  );
 
   useEffect(() => {
     void load(1);
-  }, [load, isDemo]);
+  }, [load]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  if (isDemo) {
+  if (authLoading) {
+    return (
+      <div className="app-page" style={s.wrap}>
+        <p style={s.muted}>Checking session…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
     return (
       <div className="app-page" style={s.wrap}>
         <p style={s.muted}>

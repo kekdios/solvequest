@@ -307,12 +307,18 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         sendJson(res, 401, { error: "Not authenticated" });
         return;
       }
+      let payload: { email?: string };
       try {
-        const payload = jwt.verify(token, jwtSecret!) as { email?: string };
-        if (!payload.email || typeof payload.email !== "string") {
-          sendJson(res, 401, { error: "Invalid token" });
-          return;
-        }
+        payload = jwt.verify(token, jwtSecret!) as { email?: string };
+      } catch {
+        sendJson(res, 401, { error: "Invalid token" });
+        return;
+      }
+      if (!payload.email || typeof payload.email !== "string") {
+        sendJson(res, 401, { error: "Invalid token" });
+        return;
+      }
+      try {
         const email = payload.email.toLowerCase();
         const row = loadOrCreateRow(email);
         if (!row?.id) {
@@ -351,8 +357,12 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           page,
           page_size: pageSize,
         });
-      } catch {
-        sendJson(res, 401, { error: "Invalid token" });
+      } catch (e) {
+        console.error("[account-api] GET /api/account/perp-closes:", e);
+        sendJson(res, 500, {
+          error: "perp_closes_query_failed",
+          message: e instanceof Error ? e.message : String(e),
+        });
       }
       return;
     }

@@ -661,7 +661,7 @@ function AppInner() {
             />
           )}
 
-          {screen === "history" && <HistoryScreen isDemo={demo} />}
+          {screen === "history" && <HistoryScreen />}
 
           {screen === "trade" && (
             <PerpsTradeScreen
