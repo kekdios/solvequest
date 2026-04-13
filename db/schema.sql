@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   qusd_vault_interest_at INTEGER,
   -- Deposit address (assigned at account creation; sync from app / provision script)
   sol_receive_address TEXT,
+  -- Server-generated custodial deposit key (AES-GCM); when set, deposit address is authoritative from API
+  custodial_seckey_enc TEXT,
   -- Optimistic concurrency: incremented on PUT /api/account/state and on-chain deposit credits
   sync_version INTEGER NOT NULL DEFAULT 0
 );

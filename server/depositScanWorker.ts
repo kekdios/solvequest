@@ -7,6 +7,8 @@ import path from "node:path";
 import { Connection, PublicKey } from "@solana/web3.js";
 import Database from "better-sqlite3";
 import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
+import { decryptCustodialKeypair } from "./depositWalletCrypto";
+import { sweepCustodialDepositToTreasury } from "./custodialSweepServer";
 import { scanNewUsdcDeposits, type ScanLedger } from "./solanaUsdcScan";
 
 type SqliteDb = InstanceType<typeof Database>;
@@ -76,7 +78,7 @@ export function startDepositScanWorker(root: string, env: NodeJS.ProcessEnv): vo
 
     for (const { id: accountId, sol_receive_address: addr } of rows) {
       try {
-        await processAccount(database, connection, accountId, addr, qusdPerUsdc);
+        await processAccount(database, connection, accountId, addr, qusdPerUsdc, env);
       } catch (e) {
         console.error(`[deposit-scan] account ${accountId}:`, e);
       }
@@ -96,6 +98,7 @@ async function processAccount(
   accountId: string,
   solReceiveAddress: string,
   qusdPerUsdc: number,
+  env: NodeJS.ProcessEnv,
 ): Promise<void> {
   let owner: PublicKey;
   try {
@@ -154,4 +157,31 @@ async function processAccount(
        ON CONFLICT(account_id) DO UPDATE SET watermark_signature = excluded.watermark_signature`,
     )
     .run(accountId, next.watermarkUsdcAta);
+
+  const sweepOn =
+    env.SOLVEQUEST_CUSTODIAL_SWEEP === "1" || env.SOLVEQUEST_CUSTODIAL_SWEEP === "true";
+  if (!sweepOn) return;
+
+  let enc: string | null = null;
+  try {
+    const crow = database
+      .prepare(`SELECT custodial_seckey_enc FROM accounts WHERE id = ?`)
+      .get(accountId) as { custodial_seckey_enc: string | null } | undefined;
+    enc = crow?.custodial_seckey_enc ?? null;
+  } catch {
+    return;
+  }
+  if (!enc) return;
+
+  try {
+    const kp = decryptCustodialKeypair(enc, env);
+    const r = await sweepCustodialDepositToTreasury(connection, env, kp);
+    if (r.ok) {
+      console.log(
+        `[deposit-scan] custodial sweep ${accountId.slice(0, 8)}… +${r.sweptUsdc.toFixed(4)} USDC (tx ${r.signature.slice(0, 12)}…)`,
+      );
+    }
+  } catch (e) {
+    console.warn(`[deposit-scan] custodial sweep failed ${accountId.slice(0, 8)}…:`, e);
+  }
 }

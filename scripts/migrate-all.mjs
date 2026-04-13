@@ -29,6 +29,7 @@ const steps = [
   "migrate-deposit-worker.mjs",
   "migrate-vault-interest.mjs",
   "migrate-perp-close-unique.mjs",
+  "migrate-account-custodial-deposit.mjs",
 ];
 
 console.log(`[migrate-all] database: ${outPath}\n`);

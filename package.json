@@ -21,6 +21,7 @@
     "db:migrate:deposit-worker": "node scripts/migrate-deposit-worker.mjs",
     "db:migrate:vault-interest": "node scripts/migrate-vault-interest.mjs",
     "db:migrate:perp-close-unique": "node scripts/migrate-perp-close-unique.mjs",
+    "db:migrate:custodial-deposit": "node scripts/migrate-account-custodial-deposit.mjs",
     "db:provision": "node scripts/provision-account.mjs"
   },
   "dependencies": {

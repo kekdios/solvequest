@@ -387,6 +387,10 @@ function AppInner() {
     let cancelled = false;
     void (async () => {
       try {
+        await fetch("/api/account/ensure-custodial-deposit", {
+          method: "POST",
+          credentials: "include",
+        });
         const r = await fetch("/api/account/me", { credentials: "include" });
         if (!r.ok) {
           if (!cancelled) setLedgerAccountRow(null);
@@ -416,6 +420,7 @@ function AppInner() {
     let cancelled = false;
     void (async () => {
       try {
+        if (ledgerAccountRow.custodial_deposit) return;
         const w = getOrCreateAccountReceiveWallet();
         if (ledgerAccountRow.sol_receive_address === w.solAddress) return;
         const ok = await putSolReceiveAddress(w.solAddress);
@@ -728,6 +733,11 @@ function AppInner() {
           {screen === "account" && (
             <AccountScreen
               isDemo={demo}
+              serverDepositAddress={
+                ledgerAccountRow?.custodial_deposit && ledgerAccountRow.sol_receive_address
+                  ? ledgerAccountRow.sol_receive_address
+                  : null
+              }
               qusdUnlocked={state.qusd.unlocked}
               qusdLocked={state.qusd.locked}
               onLockQusd={lockQusd}

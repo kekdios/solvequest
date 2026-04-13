@@ -12,7 +12,9 @@ import type { Plugin } from "vite";
 import { loadEnv } from "vite";
 import jwt from "jsonwebtoken";
 import Database from "better-sqlite3";
-import { PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
+import { encryptCustodialSecretKey } from "../server/depositWalletCrypto";
+import { getUsdcAta, MAINNET_USDC_MINT } from "../server/solanaUsdcScan";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
 import { applyLockedQusdInterest } from "./vaultInterest";
@@ -294,6 +296,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         mePayload.sync_version = Number((row as AccountRow).sync_version ?? 0);
         mePayload.account_active =
           database != null ? accountHasSolanaDeposit(database, accountId) : false;
+        mePayload.custodial_deposit = Boolean((row as { custodial_seckey_enc?: string | null }).custodial_seckey_enc);
         sendJson(res, 200, mePayload);
       } catch {
         sendJson(res, 401, { error: "Invalid token" });
@@ -367,6 +370,93 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       return;
     }
 
+    if (req.method === "POST" && url === "/api/account/ensure-custodial-deposit") {
+      void (async () => {
+        const token = parseCookies(req.headers.cookie)[USER_COOKIE];
+        if (!token) {
+          sendJson(res, 401, { error: "Not authenticated" });
+          return;
+        }
+        try {
+          const payload = jwt.verify(token, jwtSecret!) as { email?: string };
+          if (!payload.email || typeof payload.email !== "string") {
+            sendJson(res, 401, { error: "Invalid token" });
+            return;
+          }
+          const email = payload.email.toLowerCase();
+          const row = loadOrCreateRow(email);
+          if (!row?.id) {
+            sendJson(res, 503, { error: "no_account" });
+            return;
+          }
+          const database = getDb();
+          if (!database) {
+            sendJson(res, 503, { error: "db_missing" });
+            return;
+          }
+          const accountId = String(row.id);
+          const existing = database
+            .prepare(
+              `SELECT custodial_seckey_enc, sol_receive_address FROM accounts WHERE id = ?`,
+            )
+            .get(accountId) as
+            | { custodial_seckey_enc: string | null; sol_receive_address: string | null }
+            | undefined;
+
+          if (existing?.custodial_seckey_enc && existing.sol_receive_address) {
+            const owner = new PublicKey(existing.sol_receive_address.trim());
+            const ata = getUsdcAta(owner);
+            sendJson(res, 200, {
+              ok: true,
+              already_existed: true,
+              deposit_address: existing.sol_receive_address.trim(),
+              usdc_ata: ata.toBase58(),
+              usdc_mint: MAINNET_USDC_MINT.toBase58(),
+            });
+            return;
+          }
+
+          let enc: string;
+          try {
+            const kp = Keypair.generate();
+            enc = encryptCustodialSecretKey(kp.secretKey, env);
+            const addr = kp.publicKey.toBase58();
+            const now = Date.now();
+            database
+              .prepare(
+                `UPDATE accounts SET custodial_seckey_enc = ?, sol_receive_address = ?, updated_at = ? WHERE id = ?`,
+              )
+              .run(enc, addr, now, accountId);
+            const ata = getUsdcAta(kp.publicKey);
+            sendJson(res, 200, {
+              ok: true,
+              already_existed: false,
+              deposit_address: addr,
+              usdc_ata: ata.toBase58(),
+              usdc_mint: MAINNET_USDC_MINT.toBase58(),
+            });
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (msg.includes("no such column: custodial_seckey_enc")) {
+              sendJson(res, 503, {
+                error: "db_schema",
+                message: "Run: npm run db:migrate:custodial-deposit",
+              });
+              return;
+            }
+            console.error("[account-api] ensure-custodial-deposit:", e);
+            sendJson(res, 503, {
+              error: "custodial_deposit_unavailable",
+              message: msg,
+            });
+          }
+        } catch {
+          sendJson(res, 401, { error: "Invalid token" });
+        }
+      })();
+      return;
+    }
+
     if (req.method === "PUT" && url === "/api/account/sol-receive-address") {
       void (async () => {
         const token = parseCookies(req.headers.cookie)[USER_COOKIE];
@@ -406,6 +496,13 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           const database = getDb();
           if (!database) {
             sendJson(res, 503, { error: "db_missing" });
+            return;
+          }
+          const custodial = database
+            .prepare(`SELECT custodial_seckey_enc FROM accounts WHERE id = ?`)
+            .get(accountId) as { custodial_seckey_enc: string | null } | undefined;
+          if (custodial?.custodial_seckey_enc) {
+            sendJson(res, 409, { error: "custodial_deposit_uses_server_address" });
             return;
           }
           const addr = body.sol_receive_address.trim();

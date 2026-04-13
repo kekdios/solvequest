@@ -27,6 +27,8 @@ const statAmountStyle = {
 type Props = {
   /** Anonymous demo: no Solana deposit UI; balances stay in-browser only. */
   isDemo?: boolean;
+  /** Server custodial Solana address (per registered account); overrides browser-generated wallet. */
+  serverDepositAddress?: string | null;
   qusdUnlocked: number;
   qusdLocked: number;
   onLockQusd: (amountQusd: number) => void;
@@ -36,6 +38,7 @@ type Props = {
 
 export default function AccountScreen({
   isDemo = false,
+  serverDepositAddress = null,
   qusdUnlocked,
   qusdLocked,
   onLockQusd,
@@ -107,7 +110,7 @@ export default function AccountScreen({
               </p>
               <div style={s.receiveAddressesBlock}>
                 <Suspense fallback={<p style={s.suspenseFallback}>Loading deposit address…</p>}>
-                  <TestReceiveAddresses />
+                  <TestReceiveAddresses serverDepositAddress={serverDepositAddress} />
                 </Suspense>
               </div>
               <p style={s.depositBuySell}>

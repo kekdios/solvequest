@@ -26,7 +26,12 @@ function QrIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-export default function TestReceiveAddresses() {
+type Props = {
+  /** When set, show this server-assigned custodial address instead of a browser-generated keypair. */
+  serverDepositAddress?: string | null;
+};
+
+export default function TestReceiveAddresses({ serverDepositAddress = null }: Props) {
   const [wallet, setWallet] = useState<AccountReceiveWallet | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
@@ -34,13 +39,18 @@ export default function TestReceiveAddresses() {
 
   const refresh = useCallback(() => {
     try {
-      setWallet(getOrCreateAccountReceiveWallet());
+      const trimmed = serverDepositAddress?.trim();
+      if (trimmed) {
+        setWallet({ accountId: "custodial", solAddress: trimmed });
+      } else {
+        setWallet(getOrCreateAccountReceiveWallet());
+      }
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Could not load deposit address");
       setWallet(null);
     }
-  }, []);
+  }, [serverDepositAddress]);
 
   useEffect(() => {
     refresh();
