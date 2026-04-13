@@ -583,16 +583,11 @@ export default function App() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  /** Layout: flex + height bound via index.css `.app-shell` + `#root` (only main scrolls). */
   shell: {
-    display: "flex",
-    flexDirection: "column",
-    minHeight: "100vh",
     boxSizing: "border-box",
   },
   shellLanding: {
-    display: "flex",
-    flexDirection: "column",
-    minHeight: "100vh",
     boxSizing: "border-box",
   },
   topHeader: {
