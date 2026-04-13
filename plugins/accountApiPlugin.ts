@@ -18,6 +18,13 @@ import { getUsdcAta, MAINNET_USDC_MINT } from "../server/solanaUsdcScan";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
 import { applyLockedQusdInterest } from "./vaultInterest";
+import {
+  getLedgerBalances,
+  insertPerpCloseSettlement,
+  insertPerpMarginLock,
+  insertSignupGrant,
+  insertVaultMove,
+} from "../server/qusdLedger";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -25,7 +32,6 @@ const USER_COOKIE = "auth_token";
 
 const DEFAULT_TIER_ID = 3;
 const DEFAULT_COVERAGE_LIMIT_QUSD = 50_000;
-const DEFAULT_QUSD_UNLOCKED = 10_000;
 
 const perpSymbolZ = z.enum(PERP_SYMBOLS as unknown as [string, ...string[]]);
 
@@ -62,6 +68,7 @@ const accountStatePutZ = z.object({
   premium_accrued_usdc: z.number().finite(),
   covered_losses_qusd: z.number().finite(),
   coverage_used_qusd: z.number().finite(),
+  /** Display unlocked / locked QUSD (not pre-margin); server ledger is source of truth after sync. */
   qusd_unlocked: z.number().finite(),
   qusd_locked: z.number().finite(),
   accumulated_losses_qusd: z.number().finite(),
@@ -154,6 +161,12 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
 
 type AccountRow = Record<string, unknown>;
 
+function attachLedgerBalances(database: SqliteDb, row: AccountRow): AccountRow {
+  const id = String(row.id);
+  const { unlocked, locked } = getLedgerBalances(database, id);
+  return { ...row, qusd_unlocked: unlocked, qusd_locked: locked };
+}
+
 export function createAccountApiMiddleware(env: Record<string, string>, root: string): Connect.NextHandleFunction {
   const jwtSecret = env.JWT_SECRET;
   const jwtOk = Boolean(jwtSecret && jwtSecret !== "change-this-secret-key");
@@ -185,14 +198,15 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         applyLockedQusdInterest(database, String(existing.id));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("no such column: qusd_vault_interest_at")) {
-          console.error("[account-api] run: npm run db:migrate:vault-interest");
+        if (msg.includes("no such column")) {
+          console.error("[account-api] schema mismatch — run: npm run db:init on a fresh database");
           return null;
         }
         throw e;
       }
       database.prepare(`UPDATE accounts SET updated_at = ? WHERE id = ?`).run(Date.now(), existing.id);
-      return database.prepare(`SELECT * FROM accounts WHERE email = ?`).get(email) as AccountRow;
+      const row = database.prepare(`SELECT * FROM accounts WHERE email = ?`).get(email) as AccountRow;
+      return attachLedgerBalances(database, row);
     }
 
     const now = Date.now();
@@ -201,41 +215,24 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       database
         .prepare(
           `INSERT INTO accounts (
-            id, created_at, updated_at, label, email,
+            id, created_at, updated_at, email,
             usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd, coverage_used_qusd,
-            tier_id, qusd_unlocked, qusd_locked, accumulated_losses_qusd,
-            bonus_repaid_usdc, vault_activity_at, qusd_vault_interest_at, sync_version
-          ) VALUES (?, ?, ?, NULL, ?, 0, ?, 0, 0, 0, ?, ?, 0, 0, 0, NULL, NULL, 0)`,
+            tier_id, accumulated_losses_qusd, bonus_repaid_usdc, vault_activity_at, qusd_vault_interest_at, sync_version
+          ) VALUES (?, ?, ?, ?, 0, ?, 0, 0, 0, ?, 0, 0, NULL, NULL, 0)`,
         )
-        .run(
-          id,
-          now,
-          now,
-          email,
-          DEFAULT_COVERAGE_LIMIT_QUSD,
-          DEFAULT_TIER_ID,
-          DEFAULT_QUSD_UNLOCKED,
-        );
+        .run(id, now, now, email, DEFAULT_COVERAGE_LIMIT_QUSD, DEFAULT_TIER_ID);
+      insertSignupGrant(database, id, now);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("no column named email")) {
-        console.error(
-          "[account-api] accounts.email missing — run: npm run db:migrate:email",
-        );
-        return null;
-      }
-      if (msg.includes("no column named sync_version")) {
-        console.error("[account-api] run: npm run db:migrate:deposit-worker");
-        return null;
-      }
-      if (msg.includes("no column named qusd_vault_interest_at")) {
-        console.error("[account-api] run: npm run db:migrate:vault-interest");
+      if (msg.includes("no column named email") || msg.includes("no such table: qusd_ledger")) {
+        console.error("[account-api] run: npm run db:init (fresh schema with qusd_ledger)");
         return null;
       }
       throw e;
     }
 
-    return sel.get(email) as AccountRow | undefined ?? null;
+    const created = sel.get(email) as AccountRow | undefined;
+    return created ? attachLedgerBalances(database, created) : null;
   };
 
   return (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
@@ -566,43 +563,16 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           const now = Date.now();
           try {
             const run = database.transaction(() => {
-              const upd = database
-                .prepare(
-                  `UPDATE accounts SET
-                    updated_at = ?,
-                    usdc_balance = ?,
-                    coverage_limit_qusd = ?,
-                    premium_accrued_usdc = ?,
-                    covered_losses_qusd = ?,
-                    coverage_used_qusd = ?,
-                    qusd_unlocked = ?,
-                    qusd_locked = ?,
-                    accumulated_losses_qusd = ?,
-                    bonus_repaid_usdc = ?,
-                    vault_activity_at = ?,
-                    qusd_vault_interest_at = ?,
-                    sync_version = sync_version + 1
-                  WHERE id = ? AND sync_version = ?`,
-                )
-                .run(
-                  now,
-                  body.usdc_balance,
-                  body.coverage_limit_qusd,
-                  body.premium_accrued_usdc,
-                  body.covered_losses_qusd,
-                  body.coverage_used_qusd,
-                  body.qusd_unlocked,
-                  body.qusd_locked,
-                  body.accumulated_losses_qusd,
-                  body.bonus_repaid_usdc,
-                  body.vault_activity_at,
-                  now,
-                  accountId,
-                  body.sync_version,
-                );
-              if (upd.changes !== 1) {
-                throw Object.assign(new Error("sync_conflict"), { code: "SYNC_CONFLICT" as const });
+              const prevOpens = database
+                .prepare(`SELECT position_id FROM perp_open_positions WHERE account_id = ?`)
+                .all(accountId) as { position_id: string }[];
+              const prevOpenIds = new Set(prevOpens.map((r) => r.position_id));
+
+              for (const e of body.perp_close_events ?? []) {
+                const credit = e.marginUsdc + e.realizedPnlQusd;
+                insertPerpCloseSettlement(database, accountId, e.positionId, credit, now);
               }
+
               database.prepare(`DELETE FROM perp_open_positions WHERE account_id = ?`).run(accountId);
               const ins = database.prepare(
                 `INSERT INTO perp_open_positions (
@@ -621,6 +591,48 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                   p.marginUsdc,
                   p.openedAt,
                 );
+                if (!prevOpenIds.has(p.id)) {
+                  insertPerpMarginLock(database, accountId, p.id, p.marginUsdc, now);
+                }
+              }
+
+              const { unlocked: Lu, locked: Ll } = getLedgerBalances(database, accountId);
+              const du = body.qusd_unlocked - Lu;
+              const dl = body.qusd_locked - Ll;
+              if (Math.abs(du) > 1e-6 || Math.abs(dl) > 1e-6) {
+                insertVaultMove(database, accountId, du, dl, now);
+              }
+
+              const upd = database
+                .prepare(
+                  `UPDATE accounts SET
+                    updated_at = ?,
+                    usdc_balance = ?,
+                    coverage_limit_qusd = ?,
+                    premium_accrued_usdc = ?,
+                    covered_losses_qusd = ?,
+                    coverage_used_qusd = ?,
+                    accumulated_losses_qusd = ?,
+                    bonus_repaid_usdc = ?,
+                    vault_activity_at = ?,
+                    sync_version = sync_version + 1
+                  WHERE id = ? AND sync_version = ?`,
+                )
+                .run(
+                  now,
+                  body.usdc_balance,
+                  body.coverage_limit_qusd,
+                  body.premium_accrued_usdc,
+                  body.covered_losses_qusd,
+                  body.coverage_used_qusd,
+                  body.accumulated_losses_qusd,
+                  body.bonus_repaid_usdc,
+                  body.vault_activity_at,
+                  accountId,
+                  body.sync_version,
+                );
+              if (upd.changes !== 1) {
+                throw Object.assign(new Error("sync_conflict"), { code: "SYNC_CONFLICT" as const });
               }
               const insClose = database.prepare(
                 `INSERT OR IGNORE INTO perp_transactions (
@@ -629,7 +641,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                   exit_price, realized_pnl_qusd, closed_at, inserted_at
                 ) VALUES (?, ?, 'close', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               );
-              for (const e of body.perp_close_events) {
+              for (const e of body.perp_close_events ?? []) {
                 insClose.run(
                   accountId,
                   e.positionId,

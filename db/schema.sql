@@ -1,5 +1,4 @@
--- Solve Quest — SQLite schema
--- Persisted fields match engine Account + app vault state (no computed equity / uPnL / marks).
+-- Solve Quest — SQLite schema (QUSD balances from qusd_ledger sums).
 
 PRAGMA foreign_keys = ON;
 
@@ -7,34 +6,19 @@ CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  -- Optional display label (engine uses userId string; this row’s `id` is the canonical user/account id)
-  label TEXT,
-  -- Login email (unique when set) — links JWT session to this row
   email TEXT,
-  -- Engine Account — stored, not derived
   usdc_balance REAL NOT NULL,
   coverage_limit_qusd REAL NOT NULL,
   premium_accrued_usdc REAL NOT NULL DEFAULT 0,
   covered_losses_qusd REAL NOT NULL DEFAULT 0,
   coverage_used_qusd REAL NOT NULL DEFAULT 0,
-  -- Account tier (1 / 2 / 3); coverage_limit_qusd is authoritative after tier + cap extensions
   tier_id INTEGER NOT NULL CHECK (tier_id IN (1, 2, 3)),
-  -- QUSD vault (app state)
-  qusd_unlocked REAL NOT NULL DEFAULT 0,
-  qusd_locked REAL NOT NULL DEFAULT 0,
-  -- Cumulative realized perp loss notionals tracked in app reducer
   accumulated_losses_qusd REAL NOT NULL DEFAULT 0,
-  -- Bonus repayment progress (Send unlock); synced from client for registered users
   bonus_repaid_usdc REAL NOT NULL DEFAULT 0,
-  -- Last vault lock/unlock activity (cooldown); epoch ms or NULL
   vault_activity_at INTEGER,
-  -- Minute-boundary checkpoint for compounding interest on qusd_locked (epoch ms); server + demo client
   qusd_vault_interest_at INTEGER,
-  -- Deposit address (assigned at account creation; sync from app / provision script)
   sol_receive_address TEXT,
-  -- Server-generated custodial deposit key (AES-GCM); when set, deposit address is authoritative from API
   custodial_seckey_enc TEXT,
-  -- Optimistic concurrency: incremented on PUT /api/account/state and on-chain deposit credits
   sync_version INTEGER NOT NULL DEFAULT 0
 );
 
@@ -45,7 +29,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_sol_receive_unique
   ON accounts (sol_receive_address)
   WHERE sol_receive_address IS NOT NULL AND TRIM(sol_receive_address) != '';
 
--- On-chain USDC deposit audit (server worker inserts; UNIQUE(chain, signature) is global idempotency).
+/** Append-only QUSD movements; display unlocked = SUM(unlocked_delta), locked = SUM(locked_delta). */
+CREATE TABLE IF NOT EXISTS qusd_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  entry_type TEXT NOT NULL,
+  unlocked_delta REAL NOT NULL,
+  locked_delta REAL NOT NULL,
+  ref_type TEXT,
+  ref_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_qusd_ledger_account ON qusd_ledger (account_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_qusd_ledger_idem
+  ON qusd_ledger (account_id, ref_type, ref_id)
+  WHERE ref_type IS NOT NULL AND ref_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS deposit_credits (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
@@ -65,7 +65,6 @@ CREATE TABLE IF NOT EXISTS deposit_scan_state (
   watermark_signature TEXT
 );
 
--- Append-only perp events: one row per open; one row per close (same position_id).
 CREATE TABLE IF NOT EXISTS perp_transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
@@ -73,13 +72,11 @@ CREATE TABLE IF NOT EXISTS perp_transactions (
   txn_type TEXT NOT NULL CHECK (txn_type IN ('open', 'close')),
   symbol TEXT NOT NULL,
   side TEXT NOT NULL CHECK (side IN ('long', 'short')),
-  -- Open (required when txn_type = 'open'; optional echo on 'close' if you duplicate for audit)
   entry_price REAL,
   notional_usdc REAL,
   leverage REAL,
   margin_usdc REAL,
   opened_at INTEGER,
-  -- Close (required when txn_type = 'close')
   exit_price REAL,
   realized_pnl_qusd REAL,
   closed_at INTEGER,
@@ -93,7 +90,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_perp_txn_close_once
   ON perp_transactions (account_id, position_id)
   WHERE txn_type = 'close';
 
--- Open perp positions (authoritative for logged-in users; replaced on each sync).
 CREATE TABLE IF NOT EXISTS perp_open_positions (
   position_id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,

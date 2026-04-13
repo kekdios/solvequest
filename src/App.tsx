@@ -176,13 +176,17 @@ function reducer(state: State, action: Action): State {
         positions = fromServerFiltered;
       }
 
-      const marginLocked = positions.reduce((s, p) => s + p.marginUsdc, 0);
-      const baseUnlocked = slice.qusd.unlocked;
+      /** Server `qusd_unlocked` is display unlocked (ledger SUM); open positions are listed separately. */
+      const derivedUnlocked = slice.qusd.unlocked;
+      const mergedUnlocked =
+        action.mergeUnsyncedLocalOpens === true
+          ? Math.max(derivedUnlocked, state.qusd.unlocked)
+          : derivedUnlocked;
       return {
         ...state,
         ...slice,
         qusd: {
-          unlocked: Math.max(0, baseUnlocked - marginLocked),
+          unlocked: mergedUnlocked,
           locked: slice.qusd.locked,
         },
         perpPositions: positions,

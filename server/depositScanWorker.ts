@@ -1,6 +1,6 @@
 /**
  * Polls Solana mainnet for USDC SPL deposits to each account's sol_receive_address,
- * credits qusd_unlocked += usdc * QUSD_MULTIPLIER, records deposit_credits, bumps sync_version.
+ * Appends `qusd_ledger` + deposit_credits, bumps sync_version.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -8,6 +8,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import Database from "better-sqlite3";
 import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
 import { decryptCustodialKeypair } from "./depositWalletCrypto";
+import { insertSolanaUsdcCredit } from "./qusdLedger";
 import { sweepCustodialDepositToTreasury } from "./custodialSweepServer";
 import { scanNewUsdcDeposits, type ScanLedger } from "./solanaUsdcScan";
 
@@ -127,12 +128,13 @@ async function processAccount(
       const r = ins.run(accountId, signature, amountUsdc, creditedAt);
       if (r.changes === 0) return;
       const qusd = amountUsdc * qusdPerUsdc;
+      insertSolanaUsdcCredit(database, accountId, qusd, signature, creditedAt);
       database
         .prepare(
-          `UPDATE accounts SET qusd_unlocked = qusd_unlocked + ?, sync_version = sync_version + 1, updated_at = ?
+          `UPDATE accounts SET sync_version = sync_version + 1, updated_at = ?
            WHERE id = ?`,
         )
-        .run(qusd, creditedAt, accountId);
+        .run(creditedAt, accountId);
       console.log(
         `[deposit-scan] credited ${accountId.slice(0, 8)}… +${qusd.toFixed(2)} QUSD (${amountUsdc} USDC) sig ${signature.slice(0, 10)}…`,
       );

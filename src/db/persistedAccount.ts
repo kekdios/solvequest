@@ -6,7 +6,6 @@ export type PersistedAccountRow = {
   id: string;
   created_at: number;
   updated_at: number;
-  label: string | null;
   /** Set when row is tied to email login — matches JWT `email` */
   email: string | null;
   usdc_balance: number;

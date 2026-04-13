@@ -21,11 +21,9 @@ export type AccountStatePutBody = {
 };
 
 /**
- * Maps client reducer state → DB row + open positions.
- * `qusd_unlocked` in DB is pre-margin pool (same convention as hydrate).
+ * Maps client reducer state → API body. `qusd_unlocked` is **display** unlocked (ledger convention on server).
  */
 export function buildAccountStatePutBody(state: DemoAppState, syncVersion: number): AccountStatePutBody {
-  const marginInPos = state.perpPositions.reduce((s, p) => s + p.marginUsdc, 0);
   return {
     sync_version: syncVersion,
     usdc_balance: state.account.balance,
@@ -33,7 +31,7 @@ export function buildAccountStatePutBody(state: DemoAppState, syncVersion: numbe
     premium_accrued_usdc: state.account.premiumAccrued,
     covered_losses_qusd: state.account.coveredLosses,
     coverage_used_qusd: state.account.coverageUsed,
-    qusd_unlocked: state.qusd.unlocked + marginInPos,
+    qusd_unlocked: state.qusd.unlocked,
     qusd_locked: state.qusd.locked,
     accumulated_losses_qusd: state.accumulatedLossesQusd,
     bonus_repaid_usdc: state.bonusRepaidUsdc,
