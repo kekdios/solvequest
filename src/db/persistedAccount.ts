@@ -25,6 +25,8 @@ export type PersistedAccountRow = {
   sync_version?: number;
   /** Present on GET /api/account/me JSON only (joined from `perp_open_positions`). */
   open_perp_positions?: import("../engine/perps").PerpPosition[];
+  /** True after at least one Solana USDC deposit was credited (`deposit_credits`). */
+  account_active?: boolean;
 };
 
 export type PerpTxnType = "open" | "close";

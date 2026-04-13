@@ -558,6 +558,11 @@ function AppInner() {
                 <span style={styles.navUser} title={user.email}>
                   {user.email.length > 22 ? `${user.email.slice(0, 20)}…` : user.email}
                 </span>
+                {!demo && ledgerAccountRow?.account_active ? (
+                  <span style={styles.activeBadge} title="At least one USDC deposit to your Solana address was credited">
+                    Active
+                  </span>
+                ) : null}
                 <button type="button" style={styles.navAuthBtn} onClick={() => void logout()}>
                   Sign out
                 </button>
@@ -730,6 +735,17 @@ const styles: Record<string, CSSProperties> = {
     textTransform: "uppercase",
     color: "var(--bg)",
     background: "color-mix(in srgb, var(--accent) 85%, #000)",
+    borderRadius: 6,
+    padding: "4px 10px",
+    lineHeight: 1.2,
+  },
+  activeBadge: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "var(--bg)",
+    background: "color-mix(in srgb, var(--ok) 75%, #0a2e14)",
     borderRadius: 6,
     padding: "4px 10px",
     lineHeight: 1.2,

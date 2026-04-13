@@ -77,6 +77,20 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+/** True if any on-chain USDC deposit was credited for this account (`deposit_credits`). */
+function accountHasSolanaDeposit(database: SqliteDb, accountId: string): boolean {
+  try {
+    const row = database
+      .prepare(
+        `SELECT 1 AS ok FROM deposit_credits WHERE account_id = ? AND chain = 'solana' AND kind = 'usdc' LIMIT 1`,
+      )
+      .get(accountId) as { ok: number } | undefined;
+    return row != null;
+  } catch {
+    return false;
+  }
+}
+
 function loadOpenPositions(database: SqliteDb, accountId: string): z.infer<typeof perpPositionPutZ>[] {
   const rows = database
     .prepare(
@@ -247,6 +261,8 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         }
         const mePayload = { ...row, open_perp_positions: openPerp } as Record<string, unknown>;
         mePayload.sync_version = Number((row as AccountRow).sync_version ?? 0);
+        mePayload.account_active =
+          database != null ? accountHasSolanaDeposit(database, accountId) : false;
         sendJson(res, 200, mePayload);
       } catch {
         sendJson(res, 401, { error: "Invalid token" });
