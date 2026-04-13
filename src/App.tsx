@@ -728,7 +728,6 @@ function AppInner() {
           {screen === "account" && (
             <AccountScreen
               isDemo={demo}
-              ledgerAccountRow={ledgerAccountRow}
               qusdUnlocked={state.qusd.unlocked}
               qusdLocked={state.qusd.locked}
               onLockQusd={lockQusd}

@@ -9,21 +9,10 @@ import {
 } from "../ui/appSurface";
 import { LOCKED_QUSD_COOLDOWN_MS, QUSD_PER_USD, QUSD_DAILY_INTEREST_RATE } from "../engine/qusdVault";
 import { QusdAmount } from "../Qusd";
-import type { PersistedAccountRow } from "../db/persistedAccount";
 
 const TestReceiveAddresses = lazy(() => import("../components/TestReceiveAddresses"));
 
 const CHANGENOW_URL = "https://changenow.io/";
-
-function formatLedgerValue(key: string, value: unknown): string {
-  if (value === null || value === undefined) return "—";
-  if (key === "created_at" || key === "updated_at") {
-    const n = Number(value);
-    return Number.isFinite(n) ? new Date(n).toISOString() : String(value);
-  }
-  if (typeof value === "number") return String(value);
-  return String(value);
-}
 
 /** Stat value text was 2rem; reduced by 40% → 60% scale. */
 const STAT_VALUE_FS = "1.2rem";
@@ -38,8 +27,6 @@ const statAmountStyle = {
 type Props = {
   /** Anonymous demo: no Solana deposit UI; balances stay in-browser only. */
   isDemo?: boolean;
-  /** When logged in, full SQLite `accounts` row from GET /api/account/me (read-only display). */
-  ledgerAccountRow?: PersistedAccountRow | null;
   qusdUnlocked: number;
   qusdLocked: number;
   onLockQusd: (amountQusd: number) => void;
@@ -49,7 +36,6 @@ type Props = {
 
 export default function AccountScreen({
   isDemo = false,
-  ledgerAccountRow = null,
   qusdUnlocked,
   qusdLocked,
   onLockQusd,
@@ -133,26 +119,6 @@ export default function AccountScreen({
             </>
           )}
         </section>
-
-        {ledgerAccountRow && !isDemo ? (
-          <section style={s.dbLedgerSection} aria-label="Server database account row">
-            <h3 style={s.dbLedgerTitle}>Ledger (SQLite)</h3>
-            <p style={s.dbLedgerLead}>
-              Read-only snapshot from the server <code style={s.dbLedgerCode}>accounts</code> row for your
-              login. Trading and vault actions apply in the app only until the API persists them.
-            </p>
-            <dl style={s.dbLedgerDl}>
-              {Object.entries(ledgerAccountRow as Record<string, unknown>).map(([key, value]) => (
-                <div key={key} style={s.dbLedgerRow}>
-                  <dt style={s.dbLedgerDt}>{key}</dt>
-                  <dd style={s.dbLedgerDd} className="mono">
-                    {formatLedgerValue(key, value)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        ) : null}
 
         <div className="account-balance-grid">
         <section style={s.statHero} aria-label="Total QUSD">
@@ -274,48 +240,6 @@ export default function AccountScreen({
 const s: Record<string, CSSProperties> = {
   wrap: { display: "flex", flexDirection: "column", gap: 16 },
   metricsStack: { display: "flex", flexDirection: "column", gap: 16 },
-  dbLedgerSection: {
-    ...uiOrderCard,
-    padding: "18px 20px",
-  },
-  dbLedgerTitle: {
-    margin: "0 0 8px",
-    fontSize: "1.05rem",
-    fontWeight: 700,
-    letterSpacing: "-0.02em",
-    color: "var(--text)",
-  },
-  dbLedgerLead: {
-    margin: "0 0 14px",
-    fontSize: 12,
-    lineHeight: 1.5,
-    color: "var(--muted)",
-  },
-  dbLedgerCode: {
-    fontSize: "0.95em",
-    color: "var(--accent)",
-  },
-  dbLedgerDl: {
-    margin: 0,
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.2fr)",
-    gap: "6px 16px",
-    fontSize: 13,
-    alignItems: "start",
-  },
-  dbLedgerRow: {
-    display: "contents",
-  },
-  dbLedgerDt: {
-    margin: 0,
-    color: "var(--muted)",
-    fontWeight: 500,
-  },
-  dbLedgerDd: {
-    margin: 0,
-    color: "var(--text)",
-    wordBreak: "break-word",
-  },
   walletPanelTop: {
     width: "100%",
     background:
