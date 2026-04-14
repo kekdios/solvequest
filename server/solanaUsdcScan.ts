@@ -5,6 +5,23 @@ import type { Connection, ParsedTransactionWithMeta } from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
+type TokenBalanceRow = NonNullable<
+  NonNullable<ParsedTransactionWithMeta["meta"]>["preTokenBalances"]
+>[number];
+
+function accountKeyAtParsed(parsed: ParsedTransactionWithMeta, index: number): PublicKey | undefined {
+  const msg = parsed.transaction.message as {
+    getAccountKeys?: () => { get: (i: number) => PublicKey | undefined };
+    accountKeys?: Array<PublicKey | { pubkey: PublicKey }>;
+  };
+  if (typeof msg.getAccountKeys === "function") {
+    return msg.getAccountKeys().get(index);
+  }
+  const raw = msg.accountKeys?.[index];
+  if (raw == null) return undefined;
+  return raw instanceof PublicKey ? raw : raw.pubkey;
+}
+
 /** Mainnet USDC (legacy SPL). */
 export const MAINNET_USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
@@ -14,18 +31,58 @@ export function getUsdcAta(owner: PublicKey): PublicKey {
   return getAssociatedTokenAddressSync(MAINNET_USDC_MINT, owner, false);
 }
 
+/**
+ * USDC delta for this wallet's USDC ATA: prefer matching by token account pubkey (accountIndex),
+ * fall back to meta.owner === wallet (some RPCs omit one of these).
+ */
+function usdcRawBalanceForWalletAta(
+  balances: readonly TokenBalanceRow[] | null | undefined,
+  parsed: ParsedTransactionWithMeta,
+  mintStr: string,
+  ata: PublicKey,
+  walletOwnerStr: string,
+): bigint {
+  if (!balances?.length) return 0n;
+  for (const b of balances) {
+    if (b.mint !== mintStr) continue;
+    const key = accountKeyAtParsed(parsed, b.accountIndex);
+    if (key?.equals(ata)) {
+      const a = b.uiTokenAmount?.amount;
+      return a != null && a !== "" ? BigInt(a) : 0n;
+    }
+  }
+  for (const b of balances) {
+    if (b.mint !== mintStr) continue;
+    if (b.owner === walletOwnerStr) {
+      const a = b.uiTokenAmount?.amount;
+      return a != null && a !== "" ? BigInt(a) : 0n;
+    }
+  }
+  return 0n;
+}
+
 export function usdcNetChangeForWallet(parsed: ParsedTransactionWithMeta, owner: PublicKey): number {
   const meta = parsed.meta;
   if (!meta) return 0;
   const mintStr = MAINNET_USDC_MINT.toBase58();
-  const ownerStr = owner.toBase58();
-  const pre = meta.preTokenBalances?.find((b) => b.mint === mintStr && b.owner === ownerStr);
-  const post = meta.postTokenBalances?.find((b) => b.mint === mintStr && b.owner === ownerStr);
-  const preRaw = pre?.uiTokenAmount?.amount != null ? BigInt(pre.uiTokenAmount.amount) : 0n;
-  const postRaw = post?.uiTokenAmount?.amount != null ? BigInt(post.uiTokenAmount.amount) : 0n;
+  const ata = getUsdcAta(owner);
+  const walletOwnerStr = owner.toBase58();
+  const preRaw = usdcRawBalanceForWalletAta(meta.preTokenBalances, parsed, mintStr, ata, walletOwnerStr);
+  const postRaw = usdcRawBalanceForWalletAta(meta.postTokenBalances, parsed, mintStr, ata, walletOwnerStr);
   const delta = postRaw - preRaw;
   if (delta <= 0n) return 0;
   return Number(delta) / 1e6;
+}
+
+/** On-chain USDC balance (human) at the wallet's canonical USDC ATA. */
+export async function getUsdcAtaBalanceUi(connection: Connection, owner: PublicKey): Promise<number> {
+  const ata = getUsdcAta(owner);
+  try {
+    const t = await connection.getTokenAccountBalance(ata, READ_COMMITMENT);
+    return parseFloat(t.value.uiAmountString ?? "0");
+  } catch {
+    return 0;
+  }
 }
 
 export type UsdcCredit = { signature: string; amountUsdc: number };

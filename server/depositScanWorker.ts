@@ -10,7 +10,7 @@ import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
 import { resolveCustodialDepositKeypair } from "./depositWalletCrypto";
 import { insertSolanaUsdcCredit } from "./qusdLedger";
 import { sweepCustodialDepositToTreasury } from "./custodialSweepServer";
-import { scanNewUsdcDeposits, type ScanLedger } from "./solanaUsdcScan";
+import { getUsdcAtaBalanceUi, scanNewUsdcDeposits, type ScanLedger } from "./solanaUsdcScan";
 import { ensureCustodialHdSchema } from "./ensureCustodialHdSchema";
 
 type SqliteDb = InstanceType<typeof Database>;
@@ -188,9 +188,27 @@ export async function processAccount(
     .prepare(`SELECT watermark_signature FROM deposit_scan_state WHERE account_id = ?`)
     .get(accountId) as { watermark_signature: string | null } | undefined;
 
-  const ledger: ScanLedger = {
+  const creditedBefore = database
+    .prepare(
+      `SELECT COALESCE(SUM(amount_human), 0) AS s FROM deposit_credits
+       WHERE account_id = ? AND chain = 'solana' AND kind = 'usdc'`,
+    )
+    .get(accountId) as { s: number };
+
+  let ledger: ScanLedger = {
     watermarkUsdcAta: wmRow?.watermark_signature ?? null,
   };
+
+  /** Old bug: watermark advanced with zero credits — incremental scan then finds nothing new. */
+  const onChainUi = await getUsdcAtaBalanceUi(connection, owner);
+  const sumCredited = Number(creditedBefore?.s ?? 0);
+  if (onChainUi > 1e-6 && sumCredited < 1e-6 && ledger.watermarkUsdcAta != null) {
+    database.prepare(`DELETE FROM deposit_scan_state WHERE account_id = ?`).run(accountId);
+    ledger = { watermarkUsdcAta: null };
+    console.warn(
+      `[deposit-scan] cleared stale watermark for ${accountId.slice(0, 8)}… (USDC on-chain, no deposit_credits)`,
+    );
+  }
 
   const { credits, ledger: next } = await scanNewUsdcDeposits(connection, owner, ledger);
 
