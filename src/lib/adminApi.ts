@@ -3,6 +3,33 @@ const base = "/api/admin";
 
 export type AdminMeResponse = { ok: boolean; authenticated: boolean; pubkey?: string };
 
+/** GET /api/admin/custody-debug — requires admin session. Owner from server env SOLVEQUEST_ADMIN_CUSTODY_OWNER. */
+export type AdminCustodyDebugResponse = {
+  ok: true;
+  configured: boolean;
+  owner: string | null;
+  usdc_ata: string | null;
+  usdc_mint: string;
+  sol_lamports: number | null;
+  usdc_balance_ui: number | null;
+  ata_exists: boolean;
+  recent_signatures: { signature: string; slot: number | null; blockTime: number | null }[];
+  rpc_url: string;
+  rpc_error?: string;
+};
+
+export async function fetchAdminCustodyDebug(): Promise<AdminCustodyDebugResponse> {
+  const r = await fetch(`${base}/custody-debug`, { credentials: "include" });
+  const data = (await r.json()) as AdminCustodyDebugResponse | { ok?: false; error?: string };
+  if (r.status === 401) {
+    throw new Error("Not signed in");
+  }
+  if (!r.ok || !data || typeof data !== "object" || !("ok" in data) || !data.ok) {
+    throw new Error(typeof data === "object" && data && "error" in data ? String(data.error) : r.statusText);
+  }
+  return data as AdminCustodyDebugResponse;
+}
+
 export async function fetchAdminMe(): Promise<AdminMeResponse> {
   const r = await fetch(`${base}/me`, { credentials: "include" });
   return r.json() as Promise<AdminMeResponse>;

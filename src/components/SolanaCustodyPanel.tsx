@@ -8,11 +8,23 @@ import { MAINNET_USDC_MINT, READ_COMMITMENT, makeConnection } from "../deposit/c
 type Props = {
   /** Namespaces local deposit ledger (e.g. admin debug). */
   accountId: string;
-  /** Mainnet deposit address to observe (must match server custodial pubkey). */
+  /** Mainnet deposit **owner** (same as `sol_receive_address` / HD-derived wallet), not the admin signing wallet. */
   ownerPubkeyBase58: string | null;
   /** Credits in-app USDC wallet balance when mainnet USDC SPL arrives at the custodial ATA. */
   onUsdcCredited: (amountUsdc: number) => void;
 };
+
+function parseOwnerPk(
+  ownerPubkeyBase58: string | null,
+): { ownerPk: PublicKey | null; invalid: boolean } {
+  const t = ownerPubkeyBase58?.trim();
+  if (!t) return { ownerPk: null, invalid: false };
+  try {
+    return { ownerPk: new PublicKey(t), invalid: false };
+  } catch {
+    return { ownerPk: null, invalid: true };
+  }
+}
 
 export default function SolanaCustodyPanel({ accountId, ownerPubkeyBase58, onUsdcCredited }: Props) {
   const creditRef = useRef(onUsdcCredited);
@@ -24,15 +36,7 @@ export default function SolanaCustodyPanel({ accountId, ownerPubkeyBase58, onUsd
   const [solBal, setSolBal] = useState<number | null>(null);
   const [usdcBal, setUsdcBal] = useState<number | null>(null);
 
-  const ownerPk = (() => {
-    const t = ownerPubkeyBase58?.trim();
-    if (!t) return null;
-    try {
-      return new PublicKey(t);
-    } catch {
-      return null;
-    }
-  })();
+  const { ownerPk, invalid } = parseOwnerPk(ownerPubkeyBase58);
 
   const refreshBalances = useCallback(async (owner: PublicKey) => {
     const connection = makeConnection();
@@ -92,14 +96,26 @@ export default function SolanaCustodyPanel({ accountId, ownerPubkeyBase58, onUsd
     .sort((a, b) => (b[1].at ?? 0) - (a[1].at ?? 0))
     .slice(0, 12);
 
+  if (invalid) {
+    return (
+      <div style={s.box}>
+        <h4 style={s.h4}>Solana custody (mainnet)</h4>
+        <p style={s.err}>
+          Invalid base58 public key — paste the custodial owner address (same as user <code style={s.code}>sol_receive_address</code>
+          ).
+        </p>
+      </div>
+    );
+  }
+
   if (!ownerPubkeyBase58?.trim() || !ownerPk) {
     return (
       <div style={s.box}>
         <h4 style={s.h4}>Solana custody (mainnet)</h4>
         <p style={s.p}>
-          Set <code style={s.code}>VITE_SOLANA_DEBUG_CUSTODY_PUBKEY</code> in <code style={s.code}>.env</code> to a
-          mainnet custodial deposit pubkey for local balance / scan debugging. User deposits use server-derived HD
-          addresses only — no browser keypair.
+          Paste the <strong>custodial deposit owner</strong> above (the user&apos;s <code style={s.code}>sol_receive_address</code>
+          — not your admin signing wallet). Or set <code style={s.code}>VITE_SOLANA_DEBUG_CUSTODY_PUBKEY</code> in{" "}
+          <code style={s.code}>.env</code>. Chain USDC is read from the USDC ATA for that owner.
         </p>
       </div>
     );
@@ -109,10 +125,14 @@ export default function SolanaCustodyPanel({ accountId, ownerPubkeyBase58, onUsd
     <div style={s.box}>
       <h4 style={s.h4}>Solana custody (mainnet)</h4>
       <p style={s.p}>
+        <span className="mono" style={{ fontSize: 11, color: "var(--text)" }}>{ownerPk.toBase58()}</span>
+      </p>
+      <p style={s.p}>
         USDC SPL uses the standard ATA for mint <code style={s.code}>{MAINNET_USDC_MINT.toBase58().slice(0, 6)}…</code>.
-        Use <strong>Scan now</strong> for a local RPC check. Production USDC→QUSD credits run on the server (
-        <code style={s.code}>SOLVEQUEST_DEPOSIT_SCAN</code> or admin deposit scan). Treasury sweep runs on the server
-        only.
+        Balances below are <strong>on-chain</strong> for this owner. Use <strong>Scan now</strong> for a local browser
+        ledger check only. Production USDC→QUSD credits run on the server (
+        <code style={s.code}>SOLVEQUEST_DEPOSIT_SCAN</code> or <strong>Run server deposit scan</strong>). Treasury sweep
+        runs on the server only.
       </p>
       {errMsg && /403|forbidden/i.test(errMsg) ? (
         <p style={s.rpcHint}>
@@ -161,6 +181,7 @@ export default function SolanaCustodyPanel({ accountId, ownerPubkeyBase58, onUsd
 }
 
 const s: Record<string, CSSProperties> = {
+  err: { margin: 0, fontSize: 13, color: "#f87171", lineHeight: 1.45 },
   box: {
     marginTop: 12,
     padding: "14px 14px",

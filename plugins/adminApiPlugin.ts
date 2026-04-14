@@ -7,9 +7,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Connect } from "vite";
 import type { Plugin } from "vite";
 import { loadEnv } from "vite";
-import { PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import nacl from "tweetnacl";
 import { runDepositScanOnce } from "../server/depositScanWorker";
+import { getUsdcAta, MAINNET_USDC_MINT } from "../server/solanaUsdcScan";
 
 const COOKIE = "sq_admin_session";
 const NONCE_TTL_MS = 10 * 60 * 1000;
@@ -143,6 +144,89 @@ export function createAdminApiMiddleware(
         return;
       }
       sendJson(res, 200, { ok: true, authenticated: true, pubkey: s.pubkey });
+      return;
+    }
+
+    /** Server RPC snapshot for custodial deposit owner — set SOLVEQUEST_ADMIN_CUSTODY_OWNER in .env (base58). */
+    if (req.method === "GET" && url === "/api/admin/custody-debug") {
+      const sess = adminSessionOk(req.headers.cookie, sessions);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "unauthorized" });
+        return;
+      }
+      const rawOwner = (process.env.SOLVEQUEST_ADMIN_CUSTODY_OWNER ?? env.SOLVEQUEST_ADMIN_CUSTODY_OWNER ?? "").trim();
+      const rpcDefault =
+        process.env.SOLANA_RPC_URL?.trim() ||
+        process.env.SOLANA_RPC_PROXY_TARGET?.trim() ||
+        "https://api.mainnet-beta.solana.com";
+
+      if (!rawOwner) {
+        sendJson(res, 200, {
+          ok: true,
+          configured: false,
+          owner: null,
+          usdc_ata: null,
+          usdc_mint: MAINNET_USDC_MINT.toBase58(),
+          sol_lamports: null,
+          usdc_balance_ui: null,
+          ata_exists: false,
+          recent_signatures: [] as { signature: string; slot: number | null; blockTime: number | null }[],
+          rpc_url: rpcDefault,
+        });
+        return;
+      }
+
+      let ownerPk: PublicKey;
+      try {
+        ownerPk = new PublicKey(rawOwner);
+      } catch {
+        sendJson(res, 500, { ok: false, error: "invalid_SOLVEQUEST_ADMIN_CUSTODY_OWNER" });
+        return;
+      }
+
+      const ataPk = getUsdcAta(ownerPk);
+      void (async () => {
+        try {
+          const conn = new Connection(rpcDefault, "confirmed");
+          const [solLamports, sigs, tokenBal] = await Promise.all([
+            conn.getBalance(ownerPk, "confirmed"),
+            conn.getSignaturesForAddress(ataPk, { limit: 20 }),
+            conn.getTokenAccountBalance(ataPk).catch(() => null),
+          ]);
+          const usdcUi = tokenBal != null ? parseFloat(tokenBal.value.uiAmountString ?? "0") : 0;
+          sendJson(res, 200, {
+            ok: true,
+            configured: true,
+            owner: rawOwner,
+            usdc_ata: ataPk.toBase58(),
+            usdc_mint: MAINNET_USDC_MINT.toBase58(),
+            sol_lamports: solLamports,
+            usdc_balance_ui: usdcUi,
+            ata_exists: tokenBal != null,
+            recent_signatures: sigs.map((x) => ({
+              signature: x.signature,
+              slot: x.slot ?? null,
+              blockTime: x.blockTime ?? null,
+            })),
+            rpc_url: rpcDefault,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          sendJson(res, 200, {
+            ok: true,
+            configured: true,
+            owner: rawOwner,
+            usdc_ata: ataPk.toBase58(),
+            usdc_mint: MAINNET_USDC_MINT.toBase58(),
+            sol_lamports: null,
+            usdc_balance_ui: null,
+            ata_exists: false,
+            recent_signatures: [] as { signature: string; slot: number | null; blockTime: number | null }[],
+            rpc_url: rpcDefault,
+            rpc_error: msg,
+          });
+        }
+      })();
       return;
     }
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
   ConnectionProvider,
   WalletProvider,
@@ -8,11 +9,13 @@ import { WalletModalProvider, WalletMultiButton } from "@solana/wallet-adapter-r
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import {
+  fetchAdminCustodyDebug,
   fetchAdminMe,
   fetchAdminNonce,
   postAdminDepositScan,
   postAdminLogout,
   postAdminVerify,
+  type AdminCustodyDebugResponse,
   uint8ToBase64,
 } from "../lib/adminApi";
 import { getSolanaRpcEndpoint } from "../deposit/chainConfig";
@@ -27,18 +30,149 @@ type Props = {
   onCustodialUsdcCredited: (amountUsdc: number) => void;
 };
 
+const CUSTODY_OWNER_STORAGE = "sq_admin_custody_owner";
+
 function AdminSolanaCustody({
   onUsdcCredited,
 }: {
   onUsdcCredited: (amountUsdc: number) => void;
 }) {
   const debugPk = import.meta.env.VITE_SOLANA_DEBUG_CUSTODY_PUBKEY?.trim() || null;
+  const [custodyOwnerDraft, setCustodyOwnerDraft] = useState(() => {
+    if (typeof sessionStorage === "undefined") return "";
+    try {
+      return sessionStorage.getItem(CUSTODY_OWNER_STORAGE) ?? "";
+    } catch {
+      return "";
+    }
+  });
+
+  const [serverSnap, setServerSnap] = useState<AdminCustodyDebugResponse | null>(null);
+  const [serverSnapLoading, setServerSnapLoading] = useState(true);
+  const [serverSnapErr, setServerSnapErr] = useState<string | null>(null);
+
+  const loadServerSnap = useCallback(() => {
+    setServerSnapLoading(true);
+    setServerSnapErr(null);
+    void fetchAdminCustodyDebug()
+      .then(setServerSnap)
+      .catch((e: unknown) => setServerSnapErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setServerSnapLoading(false));
+  }, []);
+
+  useEffect(() => {
+    void loadServerSnap();
+  }, [loadServerSnap]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CUSTODY_OWNER_STORAGE, custodyOwnerDraft);
+    } catch {
+      /* ignore */
+    }
+  }, [custodyOwnerDraft]);
+
+  /** Optional paste / VITE wins; else server-configured owner from SOLVEQUEST_ADMIN_CUSTODY_OWNER. */
+  const ownerForPanel = custodyOwnerDraft.trim() || serverSnap?.owner || debugPk || null;
+
   return (
-    <SolanaCustodyPanel
-      accountId="admin-deposit-ledger"
-      ownerPubkeyBase58={debugPk}
-      onUsdcCredited={onUsdcCredited}
-    />
+    <>
+      <div style={s.custodyServerCard}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <h3 style={s.custodyServerH3}>Custody (server RPC)</h3>
+          <button type="button" style={s.custodyRefreshBtn} disabled={serverSnapLoading} onClick={() => loadServerSnap()}>
+            {serverSnapLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+        {serverSnapLoading && !serverSnap ? (
+          <p style={s.custodyHint}>Loading snapshot…</p>
+        ) : serverSnapErr ? (
+          <p style={s.err}>{serverSnapErr}</p>
+        ) : serverSnap && !serverSnap.configured ? (
+          <p style={s.custodyHint}>
+            Set <code style={s.inlineCode}>SOLVEQUEST_ADMIN_CUSTODY_OWNER</code> in the <strong>server</strong>{" "}
+            <code style={s.inlineCode}>.env</code> to your custodial deposit <strong>owner</strong> (same base58 as{" "}
+            <code style={s.inlineCode}>sol_receive_address</code> / HD deposit wallet — not your admin signing wallet).
+            Restart the API process. Optional: <code style={s.inlineCode}>SOLANA_RPC_URL</code> for RPC.
+          </p>
+        ) : serverSnap?.configured && serverSnap.owner ? (
+          <>
+            {serverSnap.rpc_error ? (
+              <p style={s.err} role="alert">
+                RPC: {serverSnap.rpc_error}
+              </p>
+            ) : null}
+            <p style={s.custodyMono}>
+              <span style={s.custodyK}>Owner</span> {serverSnap.owner}
+            </p>
+            <p style={s.custodyMono}>
+              <span style={s.custodyK}>USDC ATA</span> {serverSnap.usdc_ata}
+            </p>
+            <p style={s.custodyMono}>
+              <span style={s.custodyK}>SOL</span>{" "}
+              {serverSnap.sol_lamports == null ? "—" : (serverSnap.sol_lamports / LAMPORTS_PER_SOL).toFixed(6)}
+            </p>
+            <p style={s.custodyMono}>
+              <span style={s.custodyK}>USDC</span>{" "}
+              {serverSnap.usdc_balance_ui == null ? "—" : serverSnap.usdc_balance_ui.toFixed(4)}{" "}
+              {!serverSnap.ata_exists ? "(ATA not created yet)" : null}
+            </p>
+            <p style={{ ...s.custodyHint, marginTop: 8 }}>
+              RPC: <code style={s.inlineCode}>{serverSnap.rpc_url}</code>
+            </p>
+            {serverSnap.recent_signatures.length > 0 ? (
+              <div style={{ marginTop: 12 }}>
+                <p style={s.custodySigTitle}>Recent ATA transactions</p>
+                <ul style={s.custodySigUl}>
+                  {serverSnap.recent_signatures.map((row) => (
+                    <li key={row.signature} style={s.custodySigLi}>
+                      <a
+                        href={`https://solscan.io/tx/${row.signature}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={s.custodySigA}
+                      >
+                        {row.signature.slice(0, 12)}…
+                      </a>
+                      {row.blockTime != null ? (
+                        <span style={s.custodySigMeta}>{new Date(row.blockTime * 1000).toISOString()}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p style={{ ...s.custodyHint, marginTop: 8 }}>No signatures yet for this USDC ATA.</p>
+            )}
+          </>
+        ) : null}
+      </div>
+
+      <div style={s.custodyField}>
+        <label htmlFor="sq-admin-custody-owner" style={s.custodyLabel}>
+          Override owner (optional)
+        </label>
+        <input
+          id="sq-admin-custody-owner"
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="Leave empty to use server env or VITE_SOLANA_DEBUG_CUSTODY_PUBKEY"
+          value={custodyOwnerDraft}
+          onChange={(e) => setCustodyOwnerDraft(e.target.value)}
+          style={s.custodyInput}
+        />
+        <p style={s.custodyHint}>
+          Browser panel below uses this field, then <code style={s.inlineCode}>SOLVEQUEST_ADMIN_CUSTODY_OWNER</code>, then{" "}
+          <code style={s.inlineCode}>VITE_SOLANA_DEBUG_CUSTODY_PUBKEY</code>. Admin sign-in wallet is unrelated.
+        </p>
+      </div>
+      <SolanaCustodyPanel
+        accountId="admin-deposit-ledger"
+        ownerPubkeyBase58={ownerForPanel}
+        onUsdcCredited={onUsdcCredited}
+      />
+    </>
   );
 }
 
@@ -242,4 +376,38 @@ const s: Record<string, CSSProperties> = {
   hint: { marginTop: 20, fontSize: 12, lineHeight: 1.5, color: "var(--muted)" },
   inlineCode: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--text)" },
   custodyErr: { margin: 0, fontSize: 14, color: "#f87171" },
+  custodyField: { marginBottom: 14 },
+  custodyLabel: { display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 },
+  custodyInput: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "10px 12px",
+    fontSize: 13,
+    fontFamily: "var(--mono)",
+    borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: "var(--panel)",
+    color: "var(--text)",
+  },
+  custodyHint: { margin: "8px 0 0", fontSize: 11, lineHeight: 1.5, color: "var(--muted)" },
+  custodyServerCard: {
+    marginBottom: 16,
+    padding: "16px 14px",
+    borderRadius: 10,
+    border: "1px solid color-mix(in srgb, var(--accent) 28%, var(--border))",
+    background: "color-mix(in srgb, var(--accent) 6%, var(--bg))",
+  },
+  custodyServerH3: { margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text)" },
+  custodyRefreshBtn: {
+    ...uiBtnGhost,
+    padding: "6px 12px",
+    fontSize: 12,
+  },
+  custodyMono: { margin: "6px 0 0", fontSize: 12, lineHeight: 1.45, wordBreak: "break-all", fontFamily: "var(--mono)" },
+  custodyK: { color: "var(--muted)", marginRight: 8, fontFamily: "inherit" },
+  custodySigTitle: { margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: "var(--muted)" },
+  custodySigUl: { margin: 0, paddingLeft: 0, listStyle: "none", fontSize: 11 },
+  custodySigLi: { marginBottom: 6, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "baseline" },
+  custodySigA: { color: "var(--accent)" },
+  custodySigMeta: { color: "var(--muted)", fontSize: 10 },
 };
