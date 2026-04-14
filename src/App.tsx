@@ -308,6 +308,12 @@ function AppInner() {
   /** Set when ensure-custodial or GET /api/account/me fails; shown on Account deposit UI. */
   const [ledgerHydrationError, setLedgerHydrationError] = useState<string | null>(null);
 
+  const clearSessionAndLedger = useCallback(async () => {
+    setLedgerAccountRow(null);
+    setLedgerHydrationError(null);
+    await logout();
+  }, [logout]);
+
   const [state, dispatch] = useReducer(
     reducer,
     undefined,
@@ -352,6 +358,10 @@ function AppInner() {
         if (!("conflict" in result) || !result.conflict) return;
         syncVersionRef.current = result.sync_version;
         const r = await fetch("/api/account/me", { credentials: "include" });
+        if (r.status === 401) {
+          void clearSessionAndLedger();
+          return;
+        }
         if (!r.ok) return;
         const data = (await r.json()) as PersistedAccountRow;
         setLedgerAccountRow(data);
@@ -378,6 +388,7 @@ function AppInner() {
     user?.email,
     authLoading,
     ledgerAccountRow,
+    clearSessionAndLedger,
     state.perpPositions,
     state.pendingPerpCloses,
     state.qusd.unlocked,
@@ -435,6 +446,10 @@ function AppInner() {
           method: "POST",
           credentials: "include",
         });
+        if (encRes.status === 401) {
+          if (!cancelled) await clearSessionAndLedger();
+          return;
+        }
         let ensureErr: string | null = null;
         if (!encRes.ok) {
           try {
@@ -445,6 +460,10 @@ function AppInner() {
           }
         }
         const r = await fetch("/api/account/me", { credentials: "include" });
+        if (r.status === 401) {
+          if (!cancelled) await clearSessionAndLedger();
+          return;
+        }
         if (!r.ok) {
           let msg = `Could not load account (${r.status}).`;
           try {
@@ -488,7 +507,7 @@ function AppInner() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, demo, user?.email]);
+  }, [authLoading, demo, user?.email, clearSessionAndLedger]);
 
   /** Pick up on-chain deposit credits (server bumps sync_version). */
   useEffect(() => {
@@ -497,6 +516,10 @@ function AppInner() {
       void (async () => {
         try {
           const r = await fetch("/api/account/me", { credentials: "include" });
+          if (r.status === 401) {
+            void clearSessionAndLedger();
+            return;
+          }
           if (!r.ok) return;
           const data = (await r.json()) as PersistedAccountRow;
           const sv = Number(data.sync_version ?? 0);
@@ -518,7 +541,7 @@ function AppInner() {
       })();
     }, 25_000);
     return () => window.clearInterval(id);
-  }, [demo, user?.email, authLoading, ledgerAccountRow?.id]);
+  }, [demo, user?.email, authLoading, ledgerAccountRow?.id, clearSessionAndLedger]);
 
   const lastNonAdminScreen = useRef<AppScreen>("landing");
 

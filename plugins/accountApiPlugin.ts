@@ -258,12 +258,18 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         sendJson(res, 401, { error: "Not authenticated" });
         return;
       }
+      let payload: { email?: string };
       try {
-        const payload = jwt.verify(token, jwtSecret!) as { email?: string };
-        if (!payload.email || typeof payload.email !== "string") {
-          sendJson(res, 401, { error: "Invalid token" });
-          return;
-        }
+        payload = jwt.verify(token, jwtSecret!) as { email?: string };
+      } catch {
+        sendJson(res, 401, { error: "Invalid token" });
+        return;
+      }
+      if (!payload.email || typeof payload.email !== "string") {
+        sendJson(res, 401, { error: "Invalid token" });
+        return;
+      }
+      try {
         const email = payload.email.toLowerCase();
         const row = loadOrCreateRow(email);
         if (!row) {
@@ -309,8 +315,13 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         const hasHdIndex = Number.isFinite(diNum) && diNum >= 0;
         mePayload.custodial_deposit = Boolean(custodialRow.custodial_seckey_enc || hasHdIndex);
         sendJson(res, 200, mePayload);
-      } catch {
-        sendJson(res, 401, { error: "Invalid token" });
+      } catch (e) {
+        console.error("[account-api] GET /api/account/me:", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        sendJson(res, 503, {
+          error: "account_load_failed",
+          message: msg,
+        });
       }
       return;
     }
