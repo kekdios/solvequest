@@ -7,7 +7,7 @@ const LEDGER_PREFIX = "sq-deposit-ledger-v1";
 export type CustodyLedger = {
   /** Processed tx signatures — never credit twice. */
   creditedSignatures: Record<string, { at: number; kind: "usdc" | "sol"; amountHuman?: number; lamports?: number }>;
-  /** Newest signature seen on first run — we do not back-credit history before this. */
+  /** Tip signature for incremental scans (after first full history pass, null = never scanned). */
   watermarkUsdcAta: string | null;
 };
 

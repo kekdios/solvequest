@@ -29,9 +29,32 @@ function usdcNetChangeForWallet(parsed: ParsedTransactionWithMeta, owner: Public
   return Number(delta) / 1e6;
 }
 
+const SIG_PAGE_LIMIT = 40;
+const MAX_SIG_PAGES = 1000;
+
+async function getSignaturesForAtaPaginated(
+  connection: Connection,
+  ata: PublicKey,
+): Promise<Array<{ signature: string }>> {
+  const all: Array<{ signature: string }> = [];
+  let before: string | undefined;
+  for (let page = 0; page < MAX_SIG_PAGES; page++) {
+    const batch = await connection.getSignaturesForAddress(
+      ata,
+      { limit: SIG_PAGE_LIMIT, before },
+      READ_COMMITMENT,
+    );
+    if (batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < SIG_PAGE_LIMIT) break;
+    before = batch[batch.length - 1]!.signature;
+  }
+  return all;
+}
+
 /**
  * Fetch signatures newer than watermark, parse txs, return USDC credits not yet in ledger.
- * First run: sets watermark to newest sig without crediting.
+ * First run: paginates ATA history and credits inbound USDC (matches server after DB reset).
  */
 export async function scanNewUsdcDeposits(
   connection: Connection,
@@ -39,15 +62,33 @@ export async function scanNewUsdcDeposits(
   ledger: CustodyLedger,
 ): Promise<{ credits: UsdcCredit[]; ledger: CustodyLedger }> {
   const ata = getUsdcAta(owner);
-  const sigs = await connection.getSignaturesForAddress(ata, { limit: 40 }, READ_COMMITMENT);
   let next = ledger;
 
-  if (sigs.length === 0) {
-    return { credits: [], ledger: next };
+  if (next.watermarkUsdcAta === null) {
+    const allSigs = await getSignaturesForAtaPaginated(connection, ata);
+    if (allSigs.length === 0) {
+      return { credits: [], ledger: next };
+    }
+    const chronological = [...allSigs].reverse();
+    const credits: UsdcCredit[] = [];
+    for (const { signature } of chronological) {
+      if (isSignatureCredited(next, signature)) continue;
+      const tx = await connection.getParsedTransaction(signature, {
+        commitment: READ_COMMITMENT,
+        maxSupportedTransactionVersion: 0,
+      });
+      if (!tx) continue;
+      const amt = usdcNetChangeForWallet(tx as ParsedTransactionWithMeta, owner);
+      if (amt <= 0) continue;
+      credits.push({ signature, amountUsdc: amt });
+      next = markCredited(next, signature, { kind: "usdc", amountHuman: amt });
+    }
+    next = { ...next, watermarkUsdcAta: allSigs[0]!.signature };
+    return { credits, ledger: next };
   }
 
-  if (next.watermarkUsdcAta === null) {
-    next = { ...next, watermarkUsdcAta: sigs[0]!.signature };
+  const sigs = await connection.getSignaturesForAddress(ata, { limit: SIG_PAGE_LIMIT }, READ_COMMITMENT);
+  if (sigs.length === 0) {
     return { credits: [], ledger: next };
   }
 

@@ -34,9 +34,34 @@ export type ScanLedger = {
   watermarkUsdcAta: string | null;
 };
 
+const SIG_PAGE_LIMIT = 40;
+/** Cap RPC pagination so pathological ATAs do not loop forever (40k txs ≈ 1000 pages). */
+const MAX_SIG_PAGES = 1000;
+
+async function getSignaturesForAtaPaginated(
+  connection: Connection,
+  ata: PublicKey,
+): Promise<Array<{ signature: string }>> {
+  const all: Array<{ signature: string }> = [];
+  let before: string | undefined;
+  for (let page = 0; page < MAX_SIG_PAGES; page++) {
+    const batch = await connection.getSignaturesForAddress(
+      ata,
+      { limit: SIG_PAGE_LIMIT, before },
+      READ_COMMITMENT,
+    );
+    if (batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < SIG_PAGE_LIMIT) break;
+    before = batch[batch.length - 1]!.signature;
+  }
+  return all;
+}
+
 /**
  * Fetch signatures for USDC ATA, return new USDC credits since watermark (same semantics as browser).
- * First run: sets watermark to newest sig without crediting.
+ * First run (`watermarkUsdcAta === null`): paginates ATA history, credits each inbound USDC tx
+ * oldest→newest, then sets the watermark to the newest signature (needed after DB reset / new account).
  */
 export async function scanNewUsdcDeposits(
   connection: Connection,
@@ -44,15 +69,31 @@ export async function scanNewUsdcDeposits(
   ledger: ScanLedger,
 ): Promise<{ credits: UsdcCredit[]; ledger: ScanLedger }> {
   const ata = getUsdcAta(owner);
-  const sigs = await connection.getSignaturesForAddress(ata, { limit: 40 }, READ_COMMITMENT);
   let next = ledger;
 
-  if (sigs.length === 0) {
-    return { credits: [], ledger: next };
+  if (next.watermarkUsdcAta === null) {
+    const allSigs = await getSignaturesForAtaPaginated(connection, ata);
+    if (allSigs.length === 0) {
+      return { credits: [], ledger: next };
+    }
+    const chronological = [...allSigs].reverse();
+    const credits: UsdcCredit[] = [];
+    for (const { signature } of chronological) {
+      const tx = await connection.getParsedTransaction(signature, {
+        commitment: READ_COMMITMENT,
+        maxSupportedTransactionVersion: 0,
+      });
+      if (!tx) continue;
+      const amt = usdcNetChangeForWallet(tx as ParsedTransactionWithMeta, owner);
+      if (amt <= 0) continue;
+      credits.push({ signature, amountUsdc: amt });
+    }
+    next = { ...next, watermarkUsdcAta: allSigs[0]!.signature };
+    return { credits, ledger: next };
   }
 
-  if (next.watermarkUsdcAta === null) {
-    next = { ...next, watermarkUsdcAta: sigs[0]!.signature };
+  const sigs = await connection.getSignaturesForAddress(ata, { limit: SIG_PAGE_LIMIT }, READ_COMMITMENT);
+  if (sigs.length === 0) {
     return { credits: [], ledger: next };
   }
 
