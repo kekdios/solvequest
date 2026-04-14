@@ -1,7 +1,7 @@
 #!/usr/bin/env npx tsx
 /**
  * Standalone: derive custodial owner + mainnet USDC ATA from the same env as the API
- * (VITE_SOLANA_TEST_SECRET_KEY_B64 or SOLANA_TEST_SECRET_KEY_B64 / SOLANA_CUSTODIAL_MASTER_KEY_B64).
+ * (SOLANA_CUSTODIAL_MASTER_KEY_B64 — same master as `server/custodialHdDerive.ts`).
  *
  * Usage:
  *   npx tsx scripts/local-custodial-usdc-cycle.ts

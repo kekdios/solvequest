@@ -240,7 +240,12 @@ async function processAccount(
     return;
   }
   const kp = crow ? resolveCustodialDepositKeypair(crow, env) : null;
-  if (!kp) return;
+  if (!kp) {
+    console.warn(
+      `[deposit-scan] sweep skipped ${accountId.slice(0, 8)}… — no custodial key (set accounts.custodial_derivation_index or legacy custodial_seckey_enc).`,
+    );
+    return;
+  }
 
   try {
     const r = await sweepCustodialDepositToTreasury(connection, env, kp);
@@ -248,6 +253,8 @@ async function processAccount(
       console.log(
         `[deposit-scan] custodial sweep ${accountId.slice(0, 8)}… +${r.sweptUsdc.toFixed(4)} USDC (tx ${r.signature.slice(0, 12)}…)`,
       );
+    } else {
+      console.warn(`[deposit-scan] custodial sweep not executed ${accountId.slice(0, 8)}…: ${r.reason}`);
     }
   } catch (e) {
     console.warn(`[deposit-scan] custodial sweep failed ${accountId.slice(0, 8)}…:`, e);

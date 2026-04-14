@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Inserts a new account row + signup QUSD ledger + HD-derived Solana deposit address (same scheme as ensure-custodial-deposit).
- * Env: SOLANA_CUSTODIAL_MASTER_KEY_B64 (recommended) or VITE_SOLANA_TEST_SECRET_KEY_B64 / SOLANA_TEST_SECRET_KEY_B64
+ * Env: SOLANA_CUSTODIAL_MASTER_KEY_B64 (server-only)
  * Usage: npx tsx scripts/provision-account.ts [path/to/db.sqlite]
  */
 import crypto from "node:crypto";

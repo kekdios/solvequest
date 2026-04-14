@@ -18,11 +18,8 @@ interface ImportMetaEnv {
   readonly VITE_SOLANA_USE_ENV_RPC_URL: string;
   /** Treasury Solana address for custodial sweep (USDC ATA created idempotently). */
   readonly VITE_SOLANA_TREASURY_ADDRESS: string;
-  /**
-   * Base64-encoded Solana secret — also used server-side as HD master input (with SHA-512) when no SOLANA_CUSTODIAL_MASTER_KEY_B64.
-   * Prefer a server-only `SOLANA_CUSTODIAL_MASTER_KEY_B64` in production so the master is not bundled for the browser.
-   */
-  readonly VITE_SOLANA_TEST_SECRET_KEY_B64: string;
+  /** @deprecated Not used for HD custodial derivation; set `SOLANA_CUSTODIAL_MASTER_KEY_B64` on the server only. */
+  readonly VITE_SOLANA_TEST_SECRET_KEY_B64?: string;
   /** Account id used with the test secret (default `test-env`). */
   readonly VITE_SOLANA_TEST_ACCOUNT_ID: string;
   /** Optional mainnet pubkey for admin “Solana custody” debug panel (balances / scan); not a private key. */

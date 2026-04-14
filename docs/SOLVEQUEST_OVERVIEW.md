@@ -45,7 +45,7 @@ Vite (dev/build) also reads project `.env` / `.env.local` per Vite rules for **`
 | Auth | `JWT_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM_AUTH`, JWT expiry vars |
 | Database | `SOLVEQUEST_DB_PATH` (optional; default `data/solvequest.db` under repo root) |
 | Solana | `SOLANA_RPC_PROXY_TARGET` or `SOLANA_RPC_URL`, `SOLANA_TREASURY_ADDRESS` (server; treasury also exposed read-only via `GET /api/config/treasury`), optional `VITE_*` for client |
-| Custodial HD master | **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** (recommended, server-only; same base64 material as the old test secret) or **`VITE_SOLANA_TEST_SECRET_KEY_B64`** / **`SOLANA_TEST_SECRET_KEY_B64`** — used by **`server/custodialHdDerive.ts`** to derive deposit addresses (`m/44'/501'/<n>'/0'`). Prefer **not** putting the real master in `VITE_*` so it is not bundled for the browser. |
+| Custodial HD master | **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** (server-only) — used by **`server/custodialHdDerive.ts`** to derive deposit addresses (`m/44'/501'/<n>'/0'`). Legacy encrypted rows use the same env value for decryption. |
 | Deposits | `QUSD_MULTIPLIER` / `VITE_QUSD_MULTIPLIER`, `SOLVEQUEST_DEPOSIT_SCAN` (background scan opt-in), custodial sweep flags |
 | Admin | `ADMIN_SOLANA_ADDRESS` (comma-separated allowed admin pubkeys) |
 | Admin debug (optional) | `VITE_SOLANA_DEBUG_CUSTODY_PUBKEY` — mainnet pubkey for the admin Solana custody panel (read-only scan / balances); not a private key. |

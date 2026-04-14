@@ -5,12 +5,11 @@ import { createDecipheriv, createHash } from "node:crypto";
 import { Keypair } from "@solana/web3.js";
 import { deriveCustodialKeypairFromIndex } from "./custodialHdDerive";
 
+/** Legacy `custodial_seckey_enc` rows were keyed from the same base64 material; use `SOLANA_CUSTODIAL_MASTER_KEY_B64` (same bytes as before if migrating from test env names). */
 function getDepositEncryptionKey(env: NodeJS.ProcessEnv): Buffer {
-  const b64 = (env.VITE_SOLANA_TEST_SECRET_KEY_B64 || env.SOLANA_TEST_SECRET_KEY_B64 || "").trim();
+  const b64 = (env.SOLANA_CUSTODIAL_MASTER_KEY_B64 || "").trim();
   if (!b64) {
-    throw new Error(
-      "Set VITE_SOLANA_TEST_SECRET_KEY_B64 or SOLANA_TEST_SECRET_KEY_B64 for custodial deposit encryption (testing).",
-    );
+    throw new Error("Set SOLANA_CUSTODIAL_MASTER_KEY_B64 for custodial deposit encryption (legacy rows).");
   }
   const raw = Buffer.from(b64, "base64");
   if (raw.length < 32) {

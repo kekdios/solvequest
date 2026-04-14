@@ -485,7 +485,7 @@ function AppInner() {
         if (!addr) {
           setLedgerHydrationError(
             ensureErr ??
-              "No deposit address assigned. Set SOLANA_CUSTODIAL_MASTER_KEY_B64 or VITE_SOLANA_TEST_SECRET_KEY_B64 on the server, ensure the DB has custodial columns (npm run db:migrate-hd), then reload.",
+              "No deposit address assigned. Set SOLANA_CUSTODIAL_MASTER_KEY_B64 on the server, ensure the DB has custodial columns (npm run db:migrate-hd), then reload.",
           );
         } else {
           setLedgerHydrationError(null);

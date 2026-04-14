@@ -27,7 +27,7 @@
 | **SPA (Vite/React)** | Demo mode UI; registered user UI; header badge; registration flow; **no** user private keys. |
 | **API (Node)** | Email OTP (send/verify), JWT/session cookie; HD-derived Solana pubkey; account CRUD; deposit scan / sweep workers. |
 | **SQLite** | `accounts` (`sol_receive_address`, `custodial_derivation_index`, …), QUSD ledger, deposit idempotency, perp tables. |
-| **Secrets** | Master key material in **server env** (`SOLANA_CUSTODIAL_MASTER_KEY_B64` preferred); avoid shipping real secrets in `VITE_*` bundles. |
+| **Secrets** | Custodial HD master: **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** only (server env). |
 
 ---
 
