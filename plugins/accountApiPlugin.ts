@@ -399,12 +399,18 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           sendJson(res, 401, { error: "Not authenticated" });
           return;
         }
+        let payload: { email?: string };
         try {
-          const payload = jwt.verify(token, jwtSecret!) as { email?: string };
-          if (!payload.email || typeof payload.email !== "string") {
-            sendJson(res, 401, { error: "Invalid token" });
-            return;
-          }
+          payload = jwt.verify(token, jwtSecret!) as { email?: string };
+        } catch {
+          sendJson(res, 401, { error: "Invalid token" });
+          return;
+        }
+        if (!payload.email || typeof payload.email !== "string") {
+          sendJson(res, 401, { error: "Invalid token" });
+          return;
+        }
+        try {
           const email = payload.email.toLowerCase();
           const row = loadOrCreateRow(email);
           if (!row?.id) {
@@ -519,8 +525,13 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
               message: msg,
             });
           }
-        } catch {
-          sendJson(res, 401, { error: "Invalid token" });
+        } catch (e) {
+          console.error("[account-api] ensure-custodial-deposit (unexpected):", e);
+          const msg = e instanceof Error ? e.message : String(e);
+          sendJson(res, 503, {
+            error: "custodial_deposit_unavailable",
+            message: msg,
+          });
         }
       })();
       return;
@@ -533,12 +544,18 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           sendJson(res, 401, { error: "Not authenticated" });
           return;
         }
+        let payload: { email?: string };
         try {
-          const payload = jwt.verify(token, jwtSecret!) as { email?: string };
-          if (!payload.email || typeof payload.email !== "string") {
-            sendJson(res, 401, { error: "Invalid token" });
-            return;
-          }
+          payload = jwt.verify(token, jwtSecret!) as { email?: string };
+        } catch {
+          sendJson(res, 401, { error: "Invalid token" });
+          return;
+        }
+        if (!payload.email || typeof payload.email !== "string") {
+          sendJson(res, 401, { error: "Invalid token" });
+          return;
+        }
+        try {
           const email = payload.email.toLowerCase();
           let body: z.infer<typeof accountStatePutZ>;
           try {
@@ -686,8 +703,12 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
             .prepare(`SELECT sync_version FROM accounts WHERE id = ?`)
             .get(accountId) as { sync_version: number };
           sendJson(res, 200, { ok: true, sync_version: Number(nv.sync_version) });
-        } catch {
-          sendJson(res, 401, { error: "Invalid token" });
+        } catch (e: unknown) {
+          console.error("[account-api] PUT /api/account/state (unexpected):", e);
+          sendJson(res, 500, {
+            error: "state_update_failed",
+            message: e instanceof Error ? e.message : String(e),
+          });
         }
       })();
       return;
