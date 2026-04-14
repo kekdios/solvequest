@@ -1,8 +1,9 @@
 /**
- * Encrypts per-account custodial Solana secret keys at rest (testing: key material from env).
+ * Decrypts legacy per-account custodial rows (`custodial_seckey_enc`); HD accounts derive keys from env + index.
  */
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createDecipheriv, createHash } from "node:crypto";
 import { Keypair } from "@solana/web3.js";
+import { deriveCustodialKeypairFromIndex } from "./custodialHdDerive";
 
 function getDepositEncryptionKey(env: NodeJS.ProcessEnv): Buffer {
   const b64 = (env.VITE_SOLANA_TEST_SECRET_KEY_B64 || env.SOLANA_TEST_SECRET_KEY_B64 || "").trim();
@@ -18,15 +19,6 @@ function getDepositEncryptionKey(env: NodeJS.ProcessEnv): Buffer {
   return createHash("sha256").update(raw).digest();
 }
 
-export function encryptCustodialSecretKey(secretKey: Uint8Array, env: NodeJS.ProcessEnv): string {
-  const key = getDepositEncryptionKey(env);
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const enc = Buffer.concat([cipher.update(Buffer.from(secretKey)), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `${iv.toString("hex")}:${tag.toString("hex")}:${enc.toString("hex")}`;
-}
-
 export function decryptCustodialKeypair(enc: string, env: NodeJS.ProcessEnv): Keypair {
   const key = getDepositEncryptionKey(env);
   const parts = enc.split(":");
@@ -38,4 +30,19 @@ export function decryptCustodialKeypair(enc: string, env: NodeJS.ProcessEnv): Ke
   decipher.setAuthTag(tag);
   const dec = Buffer.concat([decipher.update(data), decipher.final()]);
   return Keypair.fromSecretKey(Uint8Array.from(dec));
+}
+
+/** Resolves signing key for custodial deposit: legacy encrypted row, or HD derivation from index. */
+export function resolveCustodialDepositKeypair(
+  row: { custodial_seckey_enc: string | null; custodial_derivation_index: number | null },
+  env: NodeJS.ProcessEnv,
+): Keypair | null {
+  if (row.custodial_seckey_enc) {
+    return decryptCustodialKeypair(row.custodial_seckey_enc, env);
+  }
+  const idx = row.custodial_derivation_index;
+  if (idx != null && Number.isInteger(Number(idx))) {
+    return deriveCustodialKeypairFromIndex(Number(idx), env);
+  }
+  return null;
 }

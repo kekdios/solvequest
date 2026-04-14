@@ -4,16 +4,17 @@ import { getAccount } from "@solana/spl-token";
 import { getUsdcAta, runUsdcDepositScan } from "../deposit/scanIncoming";
 import { loadLedger, saveLedger, type CustodyLedger } from "../deposit/depositLedger";
 import { MAINNET_USDC_MINT, READ_COMMITMENT, makeConnection } from "../deposit/chainConfig";
-import { sweepCustodialToTreasury, formatLamportsSol } from "../deposit/sweepTreasury";
-import { getSolanaKeypairFromStorage } from "../lib/accountReceiveAddresses";
 
 type Props = {
+  /** Namespaces local deposit ledger (e.g. admin debug). */
   accountId: string;
+  /** Mainnet deposit address to observe (must match server custodial pubkey). */
+  ownerPubkeyBase58: string | null;
   /** Credits in-app USDC wallet balance when mainnet USDC SPL arrives at the custodial ATA. */
   onUsdcCredited: (amountUsdc: number) => void;
 };
 
-export default function SolanaCustodyPanel({ accountId, onUsdcCredited }: Props) {
+export default function SolanaCustodyPanel({ accountId, ownerPubkeyBase58, onUsdcCredited }: Props) {
   const creditRef = useRef(onUsdcCredited);
   creditRef.current = onUsdcCredited;
 
@@ -22,7 +23,16 @@ export default function SolanaCustodyPanel({ accountId, onUsdcCredited }: Props)
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [solBal, setSolBal] = useState<number | null>(null);
   const [usdcBal, setUsdcBal] = useState<number | null>(null);
-  const [sweepMsg, setSweepMsg] = useState<string | null>(null);
+
+  const ownerPk = (() => {
+    const t = ownerPubkeyBase58?.trim();
+    if (!t) return null;
+    try {
+      return new PublicKey(t);
+    } catch {
+      return null;
+    }
+  })();
 
   const refreshBalances = useCallback(async (owner: PublicKey) => {
     const connection = makeConnection();
@@ -38,39 +48,35 @@ export default function SolanaCustodyPanel({ accountId, onUsdcCredited }: Props)
   }, []);
 
   const runScan = useCallback(async () => {
-    const kp = getSolanaKeypairFromStorage();
-    if (!kp) return;
-    const owner = kp.publicKey;
+    if (!ownerPk) return;
     setStatus("scanning");
     setErrMsg(null);
     try {
       const current = loadLedger(accountId);
-      const { credits, ledger: next } = await runUsdcDepositScan(owner, current);
+      const { credits, ledger: next } = await runUsdcDepositScan(ownerPk, current);
       saveLedger(accountId, next);
       setLedger(next);
       for (const c of credits) {
         creditRef.current(c.amountUsdc);
       }
-      await refreshBalances(owner);
+      await refreshBalances(ownerPk);
       setStatus("idle");
     } catch (e) {
       setStatus("error");
       setErrMsg(e instanceof Error ? e.message : "Scan failed");
     }
-  }, [accountId, refreshBalances]);
+  }, [accountId, ownerPk, refreshBalances]);
 
   useEffect(() => {
     setLedger(loadLedger(accountId));
   }, [accountId]);
 
-  /** Load SOL/USDC balances only — deposit scan runs when you click “Scan now”. */
   useEffect(() => {
-    const kp = getSolanaKeypairFromStorage();
-    if (!kp) return;
+    if (!ownerPk) return;
     let alive = true;
     void (async () => {
       try {
-        await refreshBalances(kp.publicKey);
+        await refreshBalances(ownerPk);
       } catch (e) {
         if (!alive) return;
         setStatus("error");
@@ -80,41 +86,39 @@ export default function SolanaCustodyPanel({ accountId, onUsdcCredited }: Props)
     return () => {
       alive = false;
     };
-  }, [accountId, refreshBalances]);
-
-  const sweep = async () => {
-    setSweepMsg(null);
-    const kp = getSolanaKeypairFromStorage();
-    if (!kp) return;
-    const r = await sweepCustodialToTreasury(kp);
-    if (r.ok) {
-      setSweepMsg(`Sweep ok · ${r.sweptUsdc.toFixed(4)} USDC · ${formatLamportsSol(r.sweptSolLamports)} SOL`);
-      await refreshBalances(kp.publicKey);
-    } else {
-      setSweepMsg(r.reason);
-    }
-  };
+  }, [accountId, ownerPk, refreshBalances]);
 
   const creditedList = Object.entries(ledger.creditedSignatures)
     .sort((a, b) => (b[1].at ?? 0) - (a[1].at ?? 0))
     .slice(0, 12);
 
+  if (!ownerPubkeyBase58?.trim() || !ownerPk) {
+    return (
+      <div style={s.box}>
+        <h4 style={s.h4}>Solana custody (mainnet)</h4>
+        <p style={s.p}>
+          Set <code style={s.code}>VITE_SOLANA_DEBUG_CUSTODY_PUBKEY</code> in <code style={s.code}>.env</code> to a
+          mainnet custodial deposit pubkey for local balance / scan debugging. User deposits use server-derived HD
+          addresses only — no browser keypair.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div style={s.box}>
       <h4 style={s.h4}>Solana custody (mainnet)</h4>
       <p style={s.p}>
-        Unique deposit keypair per account; USDC SPL uses the standard ATA for mint{" "}
-        <code style={s.code}>{MAINNET_USDC_MINT.toBase58().slice(0, 6)}…</code>. Use <strong>Scan now</strong> to check
-        for new deposits. In production, USDC→QUSD credits are applied when an admin runs{" "}
-        <strong>Run server deposit scan</strong> (or enable background{" "}
-        <code style={s.code}>SOLVEQUEST_DEPOSIT_SCAN=1</code>). This panel is for debugging / treasury sweep only.
+        USDC SPL uses the standard ATA for mint <code style={s.code}>{MAINNET_USDC_MINT.toBase58().slice(0, 6)}…</code>.
+        Use <strong>Scan now</strong> for a local RPC check. Production USDC→QUSD credits run on the server (
+        <code style={s.code}>SOLVEQUEST_DEPOSIT_SCAN</code> or admin deposit scan). Treasury sweep runs on the server
+        only.
       </p>
       {errMsg && /403|forbidden/i.test(errMsg) ? (
         <p style={s.rpcHint}>
           RPC returned 403 — public mainnet often rejects browser <code style={s.code}>Origin</code> headers; local dev
           should use same-origin <code style={s.code}>/solana-rpc</code> (Vite strips <code style={s.code}>Origin</code>{" "}
-          when proxying). Do not set <code style={s.code}>VITE_SOLANA_USE_ENV_RPC_URL=1</code> unless your RPC allows
-          browser origins. Restart the dev server after changing <code style={s.code}>.env</code>.
+          when proxying).
         </p>
       ) : null}
       <div style={s.row}>
@@ -135,11 +139,7 @@ export default function SolanaCustodyPanel({ accountId, onUsdcCredited }: Props)
         <button type="button" style={s.btn} onClick={() => void runScan()}>
           Scan now
         </button>
-        <button type="button" style={s.btnGhost} onClick={() => void sweep()}>
-          Sweep to treasury
-        </button>
       </div>
-      {sweepMsg ? <p style={s.sweep}>{sweepMsg}</p> : null}
       {creditedList.length > 0 ? (
         <div style={s.credits}>
           <p style={s.creditsTitle}>Credited (signature log)</p>
@@ -200,16 +200,6 @@ const s: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: "pointer",
   },
-  btnGhost: {
-    background: "transparent",
-    border: "1px solid var(--border)",
-    color: "var(--muted)",
-    borderRadius: 8,
-    padding: "8px 12px",
-    fontSize: 12,
-    cursor: "pointer",
-  },
-  sweep: { margin: "8px 0 0", fontSize: 12, color: "var(--ok)" },
   credits: { marginTop: 10 },
   creditsTitle: { margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: "var(--muted)" },
   ul: { margin: 0, paddingLeft: 18, fontSize: 11, color: "var(--muted)" },

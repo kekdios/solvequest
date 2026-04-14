@@ -10,13 +10,7 @@ import {
 } from "react";
 import { SessionAuthProvider, useAuthMode, isDemoMode, useSessionAuth } from "./auth/sessionAuth";
 import { getDefaultDemoAppState, loadDemoAppState, saveDemoAppState } from "./lib/demoPersistence";
-import {
-  buildAccountStatePutBody,
-  putAccountState,
-  putSolReceiveAddress,
-  type AccountStatePutBody,
-} from "./lib/accountSync";
-import { getOrCreateAccountReceiveWallet } from "./lib/accountReceiveAddresses";
+import { buildAccountStatePutBody, putAccountState, type AccountStatePutBody } from "./lib/accountSync";
 import type { DemoAppState, DemoLogEntry, PerpCloseSyncEvent } from "./lib/demoSessionTypes";
 import { INITIAL_SESSION_WARN_FLAGS } from "./lib/demoSessionTypes";
 import { syncEquity } from "./engine/accountCore";
@@ -459,37 +453,6 @@ function AppInner() {
       cancelled = true;
     };
   }, [authLoading, demo, user?.email]);
-
-  /** Sync custodial Solana receive pubkey to SQLite so the server deposit worker can credit QUSD. */
-  useEffect(() => {
-    if (demo || !user?.email || !ledgerAccountRow || authLoading) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        if (ledgerAccountRow.custodial_deposit) return;
-        const w = getOrCreateAccountReceiveWallet();
-        if (ledgerAccountRow.sol_receive_address === w.solAddress) return;
-        const ok = await putSolReceiveAddress(w.solAddress);
-        if (!ok || cancelled) return;
-        const r = await fetch("/api/account/me", { credentials: "include" });
-        if (!r.ok || cancelled) return;
-        const data = (await r.json()) as PersistedAccountRow;
-        setLedgerAccountRow(data);
-        syncVersionRef.current = Number(data.sync_version ?? 0);
-        dispatch({
-          type: "hydrateFromAccountRow",
-          row: data,
-          keepLocalPendingPerpCloses: true,
-          mergeUnsyncedLocalOpens: true,
-        });
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [demo, user?.email, authLoading, ledgerAccountRow?.id, ledgerAccountRow?.sol_receive_address]);
 
   /** Pick up on-chain deposit credits (server bumps sync_version). */
   useEffect(() => {

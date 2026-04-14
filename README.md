@@ -1,6 +1,6 @@
 # Solve Quest
 
-Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), optional **vault** lock/unlock, **email (OTP) auth**, **Solana USDC → QUSD** deposits, and an **admin** area (wallet sign-in, deposit tooling).
+Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), optional **vault** lock/unlock (**~1% / day** on locked QUSD — demo accrues in-browser; registered users accrue on server — see **`docs/SOLVEQUEST_OVERVIEW.md`**), **email (OTP) auth**, **Solana USDC → QUSD** deposits, and an **admin** area (wallet sign-in, deposit tooling).
 
 **Stack:** React 19 + Vite · Express (`server/index.ts`) · SQLite (`better-sqlite3`) · Solana (web3.js, SPL).
 
@@ -29,7 +29,7 @@ Minimum env for local auth/API: set **`JWT_SECRET`** (and email OTP vars if you 
 
 ## Docs
 
-- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana, droplet notes. Default production SSH (matches `scripts/deploy.sh`): **`ssh root@152.42.168.173`**.
+- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana, **locked QUSD vault interest** (rates, demo vs server, `qusd_vault_interest_at`), droplet notes. Default production SSH (matches `scripts/deploy.sh`): **`ssh root@152.42.168.173`**.
 
 ## Repository
 

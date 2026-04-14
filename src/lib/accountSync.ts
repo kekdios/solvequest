@@ -65,17 +65,3 @@ export async function putAccountState(body: AccountStatePutBody): Promise<PutAcc
     return { ok: false };
   }
 }
-
-export async function putSolReceiveAddress(solReceiveAddress: string): Promise<boolean> {
-  try {
-    const r = await fetch("/api/account/sol-receive-address", {
-      method: "PUT",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sol_receive_address: solReceiveAddress }),
-    });
-    return r.ok;
-  } catch {
-    return false;
-  }
-}

@@ -45,8 +45,10 @@ Vite (dev/build) also reads project `.env` / `.env.local` per Vite rules for **`
 | Auth | `JWT_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM_AUTH`, JWT expiry vars |
 | Database | `SOLVEQUEST_DB_PATH` (optional; default `data/solvequest.db` under repo root) |
 | Solana | `SOLANA_RPC_PROXY_TARGET` or `SOLANA_RPC_URL`, `SOLANA_TREASURY_ADDRESS` (server; treasury also exposed read-only via `GET /api/config/treasury`), optional `VITE_*` for client |
+| Custodial HD master | **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** (recommended, server-only; same base64 material as the old test secret) or **`VITE_SOLANA_TEST_SECRET_KEY_B64`** / **`SOLANA_TEST_SECRET_KEY_B64`** — used by **`server/custodialHdDerive.ts`** to derive deposit addresses (`m/44'/501'/<n>'/0'`). Prefer **not** putting the real master in `VITE_*` so it is not bundled for the browser. |
 | Deposits | `QUSD_MULTIPLIER` / `VITE_QUSD_MULTIPLIER`, `SOLVEQUEST_DEPOSIT_SCAN` (background scan opt-in), custodial sweep flags |
 | Admin | `ADMIN_SOLANA_ADDRESS` (comma-separated allowed admin pubkeys) |
+| Admin debug (optional) | `VITE_SOLANA_DEBUG_CUSTODY_PUBKEY` — mainnet pubkey for the admin Solana custody panel (read-only scan / balances); not a private key. |
 | Server | `PORT` (production default often **3000** in code, but **systemd** may set e.g. **3001**—must match nginx) |
 
 On the **droplet**, ensure the process **working directory** is the app root (e.g. `/opt/solvequest`) so `.env` / `backend/.env` resolve correctly.
@@ -74,12 +76,12 @@ Defaults below match **`scripts/deploy.sh`** and **`scripts/solvequest.service.e
 - **Default path**: `<repo>/data/solvequest.db`.
 - **Override**: `SOLVEQUEST_DB_PATH=/absolute/path/to/file.db`.
 - **Create / reset**: `npm run db:init` runs `scripts/init-db.mjs` which executes **`db/schema.sql`** only.
-- **“Migrations”**: there are **no** chained migration scripts in this branch; old DBs should be **backed up and replaced**, then `db:init`, unless you hand-patch (not recommended).
+- **Small additive migrations**: `npm run db:migrate-hd` runs **`scripts/migrate-custodial-hd.mjs`** to add **`custodial_derivation_index`** (and its index) on **existing** DBs created before that column existed. For a corrupt or unknown-old schema, **back up, delete the DB file**, then `db:init` is still the clean reset. `npm run db:migrate` (migrate-all) only prints guidance — it does not alter schema.
 
 ### Schema concepts
 
-- **`accounts`**: profile, coverage stats, `sync_version`, Solana receive + optional **encrypted custodial** key, vault timestamps — **not** raw QUSD columns; balances come from the ledger.
-- **`qusd_ledger`**: append-only rows (`unlocked_delta`, `locked_delta`); **display** unlocked/locked = `SUM` of deltas.
+- **`accounts`**: profile, coverage stats, `sync_version`, **`sol_receive_address`**, **`custodial_derivation_index`** (HD deposit path index), optional legacy **`custodial_seckey_enc`** (decrypt-only for older rows), **`vault_activity_at`** (lock/unlock cooldown), **`qusd_vault_interest_at`** (server vault interest clock) — **not** raw QUSD columns; unlocked/locked **balances** come from the ledger.
+- **`qusd_ledger`**: append-only rows (`unlocked_delta`, `locked_delta`); **display** unlocked/locked = `SUM` of deltas. Includes **`vault_interest`** rows (positive `locked_delta`) when the server credits locked QUSD yield.
 - **`perp_open_positions` / `perp_transactions`**: open positions and closed trade history.
 - **`deposit_credits`**, **`deposit_scan_state`**: on-chain deposit idempotency and scan watermarks.
 
@@ -179,7 +181,35 @@ After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10
 - **Browser RPC**: defaults to **same-origin** `/solana-rpc` so providers that reject browser `Origin` on public mainnet are avoided; Express proxies to **`SOLANA_RPC_PROXY_TARGET`** (default mainnet-beta) and strips Origin on the upstream request.
 - **Treasury**: sweeps use a treasury **pubkey** from env; **`GET /api/config/treasury`** exposes the configured address for the admin UI without requiring a Vite rebuild.
 - **Deposits**: USDC SPL to the account’s receive ATA is detected by **`server/depositScanWorker.ts`** (optional background polling via env, or admin-triggered scan). Credits append **`qusd_ledger`** and **`deposit_credits`**.
-- **Custodial keys**: stored encrypted on the account row when using server-generated deposit addresses (`ensure-custodial-deposit` flow).
+- **Custodial deposit addresses (current)**: After sign-in, **`POST /api/account/ensure-custodial-deposit`** assigns the next **`custodial_derivation_index`**, derives the keypair with **`server/custodialHdDerive.ts`** (SLIP-0010 style path `m/44'/501'/<n>'/0'`), and stores **`sol_receive_address`** (base58). The SPA does **not** generate user deposit keypairs. Signing for sweeps uses **`server/depositWalletCrypto.ts`** → **`resolveCustodialDepositKeypair`**: either legacy **`custodial_seckey_enc`** decryption or **re-derivation** from index + master env.
+- **CLI provisioning**: **`npm run db:provision`** runs **`tsx scripts/provision-account.ts`** — inserts a test account row with the **next** HD index and signup grant (same derivation rules as the API).
+
+---
+
+## Locked QUSD vault interest
+
+Interest applies only to **locked** QUSD (the vault), not unlocked. Constants are defined in **`src/engine/qusdVault.ts`**:
+
+| Constant | Meaning |
+|----------|--------|
+| `QUSD_DAILY_INTEREST_RATE` | `0.01` — **1% per day** (nominal). |
+| `MINUTES_PER_DAY` | `1440`. |
+| `QUSD_INTEREST_PER_MINUTE_FACTOR` | `0.01 / 1440` — per-minute fraction used in schedules below. |
+
+### Demo mode (browser)
+
+- **`App.tsx`** starts a **60s** `setInterval` when **`demo`** is true.
+- Each tick dispatches reducer action **`qusdInterestMinute`**, which adds **`locked × QUSD_INTEREST_PER_MINUTE_FACTOR`** to **`qusd.locked`** (in-memory demo state only).
+
+### Registered users (server + SQLite)
+
+- Implementation: **`plugins/vaultInterest.ts`** → **`applyLockedQusdInterest`**.
+- **Locked balance** is read from the **ledger** (`getLedgerBalances` — sum of `locked_delta` on **`qusd_ledger`**), not from a cached total on `accounts`.
+- **`accounts.qusd_vault_interest_at`** stores the timestamp used to count **elapsed full minutes** since the last accrual. If it is **null** and locked &gt; 0, the server **sets it to now** on first touch and **does not** credit yet (starts the clock).
+- For each run with at least **one** full minute elapsed: **compound** the locked balance over those minutes:  
+  **`newLocked = locked × (1 + QUSD_INTEREST_PER_MINUTE_FACTOR)^fullMinutes`**  
+  The **delta** is appended to **`qusd_ledger`** as **`entry_type = 'vault_interest'`** (`insertLockedVaultInterest` in **`server/qusdLedger.ts`**). **`qusd_vault_interest_at`** advances by `fullMinutes × 60_000` ms, **`updated_at`** and **`sync_version`** increment so the client can pull fresh balances.
+- **When it runs**: **`loadOrCreateRow(email)`** calls **`applyLockedQusdInterest`** unless **`skipInterest: true`**. Interest runs on paths such as **`GET /api/account/me`**. It is **skipped** on **`PUT /api/account/state`** (`skipInterest: true`) so accrual does not bump **`sync_version`** in the middle of the optimistic-lock update.
 
 ---
 
@@ -187,7 +217,7 @@ After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10
 
 - **Users**: email OTP via **Resend** + **JWT** cookie (`auth_token`).
 - **Account state**: client **`PUT /api/account/state`** with optimistic locking on **`sync_version`**.  
-  - Vault interest is **not** applied on that write path (avoids spurious **`sync_version`** bumps before the UPDATE).
+  - Vault interest is **not** applied on that write path (`skipInterest: true`; see **Locked QUSD vault interest** above).
 - **Admin**: separate cookie session; **Solana** message sign against **`ADMIN_SOLANA_ADDRESS`**.
 
 ---
@@ -201,9 +231,10 @@ Useful when comparing to older notes or chats:
 | QUSD balances | Moved to **ledger** (`qusd_ledger`); signup grant + perp margin/close + deposits + conserved vault moves only. |
 | Blind “reconcile” vault moves | Restricted to **unlocked+locked conserved** shuffles (`du + dl ≈ 0`) so bad client totals don’t mint QUSD. |
 | Client sync / rapid closes | **Ack** only closes included in each successful PUT; sync effect deps avoid mark ticks resetting timers; faster debounce when closes pending. |
-| `PUT` + vault interest | **`loadOrCreateRow(..., { skipInterest: true })`** for state writes so interest doesn’t bump `sync_version` before the optimistic lock. |
+| `PUT` + vault interest | **`loadOrCreateRow(..., { skipInterest: true })`** on **`PUT /api/account/state`** so **`applyLockedQusdInterest`** doesn’t bump `sync_version` before the optimistic lock (see **Locked QUSD vault interest**). |
 | SQLite locking | **WAL** + **busy_timeout** on API and deposit paths. |
-| Legacy migration scripts | Removed in favor of **`db/schema.sql` + `db:init`**; `npm run db:migrate` prints guidance only. |
+| Legacy migration scripts | **`db/schema.sql` + `db:init`** for fresh DBs; **`npm run db:migrate-hd`** for additive HD column; `npm run db:migrate` prints guidance only. |
+| Browser-generated deposit keys | Removed; deposit addresses come from the server (**HD** + `ensure-custodial-deposit`). |
 | Treasury in admin UI | **`/api/config/treasury`** reads **`SOLANA_TREASURY_ADDRESS`** on the server. |
 | Stale error copy | User-facing messages updated to point at **`db:init`** instead of removed `db:migrate:*` scripts. |
 
@@ -219,12 +250,16 @@ npm run dev          # API + Vite concurrently
 npm run build        # tsc + vite build → dist/
 
 # Database
-npm run db:init      # create DB from db/schema.sql (default data/solvequest.db)
+npm run db:init         # create DB from db/schema.sql (default data/solvequest.db)
+npm run db:migrate-hd   # add custodial_derivation_index to an existing DB (safe to re-run)
+npm run db:provision    # insert one provisioned account + HD deposit row (needs master key in env)
 
 # Deploy from laptop (default host in deploy.sh: root@152.42.168.173)
 ./scripts/deploy.sh
 # or: DEPLOY_TARGET=root@OTHER ./scripts/deploy.sh root@OTHER
 ```
+
+**Deploy note:** `deploy.sh` runs **`npm run build`** only; it does **not** run DB init/migrations. After pulling schema changes, run **`db:migrate-hd`** (or recreate the DB) on the server where **`SOLVEQUEST_DB_PATH`** points, before relying on HD custodial deposits.
 
 ---
 

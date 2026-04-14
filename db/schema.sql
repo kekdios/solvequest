@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   qusd_vault_interest_at INTEGER,
   sol_receive_address TEXT,
   custodial_seckey_enc TEXT,
+  /** HD path index m/44'/501'/<n>'/0'; null for legacy encrypted-only or pre-HD rows. */
+  custodial_derivation_index INTEGER,
   sync_version INTEGER NOT NULL DEFAULT 0
 );
 
@@ -28,6 +30,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_email ON accounts (email) WHERE e
 CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_sol_receive_unique
   ON accounts (sol_receive_address)
   WHERE sol_receive_address IS NOT NULL AND TRIM(sol_receive_address) != '';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_custodial_derivation_unique
+  ON accounts (custodial_derivation_index)
+  WHERE custodial_derivation_index IS NOT NULL;
 
 /** Append-only QUSD movements; display unlocked = SUM(unlocked_delta), locked = SUM(locked_delta). */
 CREATE TABLE IF NOT EXISTS qusd_ledger (

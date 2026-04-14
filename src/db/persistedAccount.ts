@@ -26,7 +26,7 @@ export type PersistedAccountRow = {
   open_perp_positions?: import("../engine/perps").PerpPosition[];
   /** True after at least one Solana USDC deposit was credited (`deposit_credits`). */
   account_active?: boolean;
-  /** True when `accounts.custodial_seckey_enc` is set — server-generated deposit key for this account. */
+  /** True when the server holds custody: legacy `custodial_seckey_enc` or HD `custodial_derivation_index`. */
   custodial_deposit?: boolean;
 };
 

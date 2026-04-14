@@ -17,7 +17,6 @@ import {
 } from "../lib/adminApi";
 import { getSolanaRpcEndpoint } from "../deposit/chainConfig";
 import { uiBtnGhost, uiBtnPrimary, uiOrderCard, uiPageH2 } from "../ui/appSurface";
-import { getOrCreateAccountReceiveWallet } from "../lib/accountReceiveAddresses";
 import SolanaCustodyPanel from "../components/SolanaCustodyPanel";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -33,30 +32,14 @@ function AdminSolanaCustody({
 }: {
   onUsdcCredited: (amountUsdc: number) => void;
 }) {
-  const [accountId, setAccountId] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      setAccountId(getOrCreateAccountReceiveWallet().accountId);
-      setLoadError(null);
-    } catch (e: unknown) {
-      setLoadError(e instanceof Error ? e.message : "Could not load deposit account");
-      setAccountId(null);
-    }
-  }, []);
-
-  if (loadError) {
-    return (
-      <p style={s.custodyErr} role="alert">
-        {loadError}
-      </p>
-    );
-  }
-  if (!accountId) {
-    return <p style={s.muted}>Loading custody…</p>;
-  }
-  return <SolanaCustodyPanel accountId={accountId} onUsdcCredited={onUsdcCredited} />;
+  const debugPk = import.meta.env.VITE_SOLANA_DEBUG_CUSTODY_PUBKEY?.trim() || null;
+  return (
+    <SolanaCustodyPanel
+      accountId="admin-deposit-ledger"
+      ownerPubkeyBase58={debugPk}
+      onUsdcCredited={onUsdcCredited}
+    />
+  );
 }
 
 function AdminScreenInner({ onNavigateHome, onCustodialUsdcCredited }: Props) {

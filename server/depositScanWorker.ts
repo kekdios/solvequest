@@ -7,7 +7,7 @@ import path from "node:path";
 import { Connection, PublicKey } from "@solana/web3.js";
 import Database from "better-sqlite3";
 import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
-import { decryptCustodialKeypair } from "./depositWalletCrypto";
+import { resolveCustodialDepositKeypair } from "./depositWalletCrypto";
 import { insertSolanaUsdcCredit } from "./qusdLedger";
 import { sweepCustodialDepositToTreasury } from "./custodialSweepServer";
 import { scanNewUsdcDeposits, type ScanLedger } from "./solanaUsdcScan";
@@ -227,19 +227,20 @@ async function processAccount(
     env.SOLVEQUEST_CUSTODIAL_SWEEP === "1" || env.SOLVEQUEST_CUSTODIAL_SWEEP === "true";
   if (!sweepOn) return;
 
-  let enc: string | null = null;
+  let crow: { custodial_seckey_enc: string | null; custodial_derivation_index: number | null } | undefined;
   try {
-    const crow = database
-      .prepare(`SELECT custodial_seckey_enc FROM accounts WHERE id = ?`)
-      .get(accountId) as { custodial_seckey_enc: string | null } | undefined;
-    enc = crow?.custodial_seckey_enc ?? null;
+    crow = database
+      .prepare(`SELECT custodial_seckey_enc, custodial_derivation_index FROM accounts WHERE id = ?`)
+      .get(accountId) as
+      | { custodial_seckey_enc: string | null; custodial_derivation_index: number | null }
+      | undefined;
   } catch {
     return;
   }
-  if (!enc) return;
+  const kp = crow ? resolveCustodialDepositKeypair(crow, env) : null;
+  if (!kp) return;
 
   try {
-    const kp = decryptCustodialKeypair(enc, env);
     const r = await sweepCustodialDepositToTreasury(connection, env, kp);
     if (r.ok) {
       console.log(

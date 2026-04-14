@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import QRCode from "react-qr-code";
-import {
-  getOrCreateAccountReceiveWallet,
-  type AccountReceiveWallet,
-} from "../lib/accountReceiveAddresses";
+
 function CopyIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -27,30 +24,24 @@ function QrIcon({ size = 18 }: { size?: number }) {
 }
 
 type Props = {
-  /** When set, show this server-assigned custodial address instead of a browser-generated keypair. */
+  /** Server-derived custodial address (HD from master key); no browser keypair. */
   serverDepositAddress?: string | null;
 };
 
 export default function TestReceiveAddresses({ serverDepositAddress = null }: Props) {
-  const [wallet, setWallet] = useState<AccountReceiveWallet | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const solAddress = serverDepositAddress?.trim() ?? "";
+
   const refresh = useCallback(() => {
-    try {
-      const trimmed = serverDepositAddress?.trim();
-      if (trimmed) {
-        setWallet({ accountId: "custodial", solAddress: trimmed });
-      } else {
-        setWallet(getOrCreateAccountReceiveWallet());
-      }
+    if (!solAddress) {
       setLoadError(null);
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Could not load deposit address");
-      setWallet(null);
+      return;
     }
-  }, [serverDepositAddress]);
+    setLoadError(null);
+  }, [solAddress]);
 
   useEffect(() => {
     refresh();
@@ -79,7 +70,7 @@ export default function TestReceiveAddresses({ serverDepositAddress = null }: Pr
     <div style={s.wrap}>
       {loadError ? <p style={s.err}>{loadError}</p> : null}
 
-      {wallet ? (
+      {solAddress ? (
         <>
           <div style={s.row}>
             <p style={s.depositHint}>
@@ -87,12 +78,12 @@ export default function TestReceiveAddresses({ serverDepositAddress = null }: Pr
               <strong style={s.depositHintStrong}>Solana Network</strong>
             </p>
             <div style={s.addrRow}>
-              <code style={s.addr}>{wallet.solAddress}</code>
+              <code style={s.addr}>{solAddress}</code>
               <div style={s.actions}>
                 <button
                   type="button"
                   style={s.iconBtn}
-                  onClick={() => copy(wallet.solAddress)}
+                  onClick={() => copy(solAddress)}
                   aria-label="Copy Solana address"
                   title="Copy address"
                 >
@@ -112,11 +103,11 @@ export default function TestReceiveAddresses({ serverDepositAddress = null }: Pr
             {copied ? <span style={s.copied}>Copied</span> : null}
           </div>
         </>
-      ) : !loadError ? (
-        <p style={s.muted}>Loading…</p>
-      ) : null}
+      ) : (
+        <p style={s.muted}>Loading your custodial deposit address…</p>
+      )}
 
-      {qrOpen && wallet ? (
+      {qrOpen && solAddress ? (
         <div
           style={s.modalBackdrop}
           role="dialog"
@@ -128,15 +119,15 @@ export default function TestReceiveAddresses({ serverDepositAddress = null }: Pr
             <h4 id="qr-dialog-title" style={s.modalTitle}>
               Solana (SPL)
             </h4>
-            <p style={s.modalHint}>Scan to copy receiving address (test)</p>
+            <p style={s.modalHint}>Scan to copy receiving address</p>
             <div style={s.qrBox}>
               <QRCode
-                value={wallet.solAddress}
+                value={solAddress}
                 size={220}
                 style={{ width: "100%", maxWidth: 220, height: "auto" }}
               />
             </div>
-            <code style={s.modalAddr}>{wallet.solAddress}</code>
+            <code style={s.modalAddr}>{solAddress}</code>
             <button type="button" style={s.modalClose} onClick={() => setQrOpen(false)}>
               Close
             </button>

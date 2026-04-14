@@ -19,12 +19,14 @@ interface ImportMetaEnv {
   /** Treasury Solana address for custodial sweep (USDC ATA created idempotently). */
   readonly VITE_SOLANA_TREASURY_ADDRESS: string;
   /**
-   * Base64-encoded 64-byte Solana secret (same as `solSecretKeyB64` in localStorage JSON).
-   * When set, overrides generated keys — for local testing only; never commit real funds.
+   * Base64-encoded Solana secret — also used server-side as HD master input (with SHA-512) when no SOLANA_CUSTODIAL_MASTER_KEY_B64.
+   * Prefer a server-only `SOLANA_CUSTODIAL_MASTER_KEY_B64` in production so the master is not bundled for the browser.
    */
   readonly VITE_SOLANA_TEST_SECRET_KEY_B64: string;
   /** Account id used with the test secret (default `test-env`). */
   readonly VITE_SOLANA_TEST_ACCOUNT_ID: string;
+  /** Optional mainnet pubkey for admin “Solana custody” debug panel (balances / scan); not a private key. */
+  readonly VITE_SOLANA_DEBUG_CUSTODY_PUBKEY: string;
   /** Hostname for admin-only UI (default `admin.solvequest.io`). */
   readonly VITE_ADMIN_HOST: string;
   /** Public origin of main site (default derived; set for local dev). */
