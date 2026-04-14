@@ -15,8 +15,8 @@ import { ensureCustodialHdSchema } from "./ensureCustodialHdSchema";
 
 type SqliteDb = InstanceType<typeof Database>;
 
-function openSqlite(path: string): SqliteDb {
-  const database = new Database(path);
+export function openDepositDatabase(dbPath: string): SqliteDb {
+  const database = new Database(dbPath);
   database.pragma("foreign_keys = ON");
   database.pragma("journal_mode = WAL");
   database.pragma("busy_timeout = 8000");
@@ -24,11 +24,15 @@ function openSqlite(path: string): SqliteDb {
   return database;
 }
 
-function resolveDbPath(root: string, env: NodeJS.ProcessEnv): string {
+function openSqlite(dbPath: string): SqliteDb {
+  return openDepositDatabase(dbPath);
+}
+
+export function resolveDbPath(root: string, env: NodeJS.ProcessEnv): string {
   return env.SOLVEQUEST_DB_PATH?.trim() || path.join(root, "data", "solvequest.db");
 }
 
-function rpcUrl(env: NodeJS.ProcessEnv): string {
+export function rpcUrl(env: NodeJS.ProcessEnv): string {
   return (
     env.SOLANA_RPC_URL?.trim() ||
     env.SOLANA_RPC_PROXY_TARGET?.trim() ||
@@ -158,13 +162,19 @@ export function startDepositScanWorker(root: string, env: NodeJS.ProcessEnv): vo
   );
 }
 
-async function processAccount(
+export type ProcessAccountOptions = {
+  /** When true, deposit sync runs but custodial sweep is skipped (used by admin guided sweep). */
+  skipCustodialSweep?: boolean;
+};
+
+export async function processAccount(
   database: SqliteDb,
   connection: Connection,
   accountId: string,
   solReceiveAddress: string,
   qusdPerUsdc: number,
   env: NodeJS.ProcessEnv,
+  opts?: ProcessAccountOptions,
 ): Promise<void> {
   let owner: PublicKey;
   try {
@@ -224,6 +234,10 @@ async function processAccount(
        ON CONFLICT(account_id) DO UPDATE SET watermark_signature = excluded.watermark_signature`,
     )
     .run(accountId, next.watermarkUsdcAta);
+
+  if (opts?.skipCustodialSweep) {
+    return;
+  }
 
   const sweepOn =
     env.SOLVEQUEST_CUSTODIAL_SWEEP === "1" || env.SOLVEQUEST_CUSTODIAL_SWEEP === "true";

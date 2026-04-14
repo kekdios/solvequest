@@ -72,6 +72,51 @@ export async function postAdminLogout(): Promise<void> {
 }
 
 /** Runs one server-side Solana USDC deposit scan for all accounts (admin session required). */
+export type AdminCustodialSweepStep = {
+  id: string;
+  label: string;
+  status: "ok" | "error" | "skipped";
+  detail?: string;
+};
+
+export type AdminCustodialSweepResponse =
+  | {
+      ok: true;
+      account_id: string;
+      owner: string;
+      steps: AdminCustodialSweepStep[];
+      sweep_signature?: string;
+      remaining_usdc_ui?: number;
+    }
+  | { ok: false; steps: AdminCustodialSweepStep[]; error: string; account_id?: string };
+
+/** Guided custodial sweep: sync credits → verify ledger → sweep → verify (uses SOLVEQUEST_ADMIN_CUSTODY_OWNER or body.account_id). */
+export async function postAdminCustodialSweep(body?: {
+  account_id?: string;
+}): Promise<AdminCustodialSweepResponse> {
+  const r = await fetch(`${base}/custodial-sweep`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+  const data = (await r.json()) as AdminCustodialSweepResponse & { error?: string };
+  if (r.status === 401) {
+    throw new Error("Not signed in");
+  }
+  if (r.status === 500) {
+    return {
+      ok: false,
+      error: data?.error ?? r.statusText,
+      steps: Array.isArray(data?.steps) ? data.steps : [],
+    };
+  }
+  if (!data || typeof data !== "object") {
+    throw new Error("Bad response");
+  }
+  return data as AdminCustodialSweepResponse;
+}
+
 export async function postAdminDepositScan(): Promise<{ ok: true; accountsScanned: number }> {
   const r = await fetch(`${base}/deposit-scan`, {
     method: "POST",

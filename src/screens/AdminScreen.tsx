@@ -12,9 +12,11 @@ import {
   fetchAdminCustodyDebug,
   fetchAdminMe,
   fetchAdminNonce,
+  postAdminCustodialSweep,
   postAdminDepositScan,
   postAdminLogout,
   postAdminVerify,
+  type AdminCustodialSweepResponse,
   type AdminCustodyDebugResponse,
   uint8ToBase64,
 } from "../lib/adminApi";
@@ -184,6 +186,26 @@ function AdminScreenInner({ onNavigateHome, onCustodialUsdcCredited }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [serverScanBusy, setServerScanBusy] = useState(false);
   const [serverScanMsg, setServerScanMsg] = useState<string | null>(null);
+  const [sweepBusy, setSweepBusy] = useState(false);
+  const [sweepAccountId, setSweepAccountId] = useState("");
+  const [sweepResult, setSweepResult] = useState<AdminCustodialSweepResponse | null>(null);
+  const [sweepError, setSweepError] = useState<string | null>(null);
+  const [sweepRevealN, setSweepRevealN] = useState(0);
+
+  useEffect(() => {
+    if (!sweepResult?.steps?.length) {
+      setSweepRevealN(0);
+      return;
+    }
+    setSweepRevealN(0);
+    let i = 0;
+    const id = window.setInterval(() => {
+      i += 1;
+      setSweepRevealN(Math.min(i, sweepResult.steps.length));
+      if (i >= sweepResult.steps.length) window.clearInterval(id);
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [sweepResult]);
 
   const refreshMe = useCallback(() => {
     setLoadingMe(true);
@@ -283,6 +305,87 @@ function AdminScreenInner({ onNavigateHome, onCustodialUsdcCredited }: Props) {
               <p style={{ ...s.muted, margin: "8px 0 0", fontSize: 13 }}>{serverScanMsg}</p>
             ) : null}
           </div>
+
+          <div style={{ ...s.row, alignItems: "flex-start", flexDirection: "column", marginTop: 20 }}>
+            <h3 style={s.sweepH3}>Custodial USDC sweep</h3>
+            <p style={{ ...s.muted, margin: "0 0 8px", fontSize: 13, maxWidth: 560 }}>
+              Syncs deposits (QUSD), confirms on-chain USDC and ledger credits, then sweeps USDC to treasury (
+              <code style={s.inlineCode}>SOLANA_TREASURY_ADDRESS</code> / <code style={s.inlineCode}>VITE_SOLANA_TREASURY_ADDRESS</code>
+              ). Uses <code style={s.inlineCode}>SOLVEQUEST_ADMIN_CUSTODY_OWNER</code> to find the account unless you pass a
+              UUID below.
+            </p>
+            <label htmlFor="sq-sweep-account" style={s.custodyLabel}>
+              Account id (optional)
+            </label>
+            <input
+              id="sq-sweep-account"
+              type="text"
+              placeholder="Leave empty to use SOLVEQUEST_ADMIN_CUSTODY_OWNER"
+              value={sweepAccountId}
+              onChange={(e) => setSweepAccountId(e.target.value)}
+              style={{ ...s.custodyInput, maxWidth: 480 }}
+            />
+            <button
+              type="button"
+              style={s.btn}
+              disabled={sweepBusy || serverScanBusy}
+              onClick={() => {
+                setSweepError(null);
+                setSweepResult(null);
+                setSweepBusy(true);
+                void postAdminCustodialSweep(sweepAccountId.trim() ? { account_id: sweepAccountId.trim() } : {})
+                  .then(setSweepResult)
+                  .catch((e: unknown) => setSweepError(e instanceof Error ? e.message : "Sweep request failed"))
+                  .finally(() => setSweepBusy(false));
+              }}
+            >
+              {sweepBusy ? "Running sweep pipeline…" : "Run custodial sweep (guided)"}
+            </button>
+            {sweepBusy ? (
+              <p style={{ ...s.muted, margin: "10px 0 0", fontSize: 12 }}>Contacting server — checking USDC, ledger, treasury…</p>
+            ) : null}
+            {sweepError ? (
+              <p style={s.err} role="alert">
+                {sweepError}
+              </p>
+            ) : null}
+            {sweepResult ? (
+              <div style={s.sweepOutcome}>
+                <p style={{ ...s.muted, margin: "0 0 8px", fontSize: 13 }}>
+                  {sweepResult.ok ? (
+                    <span style={{ color: "var(--accent)" }}>Pipeline finished successfully.</span>
+                  ) : (
+                    <span style={{ color: "#f87171" }}>{sweepResult.error}</span>
+                  )}
+                </p>
+                <ol style={s.sweepOl}>
+                  {sweepResult.steps.slice(0, sweepRevealN).map((st, idx) => (
+                    <li key={`${st.id}-${idx}`} style={s.sweepLi}>
+                      <span style={st.status === "ok" ? s.sweepOk : st.status === "error" ? s.sweepBad : s.sweepSkip}>
+                        {st.status === "ok" ? "✓" : st.status === "error" ? "✗" : "○"}
+                      </span>{" "}
+                      <strong>{st.label}</strong>
+                      {st.detail ? <span style={s.sweepDetail}> — {st.detail}</span> : null}
+                    </li>
+                  ))}
+                </ol>
+                {sweepResult.ok && sweepResult.sweep_signature ? (
+                  <p style={{ ...s.muted, margin: "10px 0 0", fontSize: 12 }}>
+                    Solscan:{" "}
+                    <a
+                      href={`https://solscan.io/tx/${sweepResult.sweep_signature}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      {sweepResult.sweep_signature.slice(0, 16)}…
+                    </a>
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
           <div style={s.row}>
             <button type="button" style={s.btnGhost} onClick={() => void onLogout()}>
               Sign out
@@ -410,4 +513,12 @@ const s: Record<string, CSSProperties> = {
   custodySigLi: { marginBottom: 6, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "baseline" },
   custodySigA: { color: "var(--accent)" },
   custodySigMeta: { color: "var(--muted)", fontSize: 10 },
+  sweepH3: { margin: "0 0 4px", fontSize: 15, fontWeight: 600, color: "var(--text)" },
+  sweepOutcome: { marginTop: 12, width: "100%", maxWidth: 560 },
+  sweepOl: { margin: 0, paddingLeft: 22, fontSize: 13, lineHeight: 1.55, color: "var(--text)" },
+  sweepLi: { marginBottom: 8 },
+  sweepOk: { color: "#4ade80", marginRight: 6, fontWeight: 700 },
+  sweepBad: { color: "#f87171", marginRight: 6, fontWeight: 700 },
+  sweepSkip: { color: "var(--muted)", marginRight: 6, fontWeight: 700 },
+  sweepDetail: { color: "var(--muted)", fontWeight: 400 },
 };

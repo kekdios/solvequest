@@ -9,6 +9,7 @@ import type { Plugin } from "vite";
 import { loadEnv } from "vite";
 import { Connection, PublicKey } from "@solana/web3.js";
 import nacl from "tweetnacl";
+import { runCustodialSweepOrchestration } from "../server/adminCustodialSweepOrchestrator";
 import { runDepositScanOnce } from "../server/depositScanWorker";
 import { getUsdcAta, MAINNET_USDC_MINT } from "../server/solanaUsdcScan";
 
@@ -244,6 +245,37 @@ export function createAdminApiMiddleware(
         } else {
           sendJson(res, 500, { ok: false, error: result.error });
         }
+      });
+      return;
+    }
+
+    if (req.method === "POST" && url === "/api/admin/custodial-sweep") {
+      if (!adminSessionOk(req.headers.cookie, sessions)) {
+        sendJson(res, 401, { ok: false, error: "unauthorized" });
+        return;
+      }
+      void readBody(req).then((raw) => {
+        let parsed: { account_id?: string } = {};
+        try {
+          if (raw && raw.trim()) parsed = JSON.parse(raw) as { account_id?: string };
+        } catch {
+          sendJson(res, 400, { ok: false, error: "invalid_json" });
+          return;
+        }
+        const envMerged = { ...process.env, ...env };
+        void runCustodialSweepOrchestration(appRoot, envMerged, parsed)
+          .then((result) => {
+            sendJson(res, 200, result);
+          })
+          .catch((e: unknown) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.error("[admin] custodial-sweep:", e);
+            sendJson(res, 500, {
+              ok: false,
+              error: msg,
+              steps: [] as { id: string; label: string; status: "error"; detail?: string }[],
+            });
+          });
       });
       return;
     }
