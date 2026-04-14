@@ -303,9 +303,11 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           custodial_seckey_enc?: string | null;
           custodial_derivation_index?: number | null;
         };
-        mePayload.custodial_deposit = Boolean(
-          custodialRow.custodial_seckey_enc || custodialRow.custodial_derivation_index != null,
-        );
+        /** `!= null` is false for `undefined`, so use explicit checks. HD index 0 must count as custodial. */
+        const di = custodialRow.custodial_derivation_index;
+        const diNum = di === null || di === undefined ? NaN : Number(di);
+        const hasHdIndex = Number.isFinite(diNum) && diNum >= 0;
+        mePayload.custodial_deposit = Boolean(custodialRow.custodial_seckey_enc || hasHdIndex);
         sendJson(res, 200, mePayload);
       } catch {
         sendJson(res, 401, { error: "Invalid token" });

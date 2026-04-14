@@ -26,9 +26,14 @@ function QrIcon({ size = 18 }: { size?: number }) {
 type Props = {
   /** Server-derived custodial address (HD from master key); no browser keypair. */
   serverDepositAddress?: string | null;
+  /** When set and there is no address yet, show this instead of an endless “Loading…”. */
+  depositAddressError?: string | null;
 };
 
-export default function TestReceiveAddresses({ serverDepositAddress = null }: Props) {
+export default function TestReceiveAddresses({
+  serverDepositAddress = null,
+  depositAddressError = null,
+}: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -70,6 +75,12 @@ export default function TestReceiveAddresses({ serverDepositAddress = null }: Pr
     <div style={s.wrap}>
       {loadError ? <p style={s.err}>{loadError}</p> : null}
 
+      {depositAddressError && !solAddress ? (
+        <p style={s.err} role="alert">
+          {depositAddressError}
+        </p>
+      ) : null}
+
       {solAddress ? (
         <>
           <div style={s.row}>
@@ -103,7 +114,7 @@ export default function TestReceiveAddresses({ serverDepositAddress = null }: Pr
             {copied ? <span style={s.copied}>Copied</span> : null}
           </div>
         </>
-      ) : (
+      ) : depositAddressError ? null : (
         <p style={s.muted}>Loading your custodial deposit address…</p>
       )}
 

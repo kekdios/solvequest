@@ -305,6 +305,8 @@ function AppInner() {
   const demo = isDemoMode(authMode);
 
   const [ledgerAccountRow, setLedgerAccountRow] = useState<PersistedAccountRow | null>(null);
+  /** Set when ensure-custodial or GET /api/account/me fails; shown on Account deposit UI. */
+  const [ledgerHydrationError, setLedgerHydrationError] = useState<string | null>(null);
 
   const [state, dispatch] = useReducer(
     reducer,
@@ -418,6 +420,7 @@ function AppInner() {
     if (authLoading) return;
     if (user) return;
     setLedgerAccountRow(null);
+    setLedgerHydrationError(null);
     dispatch({ type: "replaceAll", state: loadDemoAppState() ?? getDefaultDemoAppState() });
   }, [authLoading, user]);
 
@@ -426,18 +429,48 @@ function AppInner() {
     if (authLoading || demo || !user) return;
     let cancelled = false;
     void (async () => {
+      setLedgerHydrationError(null);
       try {
-        await fetch("/api/account/ensure-custodial-deposit", {
+        const encRes = await fetch("/api/account/ensure-custodial-deposit", {
           method: "POST",
           credentials: "include",
         });
+        let ensureErr: string | null = null;
+        if (!encRes.ok) {
+          try {
+            const j = (await encRes.json()) as { message?: string; error?: string };
+            ensureErr = j.message || j.error || `ensure-custodial-deposit failed (${encRes.status})`;
+          } catch {
+            ensureErr = `ensure-custodial-deposit failed (${encRes.status})`;
+          }
+        }
         const r = await fetch("/api/account/me", { credentials: "include" });
         if (!r.ok) {
-          if (!cancelled) setLedgerAccountRow(null);
+          let msg = `Could not load account (${r.status}).`;
+          try {
+            const j = (await r.json()) as { message?: string; error?: string };
+            if (j.message) msg = j.message;
+            else if (j.error) msg = String(j.error);
+          } catch {
+            /* ignore */
+          }
+          if (!cancelled) {
+            setLedgerAccountRow(null);
+            setLedgerHydrationError(msg);
+          }
           return;
         }
         const data = (await r.json()) as PersistedAccountRow;
         if (cancelled) return;
+        const addr = data.sol_receive_address?.trim() ?? "";
+        if (!addr) {
+          setLedgerHydrationError(
+            ensureErr ??
+              "No deposit address assigned. Set SOLANA_CUSTODIAL_MASTER_KEY_B64 or VITE_SOLANA_TEST_SECRET_KEY_B64 on the server, ensure the DB has custodial columns (npm run db:migrate-hd), then reload.",
+          );
+        } else {
+          setLedgerHydrationError(null);
+        }
         setLedgerAccountRow(data);
         syncVersionRef.current = Number(data.sync_version ?? 0);
         dispatch({
@@ -445,8 +478,11 @@ function AppInner() {
           row: data,
           mergeUnsyncedLocalOpens: false,
         });
-      } catch {
-        if (!cancelled) setLedgerAccountRow(null);
+      } catch (e) {
+        if (!cancelled) {
+          setLedgerAccountRow(null);
+          setLedgerHydrationError(e instanceof Error ? e.message : "Network error loading account.");
+        }
       }
     })();
     return () => {
@@ -465,6 +501,9 @@ function AppInner() {
           const data = (await r.json()) as PersistedAccountRow;
           const sv = Number(data.sync_version ?? 0);
           if (sv <= syncVersionRef.current) return;
+          if (data.sol_receive_address?.trim()) {
+            setLedgerHydrationError(null);
+          }
           setLedgerAccountRow(data);
           dispatch({
             type: "hydrateFromAccountRow",
@@ -757,11 +796,8 @@ function AppInner() {
           {screen === "account" && (
             <AccountScreen
               isDemo={demo}
-              serverDepositAddress={
-                ledgerAccountRow?.custodial_deposit && ledgerAccountRow.sol_receive_address
-                  ? ledgerAccountRow.sol_receive_address
-                  : null
-              }
+              serverDepositAddress={ledgerAccountRow?.sol_receive_address?.trim() || null}
+              depositAddressError={ledgerHydrationError}
               qusdUnlocked={state.qusd.unlocked}
               qusdLocked={state.qusd.locked}
               onLockQusd={lockQusd}
