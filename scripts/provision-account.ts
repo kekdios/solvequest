@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import Database from "better-sqlite3";
 import { deriveCustodialKeypairFromIndex } from "../server/custodialHdDerive";
+import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
 
 const SIGNUP_GRANT = 10_000;
 
@@ -24,6 +25,7 @@ const now = Date.now();
 
 const db = new Database(outPath);
 try {
+  ensureCustodialHdSchema(db);
   const maxRow = db
     .prepare(`SELECT COALESCE(MAX(custodial_derivation_index), -1) AS m FROM accounts`)
     .get() as { m: number };

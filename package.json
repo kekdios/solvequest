@@ -14,7 +14,7 @@
     "test:hl": "node scripts/test-hl-feeds.mjs",
     "db:init": "node scripts/init-db.mjs",
     "db:migrate": "node scripts/migrate-all.mjs",
-    "db:migrate-hd": "node scripts/migrate-custodial-hd.mjs",
+    "db:migrate-hd": "tsx scripts/migrate-custodial-hd.ts",
     "db:provision": "tsx scripts/provision-account.ts"
   },
   "dependencies": {

@@ -18,6 +18,7 @@ import { getUsdcAta, MAINNET_USDC_MINT } from "../server/solanaUsdcScan";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
 import { applyLockedQusdInterest } from "./vaultInterest";
+import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
 import {
   getLedgerBalances,
   insertPerpCloseSettlement,
@@ -179,6 +180,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       /** WAL + busy wait — deposit worker / concurrent reads were contending on the same file without this. */
       db.pragma("journal_mode = WAL");
       db.pragma("busy_timeout = 8000");
+      ensureCustodialHdSchema(db);
       return db;
     } catch (e) {
       console.error("[account-api] open db:", e);
@@ -515,7 +517,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
               sendJson(res, 503, {
                 error: "db_schema",
                 message:
-                  "Schema missing custodial HD columns — run npm run db:init or scripts/migrate-custodial-hd.mjs.",
+                  "Schema missing custodial HD columns — run npm run db:migrate-hd or db:init (also applied automatically on server start).",
               });
               return;
             }

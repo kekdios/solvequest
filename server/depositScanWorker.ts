@@ -11,6 +11,7 @@ import { resolveCustodialDepositKeypair } from "./depositWalletCrypto";
 import { insertSolanaUsdcCredit } from "./qusdLedger";
 import { sweepCustodialDepositToTreasury } from "./custodialSweepServer";
 import { scanNewUsdcDeposits, type ScanLedger } from "./solanaUsdcScan";
+import { ensureCustodialHdSchema } from "./ensureCustodialHdSchema";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -19,6 +20,7 @@ function openSqlite(path: string): SqliteDb {
   database.pragma("foreign_keys = ON");
   database.pragma("journal_mode = WAL");
   database.pragma("busy_timeout = 8000");
+  ensureCustodialHdSchema(database);
   return database;
 }
 

@@ -76,7 +76,7 @@ Defaults below match **`scripts/deploy.sh`** and **`scripts/solvequest.service.e
 - **Default path**: `<repo>/data/solvequest.db`.
 - **Override**: `SOLVEQUEST_DB_PATH=/absolute/path/to/file.db`.
 - **Create / reset**: `npm run db:init` runs `scripts/init-db.mjs` which executes **`db/schema.sql`** only.
-- **Small additive migrations**: `npm run db:migrate-hd` runs **`scripts/migrate-custodial-hd.mjs`** to add **`custodial_derivation_index`** (and its index) on **existing** DBs created before that column existed. For a corrupt or unknown-old schema, **back up, delete the DB file**, then `db:init` is still the clean reset. `npm run db:migrate` (migrate-all) only prints guidance — it does not alter schema.
+- **Small additive migrations**: On API startup the server runs **`ensureCustodialHdSchema`** (adds **`custodial_derivation_index`** + index if missing). You can also run **`npm run db:migrate-hd`** (`scripts/migrate-custodial-hd.ts`) manually on the same DB path. For a corrupt or unknown-old schema, **back up, delete the DB file**, then `db:init` is still the clean reset. `npm run db:migrate` (migrate-all) only prints guidance — it does not alter schema.
 
 ### Schema concepts
 
@@ -259,7 +259,7 @@ npm run db:provision    # insert one provisioned account + HD deposit row (needs
 # or: DEPLOY_TARGET=root@OTHER ./scripts/deploy.sh root@OTHER
 ```
 
-**Deploy note:** `deploy.sh` runs **`npm run build`** only; it does **not** run DB init/migrations. After pulling schema changes, run **`db:migrate-hd`** (or recreate the DB) on the server where **`SOLVEQUEST_DB_PATH`** points, before relying on HD custodial deposits.
+**Deploy note:** `deploy.sh` runs **`npm run build`** only; it does **not** run **`db:init`**. The **`custodial_derivation_index`** column is added **automatically** when the API process opens SQLite (same as `npm run db:migrate-hd`). For a brand-new host, ensure the DB file exists and has a full schema (**`db:init`** on the server) or restore a backup; additive HD migration alone does not create missing tables.
 
 ---
 
