@@ -15,7 +15,8 @@
     "db:init": "node scripts/init-db.mjs",
     "db:migrate": "node scripts/migrate-all.mjs",
     "db:migrate-hd": "tsx scripts/migrate-custodial-hd.ts",
-    "db:provision": "tsx scripts/provision-account.ts"
+    "db:provision": "tsx scripts/provision-account.ts",
+    "local-usdc-demo": "tsx scripts/local-custodial-usdc-cycle.ts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.14",
