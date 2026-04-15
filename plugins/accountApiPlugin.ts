@@ -3,7 +3,6 @@
  * Env: JWT_SECRET (same as user auth), optional SOLVEQUEST_DB_PATH (default data/solvequest.db).
  * Creates a row on first login if none exists for that email.
  */
-import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -15,6 +14,7 @@ import Database from "better-sqlite3";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
+import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
 import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
 import {
   getLedgerBalances,
@@ -26,9 +26,6 @@ import {
 type SqliteDb = InstanceType<typeof Database>;
 
 const USER_COOKIE = "auth_token";
-
-const DEFAULT_TIER_ID = 3;
-const DEFAULT_COVERAGE_LIMIT_QUSD = 50_000;
 
 const perpSymbolZ = z.enum(PERP_SYMBOLS as unknown as [string, ...string[]]);
 
@@ -146,10 +143,6 @@ function loadOpenPositions(database: SqliteDb, accountId: string): z.infer<typeo
   }));
 }
 
-function resolveAccountDbPath(root: string, env: Record<string, string>): string {
-  return env.SOLVEQUEST_DB_PATH?.trim() || path.join(root, "data", "solvequest.db");
-}
-
 function parseCookies(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (!header) return out;
@@ -181,7 +174,7 @@ function attachLedgerBalances(database: SqliteDb, row: AccountRow): AccountRow {
 export function createAccountApiMiddleware(env: Record<string, string>, root: string): Connect.NextHandleFunction {
   const jwtSecret = env.JWT_SECRET;
   const jwtOk = Boolean(jwtSecret && jwtSecret !== "change-this-secret-key");
-  const dbPath = resolveAccountDbPath(root, env);
+  const dbPath = resolveSolvequestDbPath(root, env);
 
   let db: SqliteDb | null = null;
 
@@ -206,26 +199,8 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
     const database = getDb();
     if (!database) return null;
 
-    const sel = database.prepare(`SELECT * FROM accounts WHERE email = ?`);
-    const existing = sel.get(email) as AccountRow | undefined;
-    if (existing) {
-      database.prepare(`UPDATE accounts SET updated_at = ? WHERE id = ?`).run(Date.now(), existing.id);
-      const row = database.prepare(`SELECT * FROM accounts WHERE email = ?`).get(email) as AccountRow;
-      return attachLedgerBalances(database, row);
-    }
-
-    const now = Date.now();
-    const id = randomUUID();
     try {
-      database
-        .prepare(
-          `INSERT INTO accounts (
-            id, created_at, updated_at, email,
-            usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd, coverage_used_qusd,
-            tier_id, accumulated_losses_qusd, bonus_repaid_usdc, vault_activity_at, qusd_vault_interest_at, sync_version
-          ) VALUES (?, ?, ?, ?, 0, ?, 0, 0, 0, ?, 0, 0, NULL, NULL, 0)`,
-        )
-        .run(id, now, now, email, DEFAULT_COVERAGE_LIMIT_QUSD, DEFAULT_TIER_ID);
+      ensureAccountRowForEmail(database, email);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("no column named email") || msg.includes("no such table: qusd_ledger")) {
@@ -235,8 +210,10 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       throw e;
     }
 
-    const created = sel.get(email) as AccountRow | undefined;
-    return created ? attachLedgerBalances(database, created) : null;
+    const row = database.prepare(`SELECT * FROM accounts WHERE email = ?`).get(email.toLowerCase()) as
+      | AccountRow
+      | undefined;
+    return row ? attachLedgerBalances(database, row) : null;
   };
 
   return (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
@@ -492,13 +469,6 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           }
 
           const now = Date.now();
-          const hadSignupGrant = Boolean(
-            database
-              .prepare(
-                `SELECT 1 AS ok FROM qusd_ledger WHERE account_id = ? AND entry_type = 'signup_grant' LIMIT 1`,
-              )
-              .get(accountId) as { ok: number } | undefined,
-          );
           const run = database.transaction(() => {
             database
               .prepare(
@@ -512,9 +482,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                 WHERE id = ?`,
               )
               .run(addressNormalized, now, now, accountId);
-            if (!hadSignupGrant) {
-              insertAddressVerificationBonus(database, accountId, now);
-            }
+            insertAddressVerificationBonus(database, accountId, now);
           });
           run();
 

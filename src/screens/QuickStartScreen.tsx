@@ -10,7 +10,7 @@ const STEPS: { title: string; body: string }[] = [
   {
     title: "Know your QUSD",
     body:
-      "Perps draw from your **QUSD** balance for margin. On **Account**, enter your **Solana address** and **Verify on-chain**—after verification you receive the onboarding QUSD credit; USDC (SPL) sent to that address credits as QUSD after confirmation. In **demo mode**, balances stay in this browser only.",
+      "Perps draw from your **QUSD** balance for margin. You get **10,000 QUSD** when the account row is created, **10,000 QUSD** on first successful **email code** verification, and **10,000 QUSD** when you verify a **Solana address** on **Account**. USDC (SPL) sent to that address credits as QUSD after confirmation. In **demo mode**, balances stay in this browser only.",
   },
   {
     title: "Open Perpetuals",

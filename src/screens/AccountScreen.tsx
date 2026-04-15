@@ -7,6 +7,8 @@ const TestReceiveAddresses = lazy(() => import("../components/TestReceiveAddress
 
 const CHANGENOW_URL = "https://changenow.io/";
 
+const SIGNUP_GRANT_QUSD = 10_000;
+const EMAIL_OTP_BONUS_QUSD = 10_000;
 const VERIFY_BONUS_QUSD = 10_000;
 
 /** Stat value text was 2rem; reduced by 40% → 60% scale. */
@@ -102,14 +104,15 @@ export default function AccountScreen({
           ) : (
             <>
               <p style={s.depositExplainer}>
-                Register a <strong style={{ color: "var(--text)" }}>Solana mainnet</strong> address you control. We
-                verify it on-chain (valid pubkey and a small SOL balance). After verification,{" "}
-                <strong style={{ color: "var(--text)" }}>
-                  {VERIFY_BONUS_QUSD.toLocaleString()} QUSD
-                </strong>{" "}
-                is credited once, and the address is saved for USDC (SPL) deposits—converted to QUSD at{" "}
+                You receive <strong style={{ color: "var(--text)" }}>{SIGNUP_GRANT_QUSD.toLocaleString()} QUSD</strong>{" "}
+                when your account is created,{" "}
+                <strong style={{ color: "var(--text)" }}>{EMAIL_OTP_BONUS_QUSD.toLocaleString()} QUSD</strong> after your
+                first successful email code verification, and an additional{" "}
+                <strong style={{ color: "var(--text)" }}>{VERIFY_BONUS_QUSD.toLocaleString()} QUSD</strong> after you link
+                and verify a <strong style={{ color: "var(--text)" }}>Solana mainnet</strong> address (valid pubkey and a
+                small on-chain SOL balance). The linked address is used for USDC (SPL) deposits—converted to QUSD at{" "}
                 <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong> when deposits are
-                confirmed. The linked address cannot be changed later.
+                confirmed—and cannot be changed later.
               </p>
 
               {depositAddressError ? (

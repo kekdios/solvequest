@@ -4,13 +4,18 @@
  * Defaults match cryptomasspay server/lib/jwt-service.ts (7d / 7d).
  */
 import { randomInt, timingSafeEqual } from "node:crypto";
+import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Connect } from "vite";
 import type { Plugin } from "vite";
 import { loadEnv } from "vite";
 import jwt, { type SignOptions } from "jsonwebtoken";
+import Database from "better-sqlite3";
 import { Resend } from "resend";
 import { z } from "zod";
+import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
+import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
+import { insertEmailOtpVerificationBonus } from "../server/qusdLedger";
 
 const USER_COOKIE = "auth_token";
 
@@ -253,6 +258,23 @@ export function createUserAuthMiddleware(env: Record<string, string>, mode: stri
           if (!verifyOtp(email, code)) {
             sendJson(res, 401, { error: "Invalid or expired verification code" });
             return;
+          }
+
+          try {
+            const root = process.cwd();
+            const dbPath = resolveSolvequestDbPath(root, env);
+            if (fs.existsSync(dbPath)) {
+              const database = new Database(dbPath);
+              database.pragma("foreign_keys = ON");
+              database.pragma("journal_mode = WAL");
+              database.pragma("busy_timeout = 8000");
+              ensureCustodialHdSchema(database);
+              const { accountId } = ensureAccountRowForEmail(database, email);
+              insertEmailOtpVerificationBonus(database, accountId, Date.now());
+              database.close();
+            }
+          } catch (e) {
+            console.error("[user-auth] email OTP QUSD bonus:", e);
           }
 
           const expiresIn = rememberMe ? rememberExp : sessionExp;

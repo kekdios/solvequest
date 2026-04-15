@@ -8,6 +8,8 @@ type SqliteDb = InstanceType<typeof Database>;
 export const SIGNUP_GRANT_QUSD = 10_000;
 /** One-time credit after the user verifies their own Solana address on-chain. */
 export const ADDRESS_VERIFICATION_BONUS_QUSD = 10_000;
+/** One-time credit after the first successful email OTP verification. */
+export const EMAIL_OTP_VERIFICATION_BONUS_QUSD = 10_000;
 
 export function getLedgerBalances(
   database: SqliteDb,
@@ -32,6 +34,16 @@ export function insertSignupGrant(database: SqliteDb, accountId: string, at: num
        VALUES (?, ?, 'signup_grant', ?, 0, 'signup', 'grant')`,
     )
     .run(accountId, at, SIGNUP_GRANT_QUSD);
+}
+
+/** Idempotent: first successful email OTP only (same ref for all accounts — uniqueness is per account_id in index). */
+export function insertEmailOtpVerificationBonus(database: SqliteDb, accountId: string, at: number): void {
+  database
+    .prepare(
+      `INSERT OR IGNORE INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
+       VALUES (?, ?, 'email_otp_bonus', ?, 0, 'email_otp', 'first_verify')`,
+    )
+    .run(accountId, at, EMAIL_OTP_VERIFICATION_BONUS_QUSD);
 }
 
 /** Idempotent: one bonus per account (registration reward after address verification). */

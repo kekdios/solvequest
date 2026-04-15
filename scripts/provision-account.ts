@@ -10,7 +10,11 @@ import dotenv from "dotenv";
 import Database from "better-sqlite3";
 import { Keypair } from "@solana/web3.js";
 import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
-import { ADDRESS_VERIFICATION_BONUS_QUSD } from "../server/qusdLedger";
+import {
+  ADDRESS_VERIFICATION_BONUS_QUSD,
+  EMAIL_OTP_VERIFICATION_BONUS_QUSD,
+  SIGNUP_GRANT_QUSD,
+} from "../server/qusdLedger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
@@ -48,6 +52,14 @@ try {
     sol_receive_address: solAddr,
     sol_receive_verified_at: now,
   });
+  db.prepare(
+    `INSERT INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
+     VALUES (?, ?, 'signup_grant', ?, 0, 'signup', 'grant')`,
+  ).run(id, now, SIGNUP_GRANT_QUSD);
+  db.prepare(
+    `INSERT INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
+     VALUES (?, ?, 'email_otp_bonus', ?, 0, 'email_otp', 'first_verify')`,
+  ).run(id, now, EMAIL_OTP_VERIFICATION_BONUS_QUSD);
   db.prepare(
     `INSERT INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
      VALUES (?, ?, 'address_verify_bonus', ?, 0, 'address_verify', 'bonus')`,
