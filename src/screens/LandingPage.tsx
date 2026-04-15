@@ -101,11 +101,13 @@ export default function LandingPage({ onStartNow }: Props) {
                 height={44}
                 decoding="async"
               />
-              <span className="lp-title-shine lp-title-usd">${usdPart}</span>
+              <span className="lp-title-shine lp-title-usd">
+                ${usdPart} USDC
+              </span>
             </span>{" "}
             <span className="lp-title-shine">PRIZE</span>
           </h1>
-          <p className="lp-sub">Powered by AI. Synced with Hyperliquid. QUSD margin in one place.</p>
+          <p className="lp-sub">Trade perpetual-style markets. Synced with Hyperliquid.</p>
           <div className="lp-qusd-ribbon">
             <img
               src="/icon-qusd.png"
@@ -116,10 +118,7 @@ export default function LandingPage({ onStartNow }: Props) {
             />
             <div className="lp-qusd-ribbon-copy">
               <p className="lp-qusd-ribbon-lead">
-                You receive <strong>10,000 QUSD</strong> as a free <strong>BONUS</strong> to test the app.
-              </p>
-              <p className="lp-qusd-ribbon-lock">
-                Trade perpetual-style markets with your QUSD balance—deposits and settlement sync with your account.
+                You receive <strong>30,000 QUSD</strong> as a free <strong>BONUS</strong> when fully verified.
               </p>
             </div>
           </div>
@@ -144,6 +143,13 @@ export default function LandingPage({ onStartNow }: Props) {
             <span className="lp-step-num" aria-hidden>
               1
             </span>
+            <h3>Verify Email</h3>
+            <p>Verify Your Solana Wallet Address</p>
+          </article>
+          <article className="lp-card">
+            <span className="lp-step-num" aria-hidden>
+              2
+            </span>
             <h3>Choose Direction</h3>
             <div className="lp-dir">
               <span>
@@ -156,20 +162,9 @@ export default function LandingPage({ onStartNow }: Props) {
           </article>
           <article className="lp-card">
             <span className="lp-step-num" aria-hidden>
-              2
-            </span>
-            <h3>Activate AI Execution</h3>
-            <p>
-              Our proprietary AI monitors Hyperliquid in real time and executes optimal entries and exits
-              for you.
-            </p>
-          </article>
-          <article className="lp-card">
-            <span className="lp-step-num" aria-hidden>
               3
             </span>
-            <h3>Earn Consistent Returns</h3>
-            <p>Sit back while the system manages risk and maximizes profit.</p>
+            <h3>Trade to accumulate enough QUSD to claim the PRIZE</h3>
           </article>
         </div>
       </section>
