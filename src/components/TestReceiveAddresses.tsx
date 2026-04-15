@@ -24,24 +24,28 @@ function QrIcon({ size = 18 }: { size?: number }) {
 }
 
 type Props = {
-  /** User-verified Solana receive address from the server. */
+  /** Address to show: user deposit wallet or `SOLANA_TREASURY_ADDRESS` (treasury). */
   serverDepositAddress?: string | null;
   /** When set and there is no address yet, show this instead of an endless “Loading…”. */
   depositAddressError?: string | null;
   /** When true, skip the “loading address” placeholder (parent already collected the address). */
   addressReady?: boolean;
+  /** `treasury` — labels refer to project treasury from env. */
+  variant?: "user_deposit" | "treasury";
 };
 
 export default function TestReceiveAddresses({
   serverDepositAddress = null,
   depositAddressError = null,
   addressReady = false,
+  variant = "user_deposit",
 }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const solAddress = serverDepositAddress?.trim() ?? "";
+  const isTreasury = variant === "treasury";
 
   const refresh = useCallback(() => {
     if (!solAddress) {
@@ -90,6 +94,14 @@ export default function TestReceiveAddresses({
             <p style={s.depositHint}>
               Only send <strong style={s.depositHintStrong}>USDC</strong> on the{" "}
               <strong style={s.depositHintStrong}>Solana Network</strong>
+              {isTreasury ? (
+                <>
+                  {" "}
+                  <span style={{ fontWeight: 500, color: "var(--muted)" }}>
+                    — treasury address (<code style={s.inlineTreasuryTag}>SOLANA_TREASURY_ADDRESS</code>)
+                  </span>
+                </>
+              ) : null}
             </p>
             <div style={s.addrRow}>
               <code style={s.addr}>{solAddress}</code>
@@ -98,8 +110,8 @@ export default function TestReceiveAddresses({
                   type="button"
                   style={s.iconBtn}
                   onClick={() => copy(solAddress)}
-                  aria-label="Copy Solana address"
-                  title="Copy address"
+                  aria-label={isTreasury ? "Copy treasury address" : "Copy Solana address"}
+                  title={isTreasury ? "Copy treasury address" : "Copy address"}
                 >
                   <CopyIcon />
                 </button>
@@ -107,8 +119,8 @@ export default function TestReceiveAddresses({
                   type="button"
                   style={s.iconBtn}
                   onClick={() => setQrOpen(true)}
-                  aria-label="Show Solana address QR code"
-                  title="QR code"
+                  aria-label={isTreasury ? "Show treasury address QR code" : "Show Solana address QR code"}
+                  title={isTreasury ? "Treasury QR code" : "QR code"}
                 >
                   <QrIcon />
                 </button>
@@ -133,9 +145,11 @@ export default function TestReceiveAddresses({
         >
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
             <h4 id="qr-dialog-title" style={s.modalTitle}>
-              Solana (SPL)
+              {isTreasury ? "Treasury address (Solana)" : "Solana (SPL)"}
             </h4>
-            <p style={s.modalHint}>Scan to copy receiving address</p>
+            <p style={s.modalHint}>
+              {isTreasury ? "Scan the treasury address (SOLANA_TREASURY_ADDRESS)" : "Scan to copy receiving address"}
+            </p>
             <div style={s.qrBox}>
               <QRCode
                 value={solAddress}
@@ -175,6 +189,11 @@ const s: Record<string, CSSProperties> = {
   depositHintStrong: {
     color: "color-mix(in srgb, var(--accent) 92%, #fff)",
     fontWeight: 700,
+  },
+  inlineTreasuryTag: {
+    fontSize: "0.85em",
+    fontWeight: 600,
+    color: "var(--muted)",
   },
   addrRow: {
     display: "flex",

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
+import { resolveTreasuryAddressBase58 } from "../deposit/chainConfig";
 import { QUSD_PER_USD } from "../engine/qusdVault";
 import { QusdAmount } from "../Qusd";
 
@@ -44,6 +45,8 @@ export default function AccountScreen({
   const [draftAddress, setDraftAddress] = useState("");
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [treasuryAddress, setTreasuryAddress] = useState<string | null>(null);
+  const [treasuryLoadState, setTreasuryLoadState] = useState<"idle" | "loading" | "missing">("idle");
 
   const verified = Boolean(solReceiveVerified);
   const displayAddr = serverDepositAddress?.trim() ?? "";
@@ -51,6 +54,29 @@ export default function AccountScreen({
   useEffect(() => {
     if (verified && displayAddr) setDraftAddress(displayAddr);
   }, [verified, displayAddr]);
+
+  useEffect(() => {
+    if (isDemo || !verified) {
+      setTreasuryAddress(null);
+      setTreasuryLoadState("idle");
+      return;
+    }
+    let cancelled = false;
+    setTreasuryLoadState("loading");
+    void resolveTreasuryAddressBase58().then((addr) => {
+      if (cancelled) return;
+      if (addr) {
+        setTreasuryAddress(addr);
+        setTreasuryLoadState("idle");
+      } else {
+        setTreasuryAddress(null);
+        setTreasuryLoadState("missing");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDemo, verified]);
 
   const submitVerify = useCallback(async () => {
     const addr = draftAddress.trim();
@@ -123,7 +149,7 @@ export default function AccountScreen({
 
               <div style={s.verifyBlock}>
                 <label htmlFor="sol-verify-address" style={s.verifyLabel}>
-                  Solana address (base58)
+                  Your Solana Wallet Address
                 </label>
                 <input
                   id="sol-verify-address"
@@ -156,17 +182,27 @@ export default function AccountScreen({
               {verified && displayAddr ? (
                 <>
                   <p style={s.depositExplainerSecondary}>
-                    Send <strong style={{ color: "var(--text)" }}>USDC</strong> on{" "}
-                    <strong style={{ color: "var(--text)" }}>Solana</strong> to the address above. Credits apply after
-                    on-chain confirmation.
+                    USDC (SPL) sent to <strong style={{ color: "var(--text)" }}>your verified wallet</strong> (the
+                    field above) is credited as QUSD after on-chain confirmation. Use the treasury address below for
+                    deposits that should use the project <code style={s.inlineCodeEnv}>SOLANA_TREASURY_ADDRESS</code>.
                   </p>
                   <div style={s.receiveAddressesBlock}>
                     <Suspense fallback={<p style={s.suspenseFallback}>Loading…</p>}>
-                      <TestReceiveAddresses
-                        serverDepositAddress={displayAddr}
-                        depositAddressError={null}
-                        addressReady
-                      />
+                      {treasuryLoadState === "loading" ? (
+                        <p style={s.suspenseFallback}>Loading treasury address…</p>
+                      ) : treasuryLoadState === "missing" || !treasuryAddress ? (
+                        <p style={s.treasuryMissing} role="status">
+                          Treasury address unavailable. Set <code style={s.inlineCodeEnv}>SOLANA_TREASURY_ADDRESS</code>{" "}
+                          (or <code style={s.inlineCodeEnv}>VITE_SOLANA_TREASURY_ADDRESS</code>) on the server.
+                        </p>
+                      ) : (
+                        <TestReceiveAddresses
+                          serverDepositAddress={treasuryAddress}
+                          depositAddressError={null}
+                          addressReady
+                          variant="treasury"
+                        />
+                      )}
                     </Suspense>
                   </div>
                   <p style={s.depositBuySell}>
@@ -206,6 +242,7 @@ const s: Record<string, CSSProperties> = {
   wrap: { display: "flex", flexDirection: "column", gap: 16 },
   metricsStack: { display: "flex", flexDirection: "column", gap: 16 },
   err: { margin: "8px 0 0", fontSize: 13, color: "var(--danger)" },
+  treasuryMissing: { margin: "8px 0 0", fontSize: 13, lineHeight: 1.5, color: "var(--muted)" },
   walletPanelTop: {
     width: "100%",
     background:
@@ -296,4 +333,9 @@ const s: Record<string, CSSProperties> = {
   receiveAddressesBlock: { marginTop: 8 },
   suspenseFallback: { fontSize: 13, color: "var(--muted)" },
   buySellLink: { color: "var(--accent)", fontWeight: 600 },
+  inlineCodeEnv: {
+    fontSize: "0.85em",
+    fontWeight: 600,
+    color: "var(--muted)",
+  },
 };

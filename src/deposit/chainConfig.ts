@@ -84,3 +84,9 @@ export async function resolveTreasuryPubkey(): Promise<PublicKey | null> {
     return null;
   }
 }
+
+/** Canonical base58 treasury (`VITE_*` or `GET /api/config/treasury` → `SOLANA_TREASURY_ADDRESS`). */
+export async function resolveTreasuryAddressBase58(): Promise<string | null> {
+  const pk = await resolveTreasuryPubkey();
+  return pk?.toBase58() ?? null;
+}
