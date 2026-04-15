@@ -20,14 +20,12 @@ import {
 import { getUsdcAta, MAINNET_USDC_MINT } from "../server/solanaUsdcScan";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
-import { applyLockedQusdInterest } from "./vaultInterest";
 import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
 import {
   getLedgerBalances,
   insertPerpCloseSettlement,
   insertPerpMarginLock,
   insertSignupGrant,
-  insertVaultMove,
 } from "../server/qusdLedger";
 
 type SqliteDb = InstanceType<typeof Database>;
@@ -72,12 +70,10 @@ const accountStatePutZ = z.object({
   premium_accrued_usdc: z.number().finite(),
   covered_losses_qusd: z.number().finite(),
   coverage_used_qusd: z.number().finite(),
-  /** Display unlocked / locked QUSD (not pre-margin); server ledger is source of truth after sync. */
+  /** Spendable QUSD (ledger unlocked + locked merged; vault locking removed). */
   qusd_unlocked: z.number().finite(),
-  qusd_locked: z.number().finite(),
   accumulated_losses_qusd: z.number().finite(),
   bonus_repaid_usdc: z.number().finite(),
-  vault_activity_at: z.number().finite().nullable(),
   open_perp_positions: z.array(perpPositionPutZ),
   perp_close_events: z.array(perpCloseEventPutZ).optional().default([]),
 });
@@ -164,7 +160,8 @@ type AccountRow = Record<string, unknown>;
 function attachLedgerBalances(database: SqliteDb, row: AccountRow): AccountRow {
   const id = String(row.id);
   const { unlocked, locked } = getLedgerBalances(database, id);
-  return { ...row, qusd_unlocked: unlocked, qusd_locked: locked };
+  const spendable = unlocked + locked;
+  return { ...row, qusd_unlocked: spendable, qusd_locked: 0 };
 }
 
 export function createAccountApiMiddleware(env: Record<string, string>, root: string): Connect.NextHandleFunction {
@@ -191,29 +188,13 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
     }
   };
 
-  /**
-   * @param skipInterest — MUST be true for `PUT /api/account/state`. Otherwise vault interest bumps
-   * `sync_version` before the optimistic-lock UPDATE and causes spurious 409s / failed writes.
-   */
-  const loadOrCreateRow = (email: string, options?: { skipInterest?: boolean }): AccountRow | null => {
+  const loadOrCreateRow = (email: string): AccountRow | null => {
     const database = getDb();
     if (!database) return null;
 
     const sel = database.prepare(`SELECT * FROM accounts WHERE email = ?`);
     const existing = sel.get(email) as AccountRow | undefined;
     if (existing) {
-      if (!options?.skipInterest) {
-        try {
-          applyLockedQusdInterest(database, String(existing.id));
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          if (msg.includes("no such column")) {
-            console.error("[account-api] schema mismatch — run: npm run db:init on a fresh database");
-            return null;
-          }
-          throw e;
-        }
-      }
       database.prepare(`UPDATE accounts SET updated_at = ? WHERE id = ?`).run(Date.now(), existing.id);
       const row = database.prepare(`SELECT * FROM accounts WHERE email = ?`).get(email) as AccountRow;
       return attachLedgerBalances(database, row);
@@ -575,7 +556,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
             });
             return;
           }
-          const row = loadOrCreateRow(email, { skipInterest: true });
+          const row = loadOrCreateRow(email);
           if (!row?.id) {
             sendJson(res, 503, { error: "no_account" });
             return;
@@ -622,19 +603,6 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                 }
               }
 
-              /**
-               * Vault lock/unlock only: must conserve total QUSD (du + dl ≈ 0). Never "mint" to match a buggy client
-               * `qusd_unlocked` — that was inflating the ledger vs signup + trades + deposits.
-               */
-              const { unlocked: Lu, locked: Ll } = getLedgerBalances(database, accountId);
-              const du = body.qusd_unlocked - Lu;
-              const dl = body.qusd_locked - Ll;
-              if (Math.abs(du) > 1e-6 || Math.abs(dl) > 1e-6) {
-                if (Math.abs(du + dl) < 1e-5) {
-                  insertVaultMove(database, accountId, du, dl, now);
-                }
-              }
-
               const upd = database
                 .prepare(
                   `UPDATE accounts SET
@@ -646,7 +614,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                     coverage_used_qusd = ?,
                     accumulated_losses_qusd = ?,
                     bonus_repaid_usdc = ?,
-                    vault_activity_at = ?,
+                    vault_activity_at = NULL,
                     sync_version = sync_version + 1
                   WHERE id = ? AND sync_version = ?`,
                 )
@@ -659,7 +627,6 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                   body.coverage_used_qusd,
                   body.accumulated_losses_qusd,
                   body.bonus_repaid_usdc,
-                  body.vault_activity_at,
                   accountId,
                   body.sync_version,
                 );

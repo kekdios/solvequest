@@ -23,9 +23,8 @@ export function getDefaultDemoAppState(): DemoAppState {
     marks: { ...INITIAL_MARKS },
     sessionWarnFlags: INITIAL_SESSION_WARN_FLAGS,
     accumulatedLossesQusd: 0,
-    qusd: { unlocked: 10_000, locked: 0 },
+    qusd: { unlocked: 10_000 },
     bonusRepaidUsdc: 0,
-    vaultActivityAt: null,
     pendingPerpCloses: [],
   };
 }
@@ -42,6 +41,8 @@ export function loadDemoAppState(): DemoAppState | null {
     const s = parsed.state as DemoAppState;
     if (!s.account || !s.qusd || !Array.isArray(s.log)) return null;
     if (!Array.isArray(s.pendingPerpCloses)) s.pendingPerpCloses = [];
+    const qu = s.qusd as { unlocked?: number; locked?: number };
+    s.qusd = { unlocked: Number(qu.unlocked ?? 0) + Number(qu.locked ?? 0) };
     /** Leverage is fixed at 100×; legacy saves may differ — normalize exposure + multiplier. */
     if (Array.isArray(s.perpPositions) && s.perpPositions.length > 0) {
       s.perpPositions = s.perpPositions.map((p) => ({

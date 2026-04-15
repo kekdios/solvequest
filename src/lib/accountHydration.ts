@@ -8,12 +8,10 @@ export function persistedRowToAppSlice(row: PersistedAccountRow) {
   return {
     account: accountRowToAccount(row, userId),
     qusd: {
-      unlocked: Number(row.qusd_unlocked),
-      locked: Number(row.qusd_locked),
+      unlocked: Number(row.qusd_unlocked) + Number(row.qusd_locked ?? 0),
     },
     accumulatedLossesQusd: Number(row.accumulated_losses_qusd),
     bonusRepaidUsdc: Number(row.bonus_repaid_usdc ?? 0),
-    vaultActivityAt: row.vault_activity_at != null ? Number(row.vault_activity_at) : null,
   };
 }
 

@@ -61,7 +61,7 @@ export default function LandingPage({ onStartNow }: Props) {
           <h1 id="lp-hero-heading" className="lp-title">
             Turn Market Direction Into Daily Profits
           </h1>
-          <p className="lp-sub">Powered by AI. Synced with Hyperliquid. QUSD margin and vault tools in one place.</p>
+          <p className="lp-sub">Powered by AI. Synced with Hyperliquid. QUSD margin in one place.</p>
           <div className="lp-qusd-ribbon">
             <img
               src="/icon-qusd.png"
@@ -75,8 +75,7 @@ export default function LandingPage({ onStartNow }: Props) {
                 You receive <strong>10,000 QUSD</strong> as a free <strong>BONUS</strong> to test the app.
               </p>
               <p className="lp-qusd-ribbon-lock">
-                Lock QUSD anytime to earn <strong>1% interest per day</strong>—stack yield while you trade or
-                hold.
+                Trade perpetual-style markets with your QUSD balance—deposits and settlement sync with your account.
               </p>
             </div>
           </div>
@@ -179,10 +178,9 @@ export default function LandingPage({ onStartNow }: Props) {
               <img src="/icon-qusd.png" alt="" width={22} height={22} />
             </span>
             <div>
-              <h3>Lock QUSD, Earn Daily Interest</h3>
+              <h3>QUSD balance</h3>
               <p>
-                Put your QUSD to work: lock it in the vault for <strong>1% per day</strong>—transparent
-                accrual you can unlock when you&apos;re ready.
+                Deposit USDC on Solana to credit QUSD, allocate margin to perps, and track settlement in one ledger.
               </p>
             </div>
           </div>
@@ -198,8 +196,8 @@ export default function LandingPage({ onStartNow }: Props) {
         </p>
         <div className="lp-shield">
           <ul>
-            <li>Allocation is QUSD from your unlocked balance</li>
-            <li>Closing settles margin + PnL back to unlocked QUSD</li>
+            <li>Allocation is QUSD from your balance</li>
+            <li>Closing settles margin + PnL back to QUSD</li>
             <li>Past performance does not guarantee future results—this is a demo-style experience</li>
           </ul>
         </div>

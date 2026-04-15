@@ -159,8 +159,9 @@ export async function runCustodialSweepOrchestration(
       );
       push(steps, "sweep", "Sweep USDC to treasury", "skipped", "No funds to move.");
       push(steps, "verify_sweep", "Verify ATA after sweep", "skipped", "—");
-      const { unlocked } = getLedgerBalances(database, account.id);
-      push(steps, "qusd_balance", "QUSD (ledger, unlocked)", "ok", `${unlocked.toFixed(2)} QUSD`);
+      const { unlocked, locked } = getLedgerBalances(database, account.id);
+      const spendableQusd = unlocked + locked;
+      push(steps, "qusd_balance", "QUSD (ledger)", "ok", `${spendableQusd.toFixed(2)} QUSD`);
       return {
         ok: true,
         account_id: account.id,
@@ -177,7 +178,8 @@ export async function runCustodialSweepOrchestration(
       )
       .get(account.id) as { s: number };
     const creditedUsdc = Number(creditedRow?.s ?? 0);
-    const { unlocked: qusdUnlocked } = getLedgerBalances(database, account.id);
+    const { unlocked: u, locked: l } = getLedgerBalances(database, account.id);
+    const qusdSpendable = u + l;
 
     if (creditedUsdc < USDC_EPS) {
       push(
@@ -217,7 +219,7 @@ export async function runCustodialSweepOrchestration(
       "verify_ledger",
       "Verify QUSD / deposit credits",
       "ok",
-      `Credited ≈ ${creditedUsdc.toFixed(4)} USDC · unlocked QUSD ≈ ${qusdUnlocked.toFixed(2)}`,
+      `Credited ≈ ${creditedUsdc.toFixed(4)} USDC · QUSD ≈ ${qusdSpendable.toFixed(2)}`,
     );
 
     const crow = database

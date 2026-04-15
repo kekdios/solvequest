@@ -1,7 +1,6 @@
 /**
  * Append-only QUSD ledger: balances are SUM(unlocked_delta), SUM(locked_delta).
  */
-import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 
 type SqliteDb = InstanceType<typeof Database>;
@@ -79,34 +78,3 @@ export function insertPerpCloseSettlement(
     .run(accountId, at, creditUnlocked, positionId);
 }
 
-/** Vault lock/unlock / client reconciliation: conservation unlocked+locked when possible. */
-export function insertVaultMove(
-  database: SqliteDb,
-  accountId: string,
-  unlockedDelta: number,
-  lockedDelta: number,
-  at: number,
-): void {
-  if (Math.abs(unlockedDelta) < 1e-12 && Math.abs(lockedDelta) < 1e-12) return;
-  database
-    .prepare(
-      `INSERT INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
-       VALUES (?, ?, 'vault_move', ?, ?, 'vault', ?)`,
-    )
-    .run(accountId, at, unlockedDelta, lockedDelta, `move_${randomUUID()}`);
-}
-
-export function insertLockedVaultInterest(
-  database: SqliteDb,
-  accountId: string,
-  lockedDelta: number,
-  at: number,
-): void {
-  if (lockedDelta <= 0) return;
-  database
-    .prepare(
-      `INSERT INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
-       VALUES (?, ?, 'vault_interest', 0, ?, 'vault_interest', ?)`,
-    )
-    .run(accountId, at, lockedDelta, `interest_${randomUUID()}`);
-}

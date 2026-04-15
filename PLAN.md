@@ -13,7 +13,7 @@
 
 ## Current state (baseline)
 
-- App state (perps, QUSD vault, account) in React **reducer** with demo persistence and server sync for registered users. **Vault yield**: ~**1% per day** on **locked** QUSD (`src/engine/qusdVault.ts`); demo applies per-minute increments in-browser; production applies **compound** accrual on **`GET /api/account/me`** via **`plugins/vaultInterest.ts`** → ledger rows **`vault_interest`**, using **`accounts.qusd_vault_interest_at`** (see **`docs/SOLVEQUEST_OVERVIEW.md`**).
+- App state (perps, QUSD, account) in React **reducer** with demo persistence and server sync for registered users. QUSD is a single spendable balance (legacy ledger **locked** deltas are merged into **unlocked** for display and API).
 - **Deposit addresses**: server-only HD derivation (`server/custodialHdDerive.ts`, `POST /api/account/ensure-custodial-deposit`); SQLite stores `sol_receive_address` and `custodial_derivation_index`. Legacy rows may still have `custodial_seckey_enc` (decrypt-only path in `server/depositWalletCrypto.ts`).
 - **No** browser-generated Solana deposit keypairs for end users.
 - Email/OTP, backend session, and admin flows exist as implemented in-repo (see `src/auth`, `plugins/`, `server/`).

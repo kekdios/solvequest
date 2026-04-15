@@ -9,7 +9,7 @@ This document describes what the **current** Solve Quest app does, how it is str
 ## What the app is
 
 - **Solve Quest** is a **single deployment**: a **Vite + React 19** SPA (`src/`) and an **Express** server (`server/index.ts`) that serves **`/api/*`**, proxies **Solana JSON-RPC** at **`/solana-rpc`**, and in production serves the **built static site** from **`dist/`** with SPA fallback.
-- **Product surface**: landing, email OTP auth, **perpetual-style trading UI** (Hyperliquid-derived index marks), **QUSD** balances, optional **vault** lock/unlock, **history** of closed perps, **Solana USDC → QUSD** deposit flow (custodial receive address + server-side crediting), and an **admin** area (wallet sign-in + optional deposit scan / custody tools).
+- **Product surface**: landing, email OTP auth, **perpetual-style trading UI** (Hyperliquid-derived index marks), **QUSD** balances, **history** of closed perps, **Solana USDC → QUSD** deposit flow (custodial receive address + server-side crediting), and an **admin** area (wallet sign-in + optional deposit scan / custody tools).
 - **Branding / public site**: production is commonly exposed at **`https://solvequest.io`** (DNS → your VPS; exact IP is **not fixed in code**—use DNS or your host’s dashboard).
 
 ---
@@ -81,8 +81,8 @@ Defaults below match **`scripts/deploy.sh`** and **`scripts/solvequest.service.e
 
 ### Schema concepts
 
-- **`accounts`**: profile, coverage stats, `sync_version`, **`sol_receive_address`**, **`custodial_derivation_index`** (HD deposit path index), optional legacy **`custodial_seckey_enc`** (decrypt-only for older rows), **`vault_activity_at`** (lock/unlock cooldown), **`qusd_vault_interest_at`** (server vault interest clock) — **not** raw QUSD columns; unlocked/locked **balances** come from the ledger.
-- **`qusd_ledger`**: append-only rows (`unlocked_delta`, `locked_delta`); **display** unlocked/locked = `SUM` of deltas. Includes **`vault_interest`** rows (positive `locked_delta`) when the server credits locked QUSD yield.
+- **`accounts`**: profile, coverage stats, `sync_version`, **`sol_receive_address`**, **`custodial_derivation_index`** (HD deposit path index), optional legacy **`custodial_seckey_enc`** (decrypt-only for older rows). Legacy columns **`vault_activity_at`** and **`qusd_vault_interest_at`** may exist on older DBs but are unused — **not** raw QUSD columns; balances come from the ledger.
+- **`qusd_ledger`**: append-only rows (`unlocked_delta`, `locked_delta`). The API merges **unlocked + locked** into a single spendable QUSD balance for clients; legacy **`vault_interest`** rows remain in historical data only.
 - **`perp_open_positions` / `perp_transactions`**: open positions and closed trade history.
 - **`deposit_credits`**, **`deposit_scan_state`**: on-chain deposit idempotency and scan watermarks.
 
@@ -191,38 +191,10 @@ After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10
 
 ---
 
-## Locked QUSD vault interest
-
-Interest applies only to **locked** QUSD (the vault), not unlocked. Constants are defined in **`src/engine/qusdVault.ts`**:
-
-| Constant | Meaning |
-|----------|--------|
-| `QUSD_DAILY_INTEREST_RATE` | `0.01` — **1% per day** (nominal). |
-| `MINUTES_PER_DAY` | `1440`. |
-| `QUSD_INTEREST_PER_MINUTE_FACTOR` | `0.01 / 1440` — per-minute fraction used in schedules below. |
-
-### Demo mode (browser)
-
-- **`App.tsx`** starts a **60s** `setInterval` when **`demo`** is true.
-- Each tick dispatches reducer action **`qusdInterestMinute`**, which adds **`locked × QUSD_INTEREST_PER_MINUTE_FACTOR`** to **`qusd.locked`** (in-memory demo state only).
-
-### Registered users (server + SQLite)
-
-- Implementation: **`plugins/vaultInterest.ts`** → **`applyLockedQusdInterest`**.
-- **Locked balance** is read from the **ledger** (`getLedgerBalances` — sum of `locked_delta` on **`qusd_ledger`**), not from a cached total on `accounts`.
-- **`accounts.qusd_vault_interest_at`** stores the timestamp used to count **elapsed full minutes** since the last accrual. If it is **null** and locked &gt; 0, the server **sets it to now** on first touch and **does not** credit yet (starts the clock).
-- For each run with at least **one** full minute elapsed: **compound** the locked balance over those minutes:  
-  **`newLocked = locked × (1 + QUSD_INTEREST_PER_MINUTE_FACTOR)^fullMinutes`**  
-  The **delta** is appended to **`qusd_ledger`** as **`entry_type = 'vault_interest'`** (`insertLockedVaultInterest` in **`server/qusdLedger.ts`**). **`qusd_vault_interest_at`** advances by `fullMinutes × 60_000` ms, **`updated_at`** and **`sync_version`** increment so the client can pull fresh balances.
-- **When it runs**: **`loadOrCreateRow(email)`** calls **`applyLockedQusdInterest`** unless **`skipInterest: true`**. Interest runs on paths such as **`GET /api/account/me`**. It is **skipped** on **`PUT /api/account/state`** (`skipInterest: true`) so accrual does not bump **`sync_version`** in the middle of the optimistic-lock update.
-
----
-
 ## Auth & sync
 
 - **Users**: email OTP via **Resend** + **JWT** cookie (`auth_token`).
-- **Account state**: client **`PUT /api/account/state`** with optimistic locking on **`sync_version`**.  
-  - Vault interest is **not** applied on that write path (`skipInterest: true`; see **Locked QUSD vault interest** above).
+- **Account state**: client **`PUT /api/account/state`** with optimistic locking on **`sync_version`**.
 - **Admin**: separate cookie session; **Solana** message sign against **`ADMIN_SOLANA_ADDRESS`**.
 
 ---
@@ -233,10 +205,9 @@ Useful when comparing to older notes or chats:
 
 | Topic | Resolution |
 |-------|------------|
-| QUSD balances | Moved to **ledger** (`qusd_ledger`); signup grant + perp margin/close + deposits + conserved vault moves only. |
-| Blind “reconcile” vault moves | Restricted to **unlocked+locked conserved** shuffles (`du + dl ≈ 0`) so bad client totals don’t mint QUSD. |
+| QUSD balances | Moved to **ledger** (`qusd_ledger`); signup grant + perp margin/close + deposits; legacy locked/unlocked columns merged for display. |
+| Legacy vault lock / interest | Removed from product; historical **`vault_interest`** ledger rows may remain. |
 | Client sync / rapid closes | **Ack** only closes included in each successful PUT; sync effect deps avoid mark ticks resetting timers; faster debounce when closes pending. |
-| `PUT` + vault interest | **`loadOrCreateRow(..., { skipInterest: true })`** on **`PUT /api/account/state`** so **`applyLockedQusdInterest`** doesn’t bump `sync_version` before the optimistic lock (see **Locked QUSD vault interest**). |
 | SQLite locking | **WAL** + **busy_timeout** on API and deposit paths. |
 | Legacy migration scripts | **`db/schema.sql` + `db:init`** for fresh DBs; **`npm run db:migrate-hd`** for additive HD column; `npm run db:migrate` prints guidance only. |
 | Browser-generated deposit keys | Removed; deposit addresses come from the server (**HD** + `ensure-custodial-deposit`). |

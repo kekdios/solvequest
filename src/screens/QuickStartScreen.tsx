@@ -10,12 +10,12 @@ const STEPS: { title: string; body: string }[] = [
   {
     title: "Know your QUSD",
     body:
-      "Perps draw from **unlocked QUSD** for margin. On **Account**, copy your Solana **deposit address**—USDC (SPL) credits as **unlocked** QUSD after on-chain confirmation. The cards show **Total**, **Unlocked**, and **Locked**; under **Vault**, **Lock** or **Unlock** QUSD for daily yield (cooldown applies). In **demo mode**, balances stay in this browser only.",
+      "Perps draw from your **QUSD** balance for margin. On **Account**, copy your Solana **deposit address**—USDC (SPL) credits as QUSD after on-chain confirmation. In **demo mode**, balances stay in this browser only.",
   },
   {
     title: "Open Perpetuals",
     body:
-      "Choose **Perpetuals** in the sidebar. The strip at the top shows **Unlocked** and **Locked** QUSD. Index prices update from Hyperliquid (live where available).",
+      "Choose **Perpetuals** in the sidebar. The strip at the top shows your **QUSD** balance. Index prices update from Hyperliquid (live where available).",
   },
   {
     title: "Pick a market",
@@ -30,12 +30,12 @@ const STEPS: { title: string; body: string }[] = [
   {
     title: "Set size and open",
     body:
-      "Enter **margin (QUSD tokens)** in the right column. Leverage is **100× (fixed)**—PnL = margin × index % move × 100. **Remaining** (margin + PnL) hits zero on a large enough adverse move (~1% vs entry at 100× long). Margin must be ≤ your **Unlocked** QUSD. Use the main action (**Up** / **Down** on the market) to open.",
+      "Enter **margin (QUSD tokens)** in the right column. Leverage is **100× (fixed)**—PnL = margin × index % move × 100. **Remaining** (margin + PnL) hits zero on a large enough adverse move (~1% vs entry at 100× long). Margin must be ≤ your **QUSD** balance. Use the main action (**Up** / **Down** on the market) to open.",
   },
   {
     title: "Manage the trade",
     body:
-      "On **Perpetuals**, your open positions appear in the table below the order form. Use **Close** to exit. Settlement is **margin + PnL** back to unlocked QUSD.",
+      "On **Perpetuals**, your open positions appear in the table below the order form. Use **Close** to exit. Settlement is **margin + PnL** back to QUSD.",
   },
 ];
 

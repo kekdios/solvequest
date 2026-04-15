@@ -38,9 +38,8 @@ export type DemoAppState = {
   marks: Record<PerpSymbol, number>;
   sessionWarnFlags: SessionWarnFlags;
   accumulatedLossesQusd: number;
-  qusd: { unlocked: number; locked: number };
+  qusd: { unlocked: number };
   bonusRepaidUsdc: number;
-  vaultActivityAt: number | null;
   /** Registered users: appended on close; entries are removed after the server ACKs that close in PUT /api/account/state. */
   pendingPerpCloses: PerpCloseSyncEvent[];
 };

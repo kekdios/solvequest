@@ -15,7 +15,6 @@ import type { DemoAppState, DemoLogEntry, PerpCloseSyncEvent } from "./lib/demoS
 import { INITIAL_SESSION_WARN_FLAGS } from "./lib/demoSessionTypes";
 import { syncEquity } from "./engine/accountCore";
 import { fetchHyperliquidMids, HL_POLL_INTERVAL_MS } from "./engine/hyperliquid";
-import { LOCKED_QUSD_COOLDOWN_MS, QUSD_INTEREST_PER_MINUTE_FACTOR } from "./engine/qusdVault";
 import {
   computeUnrealizedPnl,
   isLiquidatedAtMark,
@@ -52,9 +51,6 @@ type Action =
       leverage: number;
     }
   | { type: "perpClose"; positionId: string; reason?: "liquidation" }
-  | { type: "lockQusd"; amount: number }
-  | { type: "unlockQusd"; amount: number }
-  | { type: "qusdInterestMinute" }
   | {
       type: "hydrateFromAccountRow";
       row: PersistedAccountRow;
@@ -93,47 +89,6 @@ function reducer(state: State, action: Action): State {
         log: pushLog(log, { kind: "info", message: `Deposit +${action.amount} USDC` }),
       };
     }
-    case "lockQusd": {
-      const amount = action.amount;
-      if (amount <= 0 || amount > state.qusd.unlocked + 1e-9) return state;
-      const t = Date.now();
-      return {
-        ...state,
-        vaultActivityAt: t,
-        qusd: {
-          unlocked: state.qusd.unlocked - amount,
-          locked: state.qusd.locked + amount,
-        },
-      };
-    }
-    case "unlockQusd": {
-      const amount = action.amount;
-      if (amount <= 0 || amount > state.qusd.locked + 1e-9) return state;
-      if (
-        state.vaultActivityAt !== null &&
-        Date.now() < state.vaultActivityAt + LOCKED_QUSD_COOLDOWN_MS
-      ) {
-        return state;
-      }
-      const t = Date.now();
-      return {
-        ...state,
-        vaultActivityAt: t,
-        qusd: {
-          unlocked: state.qusd.unlocked + amount,
-          locked: state.qusd.locked - amount,
-        },
-      };
-    }
-    case "qusdInterestMinute": {
-      const { locked } = state.qusd;
-      if (locked <= 1e-12) return state;
-      const interest = locked * QUSD_INTEREST_PER_MINUTE_FACTOR;
-      return {
-        ...state,
-        qusd: { ...state.qusd, locked: locked + interest },
-      };
-    }
     case "setMarks":
       return { ...state, marks: action.marks };
     case "perpOpen": {
@@ -155,7 +110,7 @@ function reducer(state: State, action: Action): State {
       };
       return {
         ...state,
-        qusd: { ...state.qusd, unlocked: state.qusd.unlocked - tokens },
+        qusd: { unlocked: state.qusd.unlocked - tokens },
         account: syncEquity({ ...account }),
         perpPositions: [...state.perpPositions, pos],
         log: pushLog(log, {
@@ -188,7 +143,6 @@ function reducer(state: State, action: Action): State {
        * so we don’t show inflated unlocked on periodic GET /me.
        */
       const derivedUnlocked = slice.qusd.unlocked;
-      const derivedLocked = slice.qusd.locked;
       const marginPendingOnServer = pendingLocal.reduce((s, p) => s + p.marginUsdc, 0);
       const unlocked = Math.max(0, derivedUnlocked - marginPendingOnServer);
 
@@ -197,13 +151,11 @@ function reducer(state: State, action: Action): State {
         ...slice,
         qusd: {
           unlocked,
-          locked: derivedLocked,
         },
         perpPositions: positions,
         /** HL index marks come only from {@link fetchHyperliquidMids}; keep them when syncing SQLite so we never show seed prices under a "live" feed badge. */
         marks: state.marks,
         sessionWarnFlags: INITIAL_SESSION_WARN_FLAGS,
-        vaultActivityAt: slice.vaultActivityAt,
         pendingPerpCloses: action.keepLocalPendingPerpCloses ? (state.pendingPerpCloses ?? []) : [],
         log: pushLog([], {
           kind: "info",
@@ -257,7 +209,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         account: syncEquity({ ...account }),
-        qusd: { ...state.qusd, unlocked: nextUnlocked },
+        qusd: { unlocked: nextUnlocked },
         perpPositions: nextPositions,
         pendingPerpCloses: [...(state.pendingPerpCloses ?? []), closeEvt],
         log: pushLog(log, { kind: upl >= 0 ? "info" : "loss", message: msg }),
@@ -340,7 +292,7 @@ function AppInner() {
     };
   }, [demo, state]);
 
-  /** Registered: persist full trading + vault state to SQLite (debounced). Omits `marks` from deps so HL polls do not reset the timer (was delaying / losing close syncs). */
+  /** Registered: persist trading state to SQLite (debounced). Omits `marks` from deps so HL polls do not reset the timer (was delaying / losing close syncs). */
   useEffect(() => {
     if (demo || !user?.email || authLoading || !ledgerAccountRow) return;
     if (accountSyncTimer.current) clearTimeout(accountSyncTimer.current);
@@ -392,7 +344,6 @@ function AppInner() {
     state.perpPositions,
     state.pendingPerpCloses,
     state.qusd.unlocked,
-    state.qusd.locked,
     state.account.balance,
     state.account.plan.coverageLimit,
     state.account.premiumAccrued,
@@ -400,7 +351,6 @@ function AppInner() {
     state.account.coverageUsed,
     state.accumulatedLossesQusd,
     state.bonusRepaidUsdc,
-    state.vaultActivityAt,
   ]);
 
   useEffect(() => {
@@ -616,23 +566,6 @@ function AppInner() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  /** 1% / day on locked QUSD; demo: credit every minute in-browser. Registered: server compounds on GET /api/account/me. */
-  useEffect(() => {
-    if (!demo) return;
-    const id = window.setInterval(() => {
-      dispatch({ type: "qusdInterestMinute" });
-    }, 60_000);
-    return () => window.clearInterval(id);
-  }, [demo]);
-
-  const lockQusd = useCallback((amount: number) => {
-    dispatch({ type: "lockQusd", amount });
-  }, []);
-
-  const unlockQusd = useCallback((amount: number) => {
-    dispatch({ type: "unlockQusd", amount });
-  }, []);
-
   const [hlFeedStatus, setHlFeedStatus] = useState<"connecting" | "live" | "error">("connecting");
   const [hlFeedError, setHlFeedError] = useState<string | null>(null);
 
@@ -812,7 +745,6 @@ function AppInner() {
               }}
               onNavigateToAccount={() => setScreen("account")}
               qusdUnlocked={state.qusd.unlocked}
-              qusdLocked={state.qusd.locked}
             />
           )}
 
@@ -822,10 +754,6 @@ function AppInner() {
               serverDepositAddress={ledgerAccountRow?.sol_receive_address?.trim() || null}
               depositAddressError={ledgerHydrationError}
               qusdUnlocked={state.qusd.unlocked}
-              qusdLocked={state.qusd.locked}
-              onLockQusd={lockQusd}
-              onUnlockQusd={unlockQusd}
-              vaultActivityAt={state.vaultActivityAt}
             />
           )}
         </main>

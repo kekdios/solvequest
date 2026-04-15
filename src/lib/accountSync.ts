@@ -9,12 +9,10 @@ export type AccountStatePutBody = {
   premium_accrued_usdc: number;
   covered_losses_qusd: number;
   coverage_used_qusd: number;
-  /** Stored pool: display unlocked + margin in open positions. */
+  /** Spendable QUSD (same convention as server ledger merge). */
   qusd_unlocked: number;
-  qusd_locked: number;
   accumulated_losses_qusd: number;
   bonus_repaid_usdc: number;
-  vault_activity_at: number | null;
   open_perp_positions: PerpPosition[];
   /** Append-only closes to persist in `perp_transactions` (client removes only ACK'd ids after each successful PUT). */
   perp_close_events: PerpCloseSyncEvent[];
@@ -32,10 +30,8 @@ export function buildAccountStatePutBody(state: DemoAppState, syncVersion: numbe
     covered_losses_qusd: state.account.coveredLosses,
     coverage_used_qusd: state.account.coverageUsed,
     qusd_unlocked: state.qusd.unlocked,
-    qusd_locked: state.qusd.locked,
     accumulated_losses_qusd: state.accumulatedLossesQusd,
     bonus_repaid_usdc: state.bonusRepaidUsdc,
-    vault_activity_at: state.vaultActivityAt,
     open_perp_positions: state.perpPositions,
     perp_close_events: state.pendingPerpCloses,
   };

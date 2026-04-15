@@ -30,7 +30,6 @@ type Props = {
   };
   onNavigateToAccount: () => void;
   qusdUnlocked: number;
-  qusdLocked: number;
 };
 
 function directionLabel(side: "long" | "short"): "Up" | "Down" {
@@ -45,7 +44,6 @@ export default function PerpsTradeScreen({
   priceFeed,
   onNavigateToAccount,
   qusdUnlocked,
-  qusdLocked,
 }: Props) {
   const [symbol, setSymbol] = useState<PerpSymbol>("BTC-PERP");
   const [side, setSide] = useState<"long" | "short">("long");
@@ -97,22 +95,13 @@ export default function PerpsTradeScreen({
 
   return (
     <div style={s.wrap}>
-      <div style={s.qusdPageStrip} aria-label="QUSD vault balances">
+      <div style={s.qusdPageStrip} aria-label="QUSD balance">
         <QusdIcon size={18} />
         <span style={s.qusdPageStripInner}>
-          <span>Unlocked</span>{" "}
+          <span>QUSD</span>{" "}
           <strong style={{ color: "var(--text)" }} className="mono">
             {formatUsd(qusdUnlocked)}
-          </strong>{" "}
-          <span style={s.qusdPageStripQ}>QUSD</span>
-        </span>
-        <span style={s.qusdPageStripSep}>·</span>
-        <span style={s.qusdPageStripInner}>
-          <span>Locked</span>{" "}
-          <strong style={{ color: "var(--warn)" }} className="mono">
-            {formatUsd(qusdLocked)}
-          </strong>{" "}
-          <span style={s.qusdPageStripQ}>QUSD</span>
+          </strong>
         </span>
       </div>
       <div className="perps-layout">
@@ -268,7 +257,7 @@ export default function PerpsTradeScreen({
             </p>
           ) : null}
           {feedLive && margin > qusdUnlocked + 1e-9 && allocateQusd > 0 ? (
-            <p style={s.warn}>Allocate at most {formatUsd(qusdUnlocked)} QUSD (unlocked balance).</p>
+            <p style={s.warn}>Allocate at most {formatUsd(qusdUnlocked)} QUSD.</p>
           ) : null}
         </div>
       </div>
