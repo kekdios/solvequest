@@ -18,28 +18,6 @@ function IconChart({ className }: { className?: string }) {
   );
 }
 
-function IconChip({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="4" y="7" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M8 11h2M14 11h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconShield({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 3 5 6v6c0 5 3.5 8.5 7 10 3.5-1.5 7-5 7-10V6l-7-3Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function IconSpark({ className }: { className?: string }) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -187,40 +165,11 @@ export default function LandingPage({ onStartNow }: Props) {
           </div>
           <div className="lp-feature">
             <span className="lp-feature-icon" aria-hidden>
-              <IconChip />
-            </span>
-            <div>
-              <h3>AI-Powered Trading</h3>
-              <p>Advanced models analyze market movements 24/7</p>
-            </div>
-          </div>
-          <div className="lp-feature">
-            <span className="lp-feature-icon" aria-hidden>
-              <IconShield />
-            </span>
-            <div>
-              <h3>Risk-aware design</h3>
-              <p>See unrealized PnL and liquidation-style remaining balance before you close</p>
-            </div>
-          </div>
-          <div className="lp-feature">
-            <span className="lp-feature-icon" aria-hidden>
               <IconSpark />
             </span>
             <div>
               <h3>No Experience Needed</h3>
               <p>Beginner-friendly. No complex trading knowledge required</p>
-            </div>
-          </div>
-          <div className="lp-feature lp-feature--wide">
-            <span className="lp-feature-icon lp-feature-icon--img" aria-hidden>
-              <img src="/icon-qusd.png" alt="" width={22} height={22} />
-            </span>
-            <div>
-              <h3>QUSD balance</h3>
-              <p>
-                Deposit USDC on Solana to credit QUSD, allocate margin to perps, and track settlement in one ledger.
-              </p>
             </div>
           </div>
         </div>
@@ -237,41 +186,28 @@ export default function LandingPage({ onStartNow }: Props) {
           <ul>
             <li>Allocation is QUSD from your balance</li>
             <li>Closing settles margin + PnL back to QUSD</li>
-            <li>Past performance does not guarantee future results—this is a demo-style experience</li>
+            <li>Past performance does not guarantee future results</li>
           </ul>
         </div>
       </section>
 
-      <section className="lp-section" aria-labelledby="lp-live-heading">
-        <h2 id="lp-live-heading" className="lp-section-title">
-          Live Results
-        </h2>
-        <div className="lp-stats">
-          <div className="lp-stat">
-            <div className="lp-stat-value">1.2% – 2.8%</div>
-            <div className="lp-stat-label">Average daily return</div>
-          </div>
-          <div className="lp-stat">
-            <div className="lp-stat-value">87%</div>
-            <div className="lp-stat-label">Success Rate</div>
-          </div>
-          <div className="lp-stat">
-            <div className="lp-stat-value">Thousands</div>
-            <div className="lp-stat-label">Successful Trades</div>
-          </div>
-        </div>
-      </section>
-
       <section className="lp-cta-block" aria-labelledby="lp-final-cta-heading">
-        <h2 id="lp-final-cta-heading">Start Earning in Minutes</h2>
-        <p className="lp-cta-steps">Deposit → Activate AI → Watch Your Balance Grow</p>
-        <p className="lp-cta-lock">
-          Lock your QUSD for <strong>1% daily interest</strong>—stack yield alongside AI-driven trades.
+        <h2 id="lp-final-cta-heading">Start Trading in Minutes</h2>
+        <p className="lp-cta-steps">
+          Verify Account Info → Collect Bonus QUSD → Trade → Watch Your Balance Grow
         </p>
         <button type="button" className="lp-btn-primary" onClick={onStartNow}>
           Start Now
         </button>
-        <p className="lp-urgency">Limited Spots Available — AI capacity is restricted to ensure performance</p>
+        <p className="lp-urgency lp-urgency--prize">
+          <span className="lp-urgency-lead">Get Verified to Compete -</span>{" "}
+          <span className="lp-urgency-prize">
+            <img src="/prize-usdc.png" alt="" className="lp-urgency-usdc" width={26} height={26} decoding="async" />
+            <span>
+              ${usdPart} USDC is waiting to be claimed.
+            </span>
+          </span>
+        </p>
       </section>
     </div>
   );
