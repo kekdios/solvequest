@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+
+const PURCHASE_STEPS = [
+  "Validating your session and QUSD balance",
+  "Connecting to Solana (treasury & QUEST mint)",
+  "Reserving QUSD on your account",
+  "Sending QUEST to your verified wallet",
+] as const;
 import { uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
 import { QusdIcon } from "../Qusd";
 import { isDemoMode, useAuthMode } from "../auth/sessionAuth";
@@ -50,8 +57,26 @@ export default function QusdSellScreen({
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [qusdDraft, setQusdDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [purchaseStep, setPurchaseStep] = useState(1);
   const [sellErr, setSellErr] = useState<string | null>(null);
+  const [sellErrDetail, setSellErrDetail] = useState<string | null>(null);
   const [sellOk, setSellOk] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!busy) {
+      setPurchaseStep(1);
+      return;
+    }
+    setPurchaseStep(1);
+    const t2 = window.setTimeout(() => setPurchaseStep(2), 400);
+    const t3 = window.setTimeout(() => setPurchaseStep(3), 1000);
+    const t4 = window.setTimeout(() => setPurchaseStep(4), 2200);
+    return () => {
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      window.clearTimeout(t4);
+    };
+  }, [busy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +121,7 @@ export default function QusdSellScreen({
   const submitSell = useCallback(async () => {
     if (demo || busy) return;
     setSellErr(null);
+    setSellErrDetail(null);
     setSellOk(null);
     const q = Number.parseFloat(qusdDraft.replace(/,/g, ""));
     if (!Number.isFinite(q) || q <= 0) {
@@ -117,25 +143,36 @@ export default function QusdSellScreen({
       const j = (await r.json().catch(() => ({}))) as {
         message?: string;
         error?: string;
+        detail?: string;
         signature?: string;
         quest_amount?: number;
       };
       if (!r.ok) {
-        setSellErr(j.message || j.error || `Request failed (${r.status})`);
+        const primary =
+          j.message ||
+          (typeof j.error === "string"
+            ? j.error.replace(/_/g, " ")
+            : `Something went wrong (${r.status}).`);
+        setSellErr(primary);
+        setSellErrDetail(typeof j.detail === "string" && j.detail.trim() ? j.detail.trim() : null);
         return;
       }
       const sig = j.signature;
       const qa = j.quest_amount;
+      const baseMsg =
+        j.message ||
+        (sig
+          ? `Sent ${qa != null ? `${qa} QUEST` : "QUEST"} to your wallet.`
+          : "Purchase completed.");
       setSellOk(
-        sig
-          ? `Sent ${qa != null ? `${qa} QUEST` : "QUEST"} — signature ${sig.slice(0, 12)}…`
-          : "Purchase completed.",
+        sig ? `${baseMsg} Transaction: ${sig.slice(0, 12)}…${sig.slice(-8)}` : baseMsg,
       );
       setQusdDraft("");
       await refreshMe();
       await onRefreshAccount?.();
     } catch (e) {
-      setSellErr(e instanceof Error ? e.message : "Network error");
+      setSellErr(e instanceof Error ? e.message : "Network error — check your connection and try again.");
+      setSellErrDetail(null);
     } finally {
       setBusy(false);
     }
@@ -243,25 +280,95 @@ export default function QusdSellScreen({
           </p>
         ) : null}
 
-        {sellErr ? (
-          <p role="alert" style={{ marginTop: 12, color: "var(--danger)", fontSize: 14 }}>
-            {sellErr}
-          </p>
-        ) : null}
-        {sellOk ? (
-          <p role="status" style={{ marginTop: 12, color: "var(--ok)", fontSize: 14 }}>
-            {sellOk}
-          </p>
-        ) : null}
-
         <button
           type="button"
           style={{ ...uiBtnPrimary, marginTop: 14, opacity: busy || !solReceiveVerified ? 0.6 : 1 }}
           disabled={busy || !solReceiveVerified}
           onClick={() => void submitSell()}
         >
-          {busy ? "Processing…" : "Buy QUEST"}
+          {busy ? "Working…" : "Buy QUEST"}
         </button>
+
+        {busy ? (
+          <div
+            style={{
+              marginTop: 14,
+              padding: "12px 14px",
+              borderRadius: 8,
+              background: "color-mix(in srgb, var(--accent) 8%, var(--panel))",
+              border: "1px solid var(--border)",
+            }}
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
+              Progress
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+              {PURCHASE_STEPS.map((label, i) => {
+                const n = i + 1;
+                const done = purchaseStep > n;
+                const active = purchaseStep === n;
+                return (
+                  <li
+                    key={label}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 10,
+                      fontSize: 13,
+                      lineHeight: 1.45,
+                      marginTop: i > 0 ? 8 : 0,
+                      color: done ? "var(--ok)" : active ? "var(--text)" : "var(--muted)",
+                      fontWeight: active ? 600 : 400,
+                    }}
+                  >
+                    <span
+                      className="mono"
+                      style={{
+                        flexShrink: 0,
+                        width: 22,
+                        textAlign: "center",
+                        opacity: active ? 1 : 0.85,
+                      }}
+                      aria-hidden
+                    >
+                      {done ? "✓" : active ? "→" : "○"}
+                    </span>
+                    <span>{label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ) : null}
+
+        {sellErr ? (
+          <div role="alert" style={{ marginTop: 12 }}>
+            <p style={{ color: "var(--danger)", fontSize: 14, margin: 0, lineHeight: 1.5 }}>{sellErr}</p>
+            {sellErrDetail ? (
+              <details style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
+                <summary style={{ cursor: "pointer", userSelect: "none" }}>Technical details</summary>
+                <pre
+                  style={{
+                    margin: "8px 0 0",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-all",
+                    fontSize: 11,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {sellErrDetail}
+                </pre>
+              </details>
+            ) : null}
+          </div>
+        ) : null}
+        {sellOk ? (
+          <p role="status" style={{ marginTop: 12, color: "var(--ok)", fontSize: 14 }}>
+            {sellOk}
+          </p>
+        ) : null}
       </div>
     </div>
   );

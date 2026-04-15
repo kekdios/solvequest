@@ -34,6 +34,10 @@ import {
   sendQuestFromTreasuryToUser,
 } from "../server/qusdSellTransfer";
 import { resolveTreasurySigningKeypair } from "../server/treasurySigningKeypair";
+import {
+  formatQuestTransferFailureMessage,
+  formatTreasuryPreflightMessage,
+} from "../server/qusdSellErrors";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -168,7 +172,10 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
     }
 
     if (!jwtOk) {
-      sendJson(res, 503, { error: "auth_not_configured" });
+      sendJson(res, 503, {
+        error: "auth_not_configured",
+        message: "Sign-in is not configured on this server (JWT_SECRET).",
+      });
       return;
     }
 
@@ -243,18 +250,27 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
       void (async () => {
         const token = parseCookies(req.headers.cookie)[USER_COOKIE];
         if (!token) {
-          sendJson(res, 401, { error: "Not authenticated" });
+          sendJson(res, 401, {
+            error: "not_authenticated",
+            message: "Sign in to buy QUEST.",
+          });
           return;
         }
         let payload: { email?: string };
         try {
           payload = jwt.verify(token, jwtSecret!) as { email?: string };
         } catch {
-          sendJson(res, 401, { error: "Invalid token" });
+          sendJson(res, 401, {
+            error: "invalid_token",
+            message: "Your session expired or is invalid. Sign in again.",
+          });
           return;
         }
         if (!payload.email || typeof payload.email !== "string") {
-          sendJson(res, 401, { error: "Invalid token" });
+          sendJson(res, 401, {
+            error: "invalid_token",
+            message: "Your session expired or is invalid. Sign in again.",
+          });
           return;
         }
 
@@ -264,20 +280,28 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
         } catch (e) {
           sendJson(res, 400, {
             error: "invalid_body",
-            message: e instanceof Error ? e.message : String(e),
+            message:
+              "Invalid request. Enter a valid positive number for QUSD amount. " +
+              (e instanceof Error ? e.message : String(e)),
           });
           return;
         }
 
         const questMintStr = (env.QUEST_MINT ?? "").trim();
         if (!questMintStr) {
-          sendJson(res, 503, { error: "quest_mint_not_configured" });
+          sendJson(res, 503, {
+            error: "quest_mint_not_configured",
+            message: "QUEST token is not configured (set QUEST_MINT on the server).",
+          });
           return;
         }
 
         const multiplier = parseEnvNumber(env.QUEST_MULTIPLIER, 1000);
         if (multiplier <= 0) {
-          sendJson(res, 503, { error: "invalid_quest_multiplier" });
+          sendJson(res, 503, {
+            error: "invalid_quest_multiplier",
+            message: "Server misconfiguration: QUEST_MULTIPLIER must be a positive number.",
+          });
           return;
         }
 
@@ -294,12 +318,18 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
         try {
           const row = loadOrCreateRow(payload.email.toLowerCase());
           if (!row?.id) {
-            sendJson(res, 503, { error: "no_account" });
+            sendJson(res, 503, {
+              error: "no_account",
+              message: "Account not found. Try signing out and signing in again.",
+            });
             return;
           }
           const database = getDb();
           if (!database) {
-            sendJson(res, 503, { error: "db_missing" });
+            sendJson(res, 503, {
+              error: "db_missing",
+              message: "Service is temporarily unavailable (database). Try again shortly.",
+            });
             return;
           }
           const accountId = String(row.id);
@@ -307,13 +337,17 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
           if (verifiedAt == null) {
             sendJson(res, 403, {
               error: "sol_address_not_verified",
-              message: "Verify your Solana address on the Account page before selling QUSD for QUEST.",
+              message:
+                "Verify your Solana wallet on the Account page first — QUEST is sent to that address.",
             });
             return;
           }
           const userAddrStr = (row.sol_receive_address as string | null | undefined)?.trim();
           if (!userAddrStr) {
-            sendJson(res, 400, { error: "missing_sol_receive_address" });
+            sendJson(res, 400, {
+              error: "missing_sol_receive_address",
+              message: "No receive address on file. Add and verify your Solana address on the Account page.",
+            });
             return;
           }
 
@@ -321,7 +355,10 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
           try {
             userOwner = new PublicKey(userAddrStr);
           } catch {
-            sendJson(res, 400, { error: "invalid_stored_address" });
+            sendJson(res, 400, {
+              error: "invalid_stored_address",
+              message: "Stored wallet address is invalid. Contact support to fix your account.",
+            });
             return;
           }
 
@@ -330,14 +367,17 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
           if (spendable + 1e-9 < qusdAmount) {
             sendJson(res, 400, {
               error: "insufficient_qusd",
-              message: `Insufficient QUSD (have ${spendable.toFixed(2)}, need ${qusdAmount}).`,
+              message: `Not enough QUSD for this purchase. You have ${spendable.toFixed(2)} QUSD; this order needs ${qusdAmount.toFixed(2)} QUSD.`,
             });
             return;
           }
 
           const treasuryResolved = resolveTreasurySigningKeypair(env);
           if (!treasuryResolved.ok) {
-            sendJson(res, 503, { error: "treasury_key", message: treasuryResolved.reason });
+            sendJson(res, 503, {
+              error: "treasury_key",
+              message: `Treasury signing key is not configured correctly: ${treasuryResolved.reason}`,
+            });
             return;
           }
           const treasuryKp = treasuryResolved.keypair;
@@ -347,7 +387,11 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
 
           const mintInfo = await connection.getAccountInfo(questMintPk, "confirmed");
           if (!mintInfo) {
-            sendJson(res, 503, { error: "quest_mint_chain_missing" });
+            sendJson(res, 503, {
+              error: "quest_mint_chain_missing",
+              message:
+                "QUEST mint was not found on Solana. Check QUEST_MINT and that your RPC can see mainnet.",
+            });
             return;
           }
           const tokenProgram = mintInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
@@ -356,13 +400,19 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
           const mintMeta = await getMint(connection, questMintPk, "confirmed", tokenProgram);
           const amountRaw = questHumanToRaw(questHuman, mintMeta.decimals);
           if (amountRaw <= 0n) {
-            sendJson(res, 400, { error: "quest_raw_zero" });
+            sendJson(res, 400, {
+              error: "quest_raw_zero",
+              message: "This amount is too small for the QUEST token’s decimal precision. Try a slightly larger QUSD amount.",
+            });
             return;
           }
 
           const ataOk = await ensureTreasuryQuestAta(connection, treasuryKp, questMintPk);
           if (!ataOk.ok) {
-            sendJson(res, 503, { error: "treasury_quest_ata", message: ataOk.reason });
+            sendJson(res, 503, {
+              error: "treasury_quest_ata",
+              message: ataOk.reason,
+            });
             return;
           }
 
@@ -375,7 +425,12 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
             amountRaw,
           );
           if (!pre.ok) {
-            sendJson(res, 400, { error: "treasury_preflight_failed", message: pre.reason });
+            console.error("[qusd-sell-api] preflight:", pre.reason);
+            sendJson(res, 400, {
+              error: "treasury_preflight_failed",
+              message: formatTreasuryPreflightMessage(pre.reason),
+              detail: pre.reason,
+            });
             return;
           }
 
@@ -399,6 +454,7 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
           );
 
           if (!sent.ok) {
+            console.error("[qusd-sell-api] quest transfer:", sent.reason);
             const refundAt = Date.now();
             const runRefund = database.transaction(() => {
               insertQuestPurchaseRefund(database, accountId, qusdAmount, buyId, refundAt);
@@ -409,7 +465,8 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
             runRefund();
             sendJson(res, 502, {
               error: "quest_transfer_failed",
-              message: sent.reason,
+              message: formatQuestTransferFailureMessage(sent.reason),
+              detail: sent.reason,
               buy_id: buyId,
             });
             return;
@@ -422,12 +479,15 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
             quest_amount: questHuman,
             quest_raw: amountRaw.toString(),
             buy_id: buyId,
+            message: "QUEST sent to your verified wallet.",
           });
         } catch (e) {
           console.error("[qusd-sell-api] POST /api/qusd/sell:", e);
           sendJson(res, 500, {
             error: "qusd_sell_failed",
-            message: e instanceof Error ? e.message : String(e),
+            message:
+              "Something went wrong completing your purchase. Your QUSD was not charged — try again in a moment.",
+            detail: e instanceof Error ? e.message : String(e),
           });
         }
       })();
