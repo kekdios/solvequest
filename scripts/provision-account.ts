@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Inserts a new account row + signup QUSD ledger + HD-derived Solana deposit address (same scheme as ensure-custodial-deposit).
- * Env: SOLANA_CUSTODIAL_MASTER_KEY_B64 (server-only)
+ * Inserts a new account row + QUSD bonus + random Solana pubkey (dev provisioning only).
  * Usage: npx tsx scripts/provision-account.ts [path/to/db.sqlite]
  */
 import crypto from "node:crypto";
@@ -9,13 +8,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import Database from "better-sqlite3";
-import {
-  deriveCustodialKeypairFromIndex,
-  RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX,
-} from "../server/custodialHdDerive";
+import { Keypair } from "@solana/web3.js";
 import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
-
-const SIGNUP_GRANT = 10_000;
+import { ADDRESS_VERIFICATION_BONUS_QUSD } from "../server/qusdLedger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
@@ -29,14 +24,7 @@ const now = Date.now();
 const db = new Database(outPath);
 try {
   ensureCustodialHdSchema(db);
-  const maxRow = db
-    .prepare(`SELECT COALESCE(MAX(custodial_derivation_index), -1) AS m FROM accounts`)
-    .get() as { m: number };
-  let nextIndex = maxRow.m + 1;
-  if (nextIndex === RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX) {
-    nextIndex += 1;
-  }
-  const kp = deriveCustodialKeypairFromIndex(nextIndex, process.env);
+  const kp = Keypair.generate();
   const solAddr = kp.publicKey.toBase58();
 
   db.prepare(
@@ -44,12 +32,12 @@ try {
       id, created_at, updated_at, email,
       usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd, coverage_used_qusd,
       tier_id, accumulated_losses_qusd, bonus_repaid_usdc, vault_activity_at, qusd_vault_interest_at, sync_version,
-      sol_receive_address, custodial_derivation_index
+      sol_receive_address, sol_receive_verified_at
     ) VALUES (
       @id, @created_at, @updated_at, NULL,
       0, @coverage_limit_qusd, 0, 0, 0,
       @tier_id, 0, 0, NULL, NULL, 0,
-      @sol_receive_address, @custodial_derivation_index
+      @sol_receive_address, @sol_receive_verified_at
     )`,
   ).run({
     id,
@@ -58,15 +46,14 @@ try {
     coverage_limit_qusd: 50_000,
     tier_id: 3,
     sol_receive_address: solAddr,
-    custodial_derivation_index: nextIndex,
+    sol_receive_verified_at: now,
   });
   db.prepare(
     `INSERT INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
-     VALUES (?, ?, 'signup_grant', ?, 0, 'signup', 'grant')`,
-  ).run(id, now, SIGNUP_GRANT);
+     VALUES (?, ?, 'address_verify_bonus', ?, 0, 'address_verify', 'bonus')`,
+  ).run(id, now, ADDRESS_VERIFICATION_BONUS_QUSD);
   console.log(`OK: provisioned account ${id}`);
-  console.log(`  HD index: ${nextIndex}`);
-  console.log(`  Solana: ${solAddr}`);
+  console.log(`  Solana (dev keypair — fund this address to test deposits): ${solAddr}`);
 } finally {
   db.close();
 }

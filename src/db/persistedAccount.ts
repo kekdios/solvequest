@@ -20,6 +20,8 @@ export type PersistedAccountRow = {
   bonus_repaid_usdc?: number;
   vault_activity_at?: number | null;
   sol_receive_address: string | null;
+  /** Set after the user passes on-chain verification (address cannot be changed). */
+  sol_receive_verified_at?: number | null;
   /** Optimistic concurrency with PUT /api/account/state and deposit worker. */
   sync_version?: number;
   /** Present on GET /api/account/me JSON only (joined from `perp_open_positions`). */

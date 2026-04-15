@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   vault_activity_at INTEGER,
   qusd_vault_interest_at INTEGER,
   sol_receive_address TEXT,
+  /** Set when the user completed on-chain verification (address locked after this). */
+  sol_receive_verified_at INTEGER,
   custodial_seckey_enc TEXT,
   /** HD path index m/44'/501'/<n>'/0'; null for legacy encrypted-only or pre-HD rows. */
   custodial_derivation_index INTEGER,

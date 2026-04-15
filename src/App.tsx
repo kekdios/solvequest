@@ -257,7 +257,7 @@ function AppInner() {
   const demo = isDemoMode(authMode);
 
   const [ledgerAccountRow, setLedgerAccountRow] = useState<PersistedAccountRow | null>(null);
-  /** Set when ensure-custodial or GET /api/account/me fails; shown on Account deposit UI. */
+  /** Set when GET /api/account/me fails; shown on Account deposit UI. */
   const [ledgerHydrationError, setLedgerHydrationError] = useState<string | null>(null);
 
   const clearSessionAndLedger = useCallback(async () => {
@@ -279,6 +279,29 @@ function AppInner() {
   const accountSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Server `sync_version` — must match PUT /api/account/state; deposit worker bumps it too. */
   const syncVersionRef = useRef(0);
+
+  const refreshAccountFromServer = useCallback(async () => {
+    try {
+      const r = await fetch("/api/account/me", { credentials: "include" });
+      if (r.status === 401) {
+        await clearSessionAndLedger();
+        return;
+      }
+      if (!r.ok) return;
+      const data = (await r.json()) as PersistedAccountRow;
+      setLedgerHydrationError(null);
+      setLedgerAccountRow(data);
+      syncVersionRef.current = Number(data.sync_version ?? 0);
+      dispatch({
+        type: "hydrateFromAccountRow",
+        row: data,
+        keepLocalPendingPerpCloses: true,
+        mergeUnsyncedLocalOpens: true,
+      });
+    } catch {
+      /* ignore */
+    }
+  }, [clearSessionAndLedger]);
 
   useEffect(() => {
     if (!demo) return;
@@ -392,23 +415,6 @@ function AppInner() {
     void (async () => {
       setLedgerHydrationError(null);
       try {
-        const encRes = await fetch("/api/account/ensure-custodial-deposit", {
-          method: "POST",
-          credentials: "include",
-        });
-        if (encRes.status === 401) {
-          if (!cancelled) await clearSessionAndLedger();
-          return;
-        }
-        let ensureErr: string | null = null;
-        if (!encRes.ok) {
-          try {
-            const j = (await encRes.json()) as { message?: string; error?: string };
-            ensureErr = j.message || j.error || `ensure-custodial-deposit failed (${encRes.status})`;
-          } catch {
-            ensureErr = `ensure-custodial-deposit failed (${encRes.status})`;
-          }
-        }
         const r = await fetch("/api/account/me", { credentials: "include" });
         if (r.status === 401) {
           if (!cancelled) await clearSessionAndLedger();
@@ -431,15 +437,7 @@ function AppInner() {
         }
         const data = (await r.json()) as PersistedAccountRow;
         if (cancelled) return;
-        const addr = data.sol_receive_address?.trim() ?? "";
-        if (!addr) {
-          setLedgerHydrationError(
-            ensureErr ??
-              "No deposit address assigned. Set SOLANA_CUSTODIAL_MASTER_KEY_B64 on the server, ensure the DB has custodial columns (npm run db:migrate-hd), then reload.",
-          );
-        } else {
-          setLedgerHydrationError(null);
-        }
+        setLedgerHydrationError(null);
         setLedgerAccountRow(data);
         syncVersionRef.current = Number(data.sync_version ?? 0);
         dispatch({
@@ -752,8 +750,10 @@ function AppInner() {
             <AccountScreen
               isDemo={demo}
               serverDepositAddress={ledgerAccountRow?.sol_receive_address?.trim() || null}
+              solReceiveVerified={ledgerAccountRow?.sol_receive_verified_at != null}
               depositAddressError={ledgerHydrationError}
               qusdUnlocked={state.qusd.unlocked}
+              onRefreshAccount={refreshAccountFromServer}
             />
           )}
         </main>

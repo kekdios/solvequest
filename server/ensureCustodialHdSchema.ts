@@ -23,4 +23,25 @@ export function ensureCustodialHdSchema(database: SqliteDb): void {
       ON accounts (custodial_derivation_index)
       WHERE custodial_derivation_index IS NOT NULL;
   `);
+
+  const hasVerifiedAt = cols.some((c) => c.name === "sol_receive_verified_at");
+  if (!hasVerifiedAt) {
+    database.exec(`ALTER TABLE accounts ADD COLUMN sol_receive_verified_at INTEGER;`);
+    console.log("[sqlite] Added column accounts.sol_receive_verified_at");
+  }
+
+  /** Legacy server-assigned HD (or encrypted) deposit addresses count as verified — no duplicate QUSD bonus. */
+  try {
+    database.exec(`
+      UPDATE accounts SET sol_receive_verified_at = COALESCE(updated_at, created_at)
+      WHERE sol_receive_verified_at IS NULL
+        AND TRIM(COALESCE(sol_receive_address, '')) != ''
+        AND (
+          custodial_derivation_index IS NOT NULL
+          OR (custodial_seckey_enc IS NOT NULL AND TRIM(custodial_seckey_enc) != '')
+        );
+    `);
+  } catch {
+    /* older DBs without custodial columns */
+  }
 }

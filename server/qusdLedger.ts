@@ -6,6 +6,8 @@ import type Database from "better-sqlite3";
 type SqliteDb = InstanceType<typeof Database>;
 
 export const SIGNUP_GRANT_QUSD = 10_000;
+/** One-time credit after the user verifies their own Solana address on-chain. */
+export const ADDRESS_VERIFICATION_BONUS_QUSD = 10_000;
 
 export function getLedgerBalances(
   database: SqliteDb,
@@ -30,6 +32,16 @@ export function insertSignupGrant(database: SqliteDb, accountId: string, at: num
        VALUES (?, ?, 'signup_grant', ?, 0, 'signup', 'grant')`,
     )
     .run(accountId, at, SIGNUP_GRANT_QUSD);
+}
+
+/** Idempotent: one bonus per account (registration reward after address verification). */
+export function insertAddressVerificationBonus(database: SqliteDb, accountId: string, at: number): void {
+  database
+    .prepare(
+      `INSERT OR IGNORE INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
+       VALUES (?, ?, 'address_verify_bonus', ?, 0, 'address_verify', 'bonus')`,
+    )
+    .run(accountId, at, ADDRESS_VERIFICATION_BONUS_QUSD);
 }
 
 export function insertSolanaUsdcCredit(

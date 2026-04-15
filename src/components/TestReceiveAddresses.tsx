@@ -24,15 +24,18 @@ function QrIcon({ size = 18 }: { size?: number }) {
 }
 
 type Props = {
-  /** Server-derived custodial address (HD from master key); no browser keypair. */
+  /** User-verified Solana receive address from the server. */
   serverDepositAddress?: string | null;
   /** When set and there is no address yet, show this instead of an endless “Loading…”. */
   depositAddressError?: string | null;
+  /** When true, skip the “loading address” placeholder (parent already collected the address). */
+  addressReady?: boolean;
 };
 
 export default function TestReceiveAddresses({
   serverDepositAddress = null,
   depositAddressError = null,
+  addressReady = false,
 }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
@@ -114,8 +117,10 @@ export default function TestReceiveAddresses({
             {copied ? <span style={s.copied}>Copied</span> : null}
           </div>
         </>
-      ) : depositAddressError ? null : (
-        <p style={s.muted}>Loading your custodial deposit address…</p>
+      ) : depositAddressError ? null : addressReady ? (
+        <p style={s.muted}>No deposit address to display.</p>
+      ) : (
+        <p style={s.muted}>Loading deposit address…</p>
       )}
 
       {qrOpen && solAddress ? (

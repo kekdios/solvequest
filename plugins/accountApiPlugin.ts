@@ -12,20 +12,15 @@ import type { Plugin } from "vite";
 import { loadEnv } from "vite";
 import jwt from "jsonwebtoken";
 import Database from "better-sqlite3";
-import { Keypair, PublicKey } from "@solana/web3.js";
-import {
-  deriveCustodialKeypairFromIndex,
-  RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX,
-} from "../server/custodialHdDerive";
-import { getUsdcAta, MAINNET_USDC_MINT } from "../server/solanaUsdcScan";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
 import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
 import {
   getLedgerBalances,
+  insertAddressVerificationBonus,
   insertPerpCloseSettlement,
   insertPerpMarginLock,
-  insertSignupGrant,
 } from "../server/qusdLedger";
 
 type SqliteDb = InstanceType<typeof Database>;
@@ -62,6 +57,25 @@ const perpCloseEventPutZ = z.object({
   realizedPnlQusd: z.number().finite(),
   closedAt: z.number(),
 });
+
+const verifySolanaAddressBodyZ = z.object({
+  address: z
+    .string()
+    .max(100)
+    .transform((s) => s.trim())
+    .pipe(z.string().min(1)),
+});
+
+/** On-chain check: account must hold at least this much SOL (lamports). */
+const MIN_SOL_LAMPORTS_FOR_VERIFY = 100_000;
+
+function accountRpcUrl(env: Record<string, string>): string {
+  return (
+    env.SOLANA_RPC_URL?.trim() ||
+    env.SOLANA_RPC_PROXY_TARGET?.trim() ||
+    "https://api.mainnet-beta.solana.com"
+  );
+}
 
 const accountStatePutZ = z.object({
   sync_version: z.number().int().min(0),
@@ -212,7 +226,6 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           ) VALUES (?, ?, ?, ?, 0, ?, 0, 0, 0, ?, 0, 0, NULL, NULL, 0)`,
         )
         .run(id, now, now, email, DEFAULT_COVERAGE_LIMIT_QUSD, DEFAULT_TIER_ID);
-      insertSignupGrant(database, id, now);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("no column named email") || msg.includes("no such table: qusd_ledger")) {
@@ -378,7 +391,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       return;
     }
 
-    if (req.method === "POST" && url === "/api/account/ensure-custodial-deposit") {
+    if (req.method === "POST" && url === "/api/account/verify-solana-address") {
       void (async () => {
         const token = parseCookies(req.headers.cookie)[USER_COOKIE];
         if (!token) {
@@ -396,8 +409,29 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
           sendJson(res, 401, { error: "Invalid token" });
           return;
         }
+        let body: z.infer<typeof verifySolanaAddressBodyZ>;
         try {
-          const email = payload.email.toLowerCase();
+          body = verifySolanaAddressBodyZ.parse(JSON.parse((await readBody(req)) || "{}"));
+        } catch (e) {
+          sendJson(res, 400, {
+            error: "invalid_body",
+            message: e instanceof Error ? e.message : String(e),
+          });
+          return;
+        }
+        const email = payload.email.toLowerCase();
+        let pk: PublicKey;
+        try {
+          pk = new PublicKey(body.address.trim());
+        } catch {
+          sendJson(res, 400, {
+            error: "invalid_address",
+            message: "That is not a valid Solana address.",
+          });
+          return;
+        }
+        const addressNormalized = pk.toBase58();
+        try {
           const row = loadOrCreateRow(email);
           if (!row?.id) {
             sendJson(res, 503, { error: "no_account" });
@@ -409,118 +443,97 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
             return;
           }
           const accountId = String(row.id);
-          const existing = database
+          const cur = database
             .prepare(
-              `SELECT custodial_seckey_enc, custodial_derivation_index, sol_receive_address FROM accounts WHERE id = ?`,
+              `SELECT sol_receive_verified_at FROM accounts WHERE id = ?`,
             )
-            .get(accountId) as
-            | {
-                custodial_seckey_enc: string | null;
-                custodial_derivation_index: number | null;
-                sol_receive_address: string | null;
-              }
-            | undefined;
-
-          const envProc = env as unknown as NodeJS.ProcessEnv;
-
-          if (existing?.custodial_seckey_enc && existing.sol_receive_address) {
-            const owner = new PublicKey(existing.sol_receive_address.trim());
-            const ata = getUsdcAta(owner);
-            sendJson(res, 200, {
-              ok: true,
-              already_existed: true,
-              deposit_address: existing.sol_receive_address.trim(),
-              usdc_ata: ata.toBase58(),
-              usdc_mint: MAINNET_USDC_MINT.toBase58(),
+            .get(accountId) as { sol_receive_verified_at: number | null } | undefined;
+          if (cur?.sol_receive_verified_at != null) {
+            sendJson(res, 400, {
+              error: "already_verified",
+              message: "Your Solana address is already verified and cannot be changed.",
             });
             return;
           }
 
-          if (existing != null && existing.custodial_derivation_index != null && existing.sol_receive_address) {
-            const idx = Number(existing.custodial_derivation_index);
-            let kp: Keypair;
-            try {
-              kp = deriveCustodialKeypairFromIndex(idx, envProc);
-            } catch (e) {
-              const msg = e instanceof Error ? e.message : String(e);
-              console.error("[account-api] ensure-custodial-deposit HD verify:", e);
-              sendJson(res, 503, { error: "custodial_deposit_unavailable", message: msg });
-              return;
-            }
-            if (kp.publicKey.toBase58() !== existing.sol_receive_address.trim()) {
-              console.error("[account-api] HD pubkey mismatch for account", accountId.slice(0, 8));
-              sendJson(res, 503, {
-                error: "hd_address_mismatch",
-                message: "Stored deposit address does not match HD derivation — check master key and DB.",
-              });
-              return;
-            }
-            const owner = kp.publicKey;
-            const ata = getUsdcAta(owner);
-            sendJson(res, 200, {
-              ok: true,
-              already_existed: true,
-              deposit_address: existing.sol_receive_address.trim(),
-              usdc_ata: ata.toBase58(),
-              usdc_mint: MAINNET_USDC_MINT.toBase58(),
+          const taken = database
+            .prepare(
+              `SELECT id FROM accounts WHERE id != ? AND TRIM(sol_receive_address) = ?`,
+            )
+            .get(accountId, addressNormalized) as { id: string } | undefined;
+          if (taken) {
+            sendJson(res, 409, {
+              error: "address_in_use",
+              message: "This Solana address is already linked to another account.",
             });
             return;
           }
 
+          const connection = new Connection(accountRpcUrl(env), "confirmed");
+          let lamports: number;
           try {
-            const runHd = database.transaction(() => {
-              const maxRow = database
-                .prepare(`SELECT COALESCE(MAX(custodial_derivation_index), -1) AS m FROM accounts`)
-                .get() as { m: number };
-              let nextIndex = maxRow.m + 1;
-              if (nextIndex === RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX) {
-                nextIndex += 1;
-              }
-              const kp = deriveCustodialKeypairFromIndex(nextIndex, envProc);
-              const addr = kp.publicKey.toBase58();
-              const now = Date.now();
-              database
-                .prepare(
-                  `UPDATE accounts SET custodial_derivation_index = ?, sol_receive_address = ?, custodial_seckey_enc = NULL, updated_at = ? WHERE id = ?`,
-                )
-                .run(nextIndex, addr, now, accountId);
-              return { kp, addr };
-            });
-            const { kp } = runHd();
-            const ata = getUsdcAta(kp.publicKey);
-            sendJson(res, 200, {
-              ok: true,
-              already_existed: false,
-              deposit_address: kp.publicKey.toBase58(),
-              usdc_ata: ata.toBase58(),
-              usdc_mint: MAINNET_USDC_MINT.toBase58(),
-            });
+            lamports = await connection.getBalance(pk, "confirmed");
           } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            if (
-              msg.includes("no such column: custodial_seckey_enc") ||
-              msg.includes("no such column: custodial_derivation_index")
-            ) {
-              sendJson(res, 503, {
-                error: "db_schema",
-                message:
-                  "Schema missing custodial HD columns — run npm run db:migrate-hd or db:init (also applied automatically on server start).",
-              });
-              return;
-            }
-            console.error("[account-api] ensure-custodial-deposit:", e);
+            console.error("[account-api] verify-solana-address RPC:", e);
             sendJson(res, 503, {
-              error: "custodial_deposit_unavailable",
-              message: msg,
+              error: "rpc_error",
+              message: "Could not reach Solana RPC to verify this address.",
             });
+            return;
           }
-        } catch (e) {
-          console.error("[account-api] ensure-custodial-deposit (unexpected):", e);
-          const msg = e instanceof Error ? e.message : String(e);
-          sendJson(res, 503, {
-            error: "custodial_deposit_unavailable",
-            message: msg,
+          if (lamports < MIN_SOL_LAMPORTS_FOR_VERIFY) {
+            sendJson(res, 400, {
+              error: "insufficient_sol",
+              message: `This address must hold at least ${MIN_SOL_LAMPORTS_FOR_VERIFY} lamports of SOL on mainnet (≈0.0001 SOL).`,
+              min_lamports: MIN_SOL_LAMPORTS_FOR_VERIFY,
+              lamports,
+            });
+            return;
+          }
+
+          const now = Date.now();
+          const hadSignupGrant = Boolean(
+            database
+              .prepare(
+                `SELECT 1 AS ok FROM qusd_ledger WHERE account_id = ? AND entry_type = 'signup_grant' LIMIT 1`,
+              )
+              .get(accountId) as { ok: number } | undefined,
+          );
+          const run = database.transaction(() => {
+            database
+              .prepare(
+                `UPDATE accounts SET
+                  sol_receive_address = ?,
+                  sol_receive_verified_at = ?,
+                  custodial_derivation_index = NULL,
+                  custodial_seckey_enc = NULL,
+                  updated_at = ?,
+                  sync_version = sync_version + 1
+                WHERE id = ?`,
+              )
+              .run(addressNormalized, now, now, accountId);
+            if (!hadSignupGrant) {
+              insertAddressVerificationBonus(database, accountId, now);
+            }
           });
+          run();
+
+          const fresh = database.prepare(`SELECT * FROM accounts WHERE id = ?`).get(accountId) as AccountRow;
+          sendJson(res, 200, {
+            ok: true,
+            account: attachLedgerBalances(database, fresh),
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.includes("UNIQUE") || msg.includes("constraint")) {
+            sendJson(res, 409, {
+              error: "address_in_use",
+              message: "This Solana address is already linked to another account.",
+            });
+            return;
+          }
+          console.error("[account-api] verify-solana-address:", e);
+          sendJson(res, 500, { error: "verify_failed", message: msg });
         }
       })();
       return;
