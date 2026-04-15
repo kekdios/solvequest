@@ -133,7 +133,16 @@ export default function AccountScreen({
           style={{ ...s.statHero, ...s.walletPanelTop }}
           aria-label="Solana address and USDC deposits"
         >
-          <p style={{ ...s.statLabel, color: "var(--text)", fontWeight: 700 }}>Solana address</p>
+          <div style={s.buyMoreHeader}>
+            <img
+              src="/icon-sol.png"
+              alt=""
+              width={28}
+              height={28}
+              style={{ ...s.buyMoreIcon, objectFit: "contain" }}
+            />
+            <h2 style={s.buyMoreTitle}>Solana Address</h2>
+          </div>
 
           {isDemo ? (
             <>
