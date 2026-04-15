@@ -619,7 +619,12 @@ function AppInner() {
             </header>
           )}
 
-          {screen === "landing" && <LandingPage onStartNow={() => setScreen("trade")} />}
+          {screen === "landing" && (
+            <LandingPage
+              onStartNow={() => setScreen("trade")}
+              onGoToPrize={() => setScreen("sellQusd")}
+            />
+          )}
 
           {screen === "auth" && (
             <AuthScreen onSuccess={() => setScreen("trade")} onContinueDemo={() => setScreen("trade")} />

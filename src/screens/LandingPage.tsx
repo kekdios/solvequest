@@ -3,6 +3,8 @@ import "./landing.css";
 
 type Props = {
   onStartNow: () => void;
+  /** Navigate to Prize (sell QUSD) screen — used for in-app links from the landing copy. */
+  onGoToPrize?: () => void;
 };
 
 function IconChart({ className }: { className?: string }) {
@@ -31,7 +33,7 @@ function IconSpark({ className }: { className?: string }) {
   );
 }
 
-export default function LandingPage({ onStartNow }: Props) {
+export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
   const [prizeAmount, setPrizeAmount] = useState<number | null | undefined>(undefined);
 
   useEffect(() => {
@@ -142,7 +144,20 @@ export default function LandingPage({ onStartNow }: Props) {
             <span className="lp-step-num" aria-hidden>
               3
             </span>
-            <h3>Trade to accumulate enough QUSD to claim the PRIZE</h3>
+            <h3 className="lp-step3-heading">
+              Trade to accumulate enough QUSD to claim the PRIZE{" "}
+              <span className="lp-step3-sub">
+                (see{" "}
+                {onGoToPrize ? (
+                  <button type="button" className="lp-text-link" onClick={onGoToPrize}>
+                    Prize
+                  </button>
+                ) : (
+                  "Prize"
+                )}{" "}
+                page for details)
+              </span>
+            </h3>
           </article>
         </div>
       </section>
