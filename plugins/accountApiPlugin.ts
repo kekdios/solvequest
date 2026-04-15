@@ -13,7 +13,10 @@ import { loadEnv } from "vite";
 import jwt from "jsonwebtoken";
 import Database from "better-sqlite3";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { deriveCustodialKeypairFromIndex } from "../server/custodialHdDerive";
+import {
+  deriveCustodialKeypairFromIndex,
+  RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX,
+} from "../server/custodialHdDerive";
 import { getUsdcAta, MAINNET_USDC_MINT } from "../server/solanaUsdcScan";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
@@ -488,7 +491,10 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
               const maxRow = database
                 .prepare(`SELECT COALESCE(MAX(custodial_derivation_index), -1) AS m FROM accounts`)
                 .get() as { m: number };
-              const nextIndex = maxRow.m + 1;
+              let nextIndex = maxRow.m + 1;
+              if (nextIndex === RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX) {
+                nextIndex += 1;
+              }
               const kp = deriveCustodialKeypairFromIndex(nextIndex, envProc);
               const addr = kp.publicKey.toBase58();
               const now = Date.now();

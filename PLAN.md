@@ -63,7 +63,7 @@
 ## Phase 3 — Align existing features with modes
 
 - **Account screen**: Deposit UI when registered; registration prompt in demo.
-- **Custody / sweep**: Server-side (`server/depositScanWorker.ts`, `server/custodialSweepServer.ts`); optional admin triggers.
+- **Custody / sweep**: Server-side (`server/depositScanWorker.ts`, `server/custodialSweepServer.ts`); admin **`POST /api/admin/deposit-scan`**, guided **`POST /api/admin/custodial-sweep`** (`server/adminCustodialSweepOrchestrator.ts`). Custodial **`sol_receive_address`** needs **native SOL** for fees before sweeps can land on-chain.
 
 ---
 

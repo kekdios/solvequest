@@ -29,7 +29,7 @@ Minimum env for local auth/API: set **`JWT_SECRET`** (and email OTP vars if you 
 
 ## Docs
 
-- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana, **locked QUSD vault interest** (rates, demo vs server, `qusd_vault_interest_at`), droplet notes. Default production SSH (matches `scripts/deploy.sh`): **`ssh root@152.42.168.173`**.
+- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana (deposit scan, **`POST /api/admin/custodial-sweep`**, treasury, **fund custodial address with SOL for sweep fees**), **locked QUSD vault interest** (rates, demo vs server, `qusd_vault_interest_at`), droplet notes. Default production SSH (matches `scripts/deploy.sh`): **`ssh root@152.42.168.173`**.
 
 ## Repository
 

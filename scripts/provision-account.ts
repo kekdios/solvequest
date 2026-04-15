@@ -9,7 +9,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import Database from "better-sqlite3";
-import { deriveCustodialKeypairFromIndex } from "../server/custodialHdDerive";
+import {
+  deriveCustodialKeypairFromIndex,
+  RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX,
+} from "../server/custodialHdDerive";
 import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
 
 const SIGNUP_GRANT = 10_000;
@@ -29,7 +32,10 @@ try {
   const maxRow = db
     .prepare(`SELECT COALESCE(MAX(custodial_derivation_index), -1) AS m FROM accounts`)
     .get() as { m: number };
-  const nextIndex = maxRow.m + 1;
+  let nextIndex = maxRow.m + 1;
+  if (nextIndex === RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX) {
+    nextIndex += 1;
+  }
   const kp = deriveCustodialKeypairFromIndex(nextIndex, process.env);
   const solAddr = kp.publicKey.toBase58();
 

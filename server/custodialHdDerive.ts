@@ -28,3 +28,14 @@ export function deriveCustodialKeypairFromIndex(derivationIndex: number, env: No
   const { key } = derivePath(path, seedHex);
   return Keypair.fromSeed(Uint8Array.from(key));
 }
+
+/**
+ * Reserved account index for sweep fee payer — never assign this to `accounts.custodial_derivation_index`.
+ * Used when `SOLANA_SWEEP_FEE_PAYER_FROM_MASTER=1` (same entropy as user deposits, separate pubkey).
+ */
+export const RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX = 1_000_000_000;
+
+/** Deterministic keypair from master; fund this pubkey with SOL to pay sweep fees for all custodial ATAs. */
+export function deriveSweepFeePayerKeypairFromMaster(env: NodeJS.ProcessEnv): Keypair {
+  return deriveCustodialKeypairFromIndex(RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX, env);
+}

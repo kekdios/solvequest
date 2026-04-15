@@ -16,6 +16,7 @@ import {
   getAssociatedTokenAddressSync,
   getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
+import { deriveSweepFeePayerKeypairFromMaster } from "./custodialHdDerive";
 import { MAINNET_USDC_MINT } from "./solanaUsdcScan";
 
 const READ_COMMITMENT = "confirmed" as const;
@@ -38,6 +39,40 @@ function treasuryPubkey(env: NodeJS.ProcessEnv): PublicKey | null {
   }
 }
 
+/**
+ * Optional funded keypair that pays tx fees (and treasury ATA rent on create) for all custodial sweeps.
+ * Custodial keypair still signs SPL/SOL transfers as authority.
+ *
+ * Precedence: **`SOLANA_SWEEP_FEE_PAYER_KEY_B64`** (raw 64-byte secret, base64) if set; else
+ * **`SOLANA_SWEEP_FEE_PAYER_FROM_MASTER=1`** → derive from **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** at a
+ * reserved HD index (see **`deriveSweepFeePayerKeypairFromMaster`**).
+ */
+function resolveSweepFeePayerKeypair(
+  env: NodeJS.ProcessEnv,
+): { ok: true; keypair: Keypair } | { ok: false; reason: string } | null {
+  const b64 = (env.SOLANA_SWEEP_FEE_PAYER_KEY_B64 ?? "").trim();
+  if (b64) {
+    try {
+      const raw = Buffer.from(b64, "base64");
+      if (raw.length < 64) {
+        return { ok: false, reason: "SOLANA_SWEEP_FEE_PAYER_KEY_B64 must decode to at least 64 bytes." };
+      }
+      return { ok: true, keypair: Keypair.fromSecretKey(Uint8Array.from(raw.subarray(0, 64))) };
+    } catch {
+      return { ok: false, reason: "Invalid SOLANA_SWEEP_FEE_PAYER_KEY_B64 (bad base64)." };
+    }
+  }
+  const fromMaster =
+    env.SOLANA_SWEEP_FEE_PAYER_FROM_MASTER === "1" || env.SOLANA_SWEEP_FEE_PAYER_FROM_MASTER === "true";
+  if (!fromMaster) return null;
+  try {
+    return { ok: true, keypair: deriveSweepFeePayerKeypairFromMaster(env) };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, reason: `SOLANA_SWEEP_FEE_PAYER_FROM_MASTER: ${msg}` };
+  }
+}
+
 export type CustodialSweepResult =
   | { ok: true; signature: string; sweptUsdc: number; sweptSolLamports: number }
   | { ok: false; reason: string };
@@ -51,6 +86,13 @@ export async function sweepCustodialDepositToTreasury(
   if (!treasury) {
     return { ok: false, reason: "Set VITE_SOLANA_TREASURY_ADDRESS or SOLANA_TREASURY_ADDRESS for sweeps." };
   }
+
+  const feePayerLoad = resolveSweepFeePayerKeypair(env);
+  if (feePayerLoad && !feePayerLoad.ok) {
+    return { ok: false, reason: feePayerLoad.reason };
+  }
+  const feePayer = feePayerLoad?.ok ? feePayerLoad.keypair : null;
+  const useCentralFeePayer = feePayer != null;
 
   const userPk = owner.publicKey;
   const userAta = getAssociatedTokenAddressSync(MAINNET_USDC_MINT, userPk, false);
@@ -80,7 +122,16 @@ export async function sweepCustodialDepositToTreasury(
     }
     const minNative =
       SWEEP_FEE_HEADROOM_LAMPORTS + (treasuryUsdcAtaMissing ? APPROX_SPL_TOKEN_ACCT_RENT_LAMPORTS : 0);
-    if (balLamports < minNative) {
+    if (useCentralFeePayer) {
+      const fpBal = await connection.getBalance(feePayer.publicKey, READ_COMMITMENT);
+      if (fpBal < minNative) {
+        const fpAddr = feePayer.publicKey.toBase58();
+        return {
+          ok: false,
+          reason: `Sweep fee payer ${fpAddr} needs ≈${minNative} lamports for${treasuryUsdcAtaMissing ? " treasury USDC ATA rent +" : ""} network fees (has ${fpBal}). Fund that key or unset SOLANA_SWEEP_FEE_PAYER_KEY_B64 to use per-custodial SOL.`,
+        };
+      }
+    } else if (balLamports < minNative) {
       const addr = userPk.toBase58();
       return {
         ok: false,
@@ -97,7 +148,7 @@ export async function sweepCustodialDepositToTreasury(
     try {
       await getOrCreateAssociatedTokenAccount(
         connection,
-        owner,
+        useCentralFeePayer ? feePayer : owner,
         MAINNET_USDC_MINT,
         treasury,
         false,
@@ -126,8 +177,13 @@ export async function sweepCustodialDepositToTreasury(
 
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash(READ_COMMITMENT);
   tx.recentBlockhash = blockhash;
-  tx.feePayer = userPk;
-  tx.sign(owner);
+  if (useCentralFeePayer) {
+    tx.feePayer = feePayer.publicKey;
+    tx.sign(owner, feePayer);
+  } else {
+    tx.feePayer = userPk;
+    tx.sign(owner);
+  }
 
   const raw = tx.serialize();
   let signature: string;
@@ -155,7 +211,9 @@ export async function sweepCustodialDepositToTreasury(
       const msg = e.message;
       const debitHint =
         msg.includes("no record of a prior credit") || msg.includes("insufficient funds")
-          ? " (Fund the custodial wallet with native SOL for fees; USDC balance does not pay network costs.)"
+          ? useCentralFeePayer
+            ? " (Fund SOLANA_SWEEP_FEE_PAYER_KEY_B64 address for fees.)"
+            : " (Fund the custodial wallet with native SOL for fees; USDC balance does not pay network costs.)"
           : "";
       return { ok: false, reason: `${msg}${logSuffix}${debitHint}` };
     }
