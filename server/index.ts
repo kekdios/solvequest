@@ -11,6 +11,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import { createUserAuthMiddleware } from "../plugins/userAuthApiPlugin";
 import { createAccountApiMiddleware } from "../plugins/accountApiPlugin";
 import { createAdminApiMiddleware } from "../plugins/adminApiPlugin";
+import { createPrizeApiMiddleware } from "../plugins/prizeApiPlugin";
 import { startDepositScanWorker } from "./depositScanWorker";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +68,7 @@ app.get("/api/config/treasury", (_req, res) => {
 
 app.use(createUserAuthMiddleware(env, mode));
 app.use(createAccountApiMiddleware(env, root));
+app.use(createPrizeApiMiddleware(env, root));
 app.use(createAdminApiMiddleware(env, mode, root));
 
 const solanaTarget =

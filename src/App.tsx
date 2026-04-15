@@ -28,6 +28,7 @@ import LandingPage from "./screens/LandingPage";
 import AccountScreen from "./screens/AccountScreen";
 import QuickStartScreen from "./screens/QuickStartScreen";
 import HistoryScreen from "./screens/HistoryScreen";
+import PrizeScreen from "./screens/PrizeScreen";
 import AuthScreen from "./screens/AuthScreen";
 import AppSidebar, { type AppScreen } from "./components/AppSidebar";
 import {
@@ -236,6 +237,10 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   history: {
     title: "History",
     lead: "Closed perpetual trades (newest first).",
+  },
+  prize: {
+    title: "Prize",
+    lead: "Prize pool, QUEST purchase with QUSD, and balances.",
   },
   account: {
     title: "Account",
@@ -728,6 +733,15 @@ function AppInner() {
           )}
 
           {screen === "history" && <HistoryScreen />}
+
+          {screen === "prize" && (
+            <PrizeScreen
+              qusdUnlocked={state.qusd.unlocked}
+              solReceiveVerified={ledgerAccountRow?.sol_receive_verified_at != null}
+              serverDepositAddress={ledgerAccountRow?.sol_receive_address?.trim() || null}
+              onRefreshAccount={refreshAccountFromServer}
+            />
+          )}
 
           {screen === "trade" && (
             <PerpsTradeScreen
