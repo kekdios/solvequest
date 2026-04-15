@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import QRCode from "react-qr-code";
 
 function CopyIcon({ size = 18 }: { size?: number }) {
@@ -32,6 +32,8 @@ type Props = {
   addressReady?: boolean;
   /** `treasury` — labels refer to project treasury from env. */
   variant?: "user_deposit" | "treasury";
+  /** When set, replaces the default “Only send USDC…” hint line. */
+  depositHintOverride?: ReactNode;
 };
 
 export default function TestReceiveAddresses({
@@ -39,6 +41,7 @@ export default function TestReceiveAddresses({
   depositAddressError = null,
   addressReady = false,
   variant = "user_deposit",
+  depositHintOverride,
 }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
@@ -92,16 +95,12 @@ export default function TestReceiveAddresses({
         <>
           <div style={s.row}>
             <p style={s.depositHint}>
-              Only send <strong style={s.depositHintStrong}>USDC</strong> on the{" "}
-              <strong style={s.depositHintStrong}>Solana Network</strong>
-              {isTreasury ? (
+              {depositHintOverride ?? (
                 <>
-                  {" "}
-                  <span style={{ fontWeight: 500, color: "var(--muted)" }}>
-                    — treasury address (<code style={s.inlineTreasuryTag}>SOLANA_TREASURY_ADDRESS</code>)
-                  </span>
+                  Only send <strong style={s.depositHintStrong}>USDC</strong> on the{" "}
+                  <strong style={s.depositHintStrong}>Solana Network</strong>
                 </>
-              ) : null}
+              )}
             </p>
             <div style={s.addrRow}>
               <code style={s.addr}>{solAddress}</code>
@@ -189,11 +188,6 @@ const s: Record<string, CSSProperties> = {
   depositHintStrong: {
     color: "color-mix(in srgb, var(--accent) 92%, #fff)",
     fontWeight: 700,
-  },
-  inlineTreasuryTag: {
-    fontSize: "0.85em",
-    fontWeight: 600,
-    color: "var(--muted)",
   },
   addrRow: {
     display: "flex",
