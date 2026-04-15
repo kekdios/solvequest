@@ -2,8 +2,11 @@
  * Resolves the key that controls SOLANA_TREASURY_ADDRESS for signing (e.g. QUEST sends).
  *
  * Precedence:
- * 1. **SOLANA_TREASURY_KEY_B64** — base64-encoded 64-byte secret; pubkey must match SOLANA_TREASURY_ADDRESS
- *    (use when treasury is a normal wallet, not HD-derived from SOLANA_CUSTODIAL_MASTER_KEY_B64).
+ * 1. **SOLANA_TREASURY_KEY_B64** — base64 of raw key bytes. Supported shapes after decode:
+ *    - **64 bytes** — `Keypair.fromSecretKey` (standard JSON keypair file bytes).
+ *    - **32 bytes** — `Keypair.fromSeed` (32-byte seed only).
+ *    - **66 bytes** — try 64-byte secret at offset 0 or 2 (some exports add a 2-byte prefix).
+ *    Public key must match SOLANA_TREASURY_ADDRESS.
  * 2. **SOLANA_TREASURY_DERIVATION_INDEX** — HD path m/44'/501'/<n>'/0' from SOLANA_CUSTODIAL_MASTER_KEY_B64.
  * 3. Scan indices 0 .. SOLANA_TREASURY_MAX_SCAN−1 (default 50_000).
  */
@@ -26,28 +29,66 @@ function treasuryPubkeyFromEnv(env: NodeJS.ProcessEnv): PublicKey | null {
   }
 }
 
+function tryKeypairsFromDecodedSecret(raw: Buffer): Keypair[] {
+  const candidates: Keypair[] = [];
+  const push = (kp: Keypair) => {
+    candidates.push(kp);
+  };
+  if (raw.length >= 64) {
+    try {
+      push(Keypair.fromSecretKey(Uint8Array.from(raw.subarray(0, 64))));
+    } catch {
+      /* try other shapes */
+    }
+  }
+  if (raw.length >= 66) {
+    try {
+      push(Keypair.fromSecretKey(Uint8Array.from(raw.subarray(2, 66))));
+    } catch {
+      /* */
+    }
+  }
+  if (raw.length >= 32) {
+    try {
+      push(Keypair.fromSeed(Uint8Array.from(raw.subarray(0, 32))));
+    } catch {
+      /* */
+    }
+  }
+  return candidates;
+}
+
 function keypairFromTreasurySecretB64(
   env: NodeJS.ProcessEnv,
   treasuryPk: PublicKey,
 ): { ok: true; keypair: Keypair } | { ok: false; reason: string } | null {
   const b64 = (env.SOLANA_TREASURY_KEY_B64 ?? "").trim();
   if (!b64) return null;
+  let raw: Buffer;
   try {
-    const raw = Buffer.from(b64, "base64");
-    if (raw.length < 64) {
-      return { ok: false, reason: "SOLANA_TREASURY_KEY_B64 must decode to at least 64 bytes." };
-    }
-    const kp = Keypair.fromSecretKey(Uint8Array.from(raw.subarray(0, 64)));
-    if (!kp.publicKey.equals(treasuryPk)) {
-      return {
-        ok: false,
-        reason: `SOLANA_TREASURY_KEY_B64 public key (${kp.publicKey.toBase58()}) does not match SOLANA_TREASURY_ADDRESS.`,
-      };
-    }
-    return { ok: true, keypair: kp };
+    raw = Buffer.from(b64, "base64");
   } catch {
-    return { ok: false, reason: "Invalid SOLANA_TREASURY_KEY_B64 (bad base64 or key bytes)." };
+    return { ok: false, reason: "SOLANA_TREASURY_KEY_B64 is not valid base64." };
   }
+  if (raw.length < 32) {
+    return {
+      ok: false,
+      reason: "SOLANA_TREASURY_KEY_B64 must decode to at least 32 bytes (64-byte secret or 32-byte seed).",
+    };
+  }
+
+  const keypairs = tryKeypairsFromDecodedSecret(raw);
+  for (const kp of keypairs) {
+    if (kp.publicKey.equals(treasuryPk)) {
+      return { ok: true, keypair: kp };
+    }
+  }
+
+  const tried = keypairs.map((k) => k.publicKey.toBase58()).join(", ") || "none";
+  return {
+    ok: false,
+    reason: `SOLANA_TREASURY_KEY_B64 does not match SOLANA_TREASURY_ADDRESS. Derived candidate pubkeys: ${tried}`,
+  };
 }
 
 /** @deprecated Use resolveTreasurySigningKeypair — name kept for call sites. */
