@@ -2,15 +2,13 @@ import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } 
 import { uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
 import { resolveTreasuryAddressBase58 } from "../deposit/chainConfig";
 import { QUSD_PER_USD } from "../engine/qusdVault";
-import { QusdAmount, QusdIcon } from "../Qusd";
+import { QusdAmount } from "../Qusd";
 
 const TestReceiveAddresses = lazy(() => import("../components/TestReceiveAddresses"));
 
 const CHANGENOW_URL = "https://changenow.io/";
 
-const SIGNUP_GRANT_QUSD = 10_000;
-const EMAIL_OTP_BONUS_QUSD = 10_000;
-const VERIFY_BONUS_QUSD = 10_000;
+const LINK_VERIFY_BONUS_QUSD = 10_000;
 
 /** Stat value text was 2rem; reduced by 40% → 60% scale. */
 const STAT_VALUE_FS = "1.2rem";
@@ -156,15 +154,10 @@ export default function AccountScreen({
           ) : (
             <>
               <p style={s.depositExplainer}>
-                You receive <strong style={{ color: "var(--text)" }}>{SIGNUP_GRANT_QUSD.toLocaleString()} QUSD</strong>{" "}
-                when your account is created,{" "}
-                <strong style={{ color: "var(--text)" }}>{EMAIL_OTP_BONUS_QUSD.toLocaleString()} QUSD</strong> after your
-                first successful email code verification, and an additional{" "}
-                <strong style={{ color: "var(--text)" }}>{VERIFY_BONUS_QUSD.toLocaleString()} QUSD</strong> after you link
-                and verify a <strong style={{ color: "var(--text)" }}>Solana mainnet</strong> address (valid pubkey and a
-                small on-chain SOL balance). The linked address is used for USDC (SPL) deposits—converted to QUSD at{" "}
-                <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong> when deposits are
-                confirmed—and cannot be changed later.
+                You receive{" "}
+                <strong style={{ color: "var(--text)" }}>{LINK_VERIFY_BONUS_QUSD.toLocaleString()} QUSD</strong> when you
+                link and verify a <strong style={{ color: "var(--text)" }}>Solana mainnet</strong> address that has a
+                small SOL balance. The linked address cannot be changed later.
               </p>
 
               {depositAddressError ? (
@@ -204,55 +197,51 @@ export default function AccountScreen({
                   </p>
                 ) : null}
               </div>
+
+              {verified && displayAddr ? (
+                <>
+                  <p style={{ ...s.buyMoreLead, margin: "18px 0 14px" }}>
+                    USDC sent to our treasury address is converted to QUSD at{" "}
+                    <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong>. Your verified
+                    wallet address is credited as QUSD after on-chain confirmation.
+                  </p>
+                  <div style={s.receiveAddressesBlock}>
+                    <Suspense fallback={<p style={s.suspenseFallback}>Loading…</p>}>
+                      {treasuryLoadState === "loading" ? (
+                        <p style={s.suspenseFallback}>Loading treasury address…</p>
+                      ) : treasuryLoadState === "missing" || !treasuryAddress ? (
+                        <p style={s.treasuryMissing} role="status">
+                          Treasury address unavailable. Set <code style={s.inlineCodeEnv}>SOLANA_TREASURY_ADDRESS</code>{" "}
+                          (or <code style={s.inlineCodeEnv}>VITE_SOLANA_TREASURY_ADDRESS</code>) on the server.
+                        </p>
+                      ) : (
+                        <TestReceiveAddresses
+                          serverDepositAddress={treasuryAddress}
+                          depositAddressError={null}
+                          addressReady
+                          variant="treasury"
+                          depositHintOverride={
+                            <>
+                              Only send <strong style={s.buyMoreHintStrong}>USDC</strong> on the{" "}
+                              <strong style={s.buyMoreHintStrong}>Solana Network</strong> — treasury address (
+                              <code style={s.inlineCodeEnv}>SOLANA_TREASURY_ADDRESS</code>)
+                            </>
+                          }
+                        />
+                      )}
+                    </Suspense>
+                  </div>
+                  <p style={s.depositBuySell}>
+                    <a href={CHANGENOW_URL} target="_blank" rel="noopener noreferrer" style={s.buySellLink}>
+                      Buy/Sell cryptocurrencies
+                    </a>{" "}
+                    <span style={{ color: "var(--muted)" }}>— instant swaps via ChangeNOW.</span>
+                  </p>
+                </>
+              ) : null}
             </>
           )}
         </section>
-
-        {!isDemo && verified && displayAddr ? (
-          <section style={s.buyMorePanel} aria-label="Buy more QUSD">
-            <div style={s.buyMoreHeader}>
-              <QusdIcon size={28} style={s.buyMoreIcon} />
-              <h2 style={s.buyMoreTitle}>Buy More QUSD</h2>
-            </div>
-            <p style={s.buyMoreLead}>
-              USDC (SPL) sent to <strong style={{ color: "var(--text)" }}>your verified wallet</strong> (the field
-              above) is credited as QUSD after on-chain confirmation. Use the treasury address below for deposits that
-              should use the project <code style={s.inlineCodeEnv}>SOLANA_TREASURY_ADDRESS</code>.
-            </p>
-            <div style={s.receiveAddressesBlock}>
-              <Suspense fallback={<p style={s.suspenseFallback}>Loading…</p>}>
-                {treasuryLoadState === "loading" ? (
-                  <p style={s.suspenseFallback}>Loading treasury address…</p>
-                ) : treasuryLoadState === "missing" || !treasuryAddress ? (
-                  <p style={s.treasuryMissing} role="status">
-                    Treasury address unavailable. Set <code style={s.inlineCodeEnv}>SOLANA_TREASURY_ADDRESS</code> (or{" "}
-                    <code style={s.inlineCodeEnv}>VITE_SOLANA_TREASURY_ADDRESS</code>) on the server.
-                  </p>
-                ) : (
-                  <TestReceiveAddresses
-                    serverDepositAddress={treasuryAddress}
-                    depositAddressError={null}
-                    addressReady
-                    variant="treasury"
-                    depositHintOverride={
-                      <>
-                        Only send <strong style={s.buyMoreHintStrong}>USDC</strong> on the{" "}
-                        <strong style={s.buyMoreHintStrong}>Solana Network</strong> — treasury address (
-                        <code style={s.inlineCodeEnv}>SOLANA_TREASURY_ADDRESS</code>)
-                      </>
-                    }
-                  />
-                )}
-              </Suspense>
-            </div>
-            <p style={s.depositBuySell}>
-              <a href={CHANGENOW_URL} target="_blank" rel="noopener noreferrer" style={s.buySellLink}>
-                Buy/Sell cryptocurrencies
-              </a>{" "}
-              <span style={{ color: "var(--muted)" }}>— instant swaps via ChangeNOW.</span>
-            </p>
-          </section>
-        ) : null}
       </div>
     </div>
   );
@@ -263,16 +252,6 @@ const s: Record<string, CSSProperties> = {
   metricsStack: { display: "flex", flexDirection: "column", gap: 16 },
   err: { margin: "8px 0 0", fontSize: 13, color: "var(--danger)" },
   treasuryMissing: { margin: "8px 0 0", fontSize: 13, lineHeight: 1.5, color: "var(--muted)" },
-  buyMorePanel: {
-    width: "100%",
-    background:
-      "linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--panel)) 0%, var(--surface) 100%)",
-    border: "1px solid color-mix(in srgb, var(--accent) 28%, var(--border))",
-    borderRadius: 12,
-    padding: "20px 20px 22px",
-    boxShadow:
-      "inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent), 0 4px 24px color-mix(in srgb, var(--text) 5%, transparent)",
-  },
   buyMoreHeader: {
     display: "flex",
     alignItems: "center",
