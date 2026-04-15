@@ -27,7 +27,7 @@ import {
   insertQuestPurchaseSpend,
 } from "../server/qusdLedger";
 import { preflightTreasuryQuestSend, sendQuestFromTreasuryToUser } from "../server/prizeQuestTransfer";
-import { resolveTreasurySigningKeypairFromMaster } from "../server/treasurySigningKeypair";
+import { resolveTreasurySigningKeypair } from "../server/treasurySigningKeypair";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -329,7 +329,7 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
             return;
           }
 
-          const treasuryResolved = resolveTreasurySigningKeypairFromMaster(env);
+          const treasuryResolved = resolveTreasurySigningKeypair(env);
           if (!treasuryResolved.ok) {
             sendJson(res, 503, { error: "treasury_key", message: treasuryResolved.reason });
             return;

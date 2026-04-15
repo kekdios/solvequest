@@ -1,8 +1,13 @@
 /**
- * Treasury must be an HD-derived pubkey from SOLANA_CUSTODIAL_MASTER_KEY_B64 (same scheme as custodial deposits).
- * Set SOLANA_TREASURY_DERIVATION_INDEX to skip scanning indices on startup.
+ * Resolves the key that controls SOLANA_TREASURY_ADDRESS for signing (e.g. QUEST sends).
+ *
+ * Precedence:
+ * 1. **SOLANA_TREASURY_KEY_B64** — base64-encoded 64-byte secret; pubkey must match SOLANA_TREASURY_ADDRESS
+ *    (use when treasury is a normal wallet, not HD-derived from SOLANA_CUSTODIAL_MASTER_KEY_B64).
+ * 2. **SOLANA_TREASURY_DERIVATION_INDEX** — HD path m/44'/501'/<n>'/0' from SOLANA_CUSTODIAL_MASTER_KEY_B64.
+ * 3. Scan indices 0 .. SOLANA_TREASURY_MAX_SCAN−1 (default 50_000).
  */
-import { PublicKey, type Keypair } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import {
   RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX,
   deriveCustodialKeypairFromIndex,
@@ -21,12 +26,48 @@ function treasuryPubkeyFromEnv(env: NodeJS.ProcessEnv): PublicKey | null {
   }
 }
 
+function keypairFromTreasurySecretB64(
+  env: NodeJS.ProcessEnv,
+  treasuryPk: PublicKey,
+): { ok: true; keypair: Keypair } | { ok: false; reason: string } | null {
+  const b64 = (env.SOLANA_TREASURY_KEY_B64 ?? "").trim();
+  if (!b64) return null;
+  try {
+    const raw = Buffer.from(b64, "base64");
+    if (raw.length < 64) {
+      return { ok: false, reason: "SOLANA_TREASURY_KEY_B64 must decode to at least 64 bytes." };
+    }
+    const kp = Keypair.fromSecretKey(Uint8Array.from(raw.subarray(0, 64)));
+    if (!kp.publicKey.equals(treasuryPk)) {
+      return {
+        ok: false,
+        reason: `SOLANA_TREASURY_KEY_B64 public key (${kp.publicKey.toBase58()}) does not match SOLANA_TREASURY_ADDRESS.`,
+      };
+    }
+    return { ok: true, keypair: kp };
+  } catch {
+    return { ok: false, reason: "Invalid SOLANA_TREASURY_KEY_B64 (bad base64 or key bytes)." };
+  }
+}
+
+/** @deprecated Use resolveTreasurySigningKeypair — name kept for call sites. */
 export function resolveTreasurySigningKeypairFromMaster(
+  env: NodeJS.ProcessEnv,
+): { ok: true; keypair: Keypair } | { ok: false; reason: string } {
+  return resolveTreasurySigningKeypair(env);
+}
+
+export function resolveTreasurySigningKeypair(
   env: NodeJS.ProcessEnv,
 ): { ok: true; keypair: Keypair } | { ok: false; reason: string } {
   const treasuryPk = treasuryPubkeyFromEnv(env);
   if (!treasuryPk) {
     return { ok: false, reason: "Set SOLANA_TREASURY_ADDRESS." };
+  }
+
+  const fromSecret = keypairFromTreasurySecretB64(env, treasuryPk);
+  if (fromSecret) {
+    return fromSecret;
   }
 
   const explicit = (env.SOLANA_TREASURY_DERIVATION_INDEX ?? "").trim();
@@ -87,6 +128,6 @@ export function resolveTreasurySigningKeypairFromMaster(
 
   return {
     ok: false,
-    reason: `No HD index 0..${maxScan - 1} matches SOLANA_TREASURY_ADDRESS. Set SOLANA_TREASURY_DERIVATION_INDEX.`,
+    reason: `No HD index 0..${maxScan - 1} matches SOLANA_TREASURY_ADDRESS. Set SOLANA_TREASURY_DERIVATION_INDEX to the correct custodial index, or set SOLANA_TREASURY_KEY_B64 to the base64-encoded 64-byte secret key for SOLANA_TREASURY_ADDRESS (when the treasury is not derived from SOLANA_CUSTODIAL_MASTER_KEY_B64).`,
   };
 }
