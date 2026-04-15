@@ -24,6 +24,80 @@ const READ_COMMITMENT = "confirmed" as const;
 /** Native SOL buffer beyond rent + signature fee so preflight is conservative. */
 const SOL_HEADROOM_LAMPORTS = 100_000;
 
+/**
+ * Ensures the treasury has an SPL account for QUEST. New treasuries often have no ATA yet; without it
+ * `getAccount` fails with `treasury_quest_ata_missing`. Creates the ATA (treasury pays rent + fee).
+ */
+export async function ensureTreasuryQuestAta(
+  connection: Connection,
+  treasuryKeypair: Keypair,
+  questMint: PublicKey,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const mintInfo = await connection.getAccountInfo(questMint, READ_COMMITMENT);
+  if (!mintInfo) {
+    return { ok: false, reason: "quest_mint_missing" };
+  }
+  const tokenProgram = mintInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+    ? TOKEN_2022_PROGRAM_ID
+    : TOKEN_PROGRAM_ID;
+  const treasury = treasuryKeypair.publicKey;
+  const treasuryAta = getAssociatedTokenAddressSync(questMint, treasury, false, tokenProgram);
+  try {
+    await getAccount(connection, treasuryAta, READ_COMMITMENT, tokenProgram);
+    return { ok: true };
+  } catch {
+    /* ATA not initialized */
+  }
+
+  const ix = createAssociatedTokenAccountInstruction(
+    treasuryKeypair.publicKey,
+    treasuryAta,
+    treasury,
+    questMint,
+    tokenProgram,
+  );
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash(READ_COMMITMENT);
+  const tx = new Transaction({
+    feePayer: treasuryKeypair.publicKey,
+    recentBlockhash: blockhash,
+  }).add(ix);
+
+  try {
+    tx.sign(treasuryKeypair);
+    const signature = await connection.sendRawTransaction(tx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: READ_COMMITMENT,
+      maxRetries: 3,
+    });
+    await connection.confirmTransaction(
+      { signature, blockhash, lastValidBlockHeight },
+      READ_COMMITMENT,
+    );
+    return { ok: true };
+  } catch (e) {
+    try {
+      await getAccount(connection, treasuryAta, READ_COMMITMENT, tokenProgram);
+      return { ok: true };
+    } catch {
+      /* fall through */
+    }
+    if (e instanceof SendTransactionError) {
+      const logs = await e.getLogs(connection).catch(() => undefined);
+      const tail = logs?.length ? logs.slice(-5).join("\n") : "";
+      const msg = `${e.message}${tail ? `\n${tail}` : ""}`;
+      return {
+        ok: false,
+        reason: `Could not create treasury QUEST token account (needs SOL for rent + fees). ${msg}`,
+      };
+    }
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      reason: `Could not create treasury QUEST token account (needs SOL for rent + fees). ${msg}`,
+    };
+  }
+}
+
 export type QusdSellPreflightOk = {
   treasuryQuestRaw: bigint;
   treasurySolLamports: number;

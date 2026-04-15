@@ -28,7 +28,11 @@ import {
   insertQuestPurchaseRefund,
   insertQuestPurchaseSpend,
 } from "../server/qusdLedger";
-import { preflightTreasuryQuestSend, sendQuestFromTreasuryToUser } from "../server/qusdSellTransfer";
+import {
+  ensureTreasuryQuestAta,
+  preflightTreasuryQuestSend,
+  sendQuestFromTreasuryToUser,
+} from "../server/qusdSellTransfer";
 import { resolveTreasurySigningKeypair } from "../server/treasurySigningKeypair";
 
 type SqliteDb = InstanceType<typeof Database>;
@@ -353,6 +357,12 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
           const amountRaw = questHumanToRaw(questHuman, mintMeta.decimals);
           if (amountRaw <= 0n) {
             sendJson(res, 400, { error: "quest_raw_zero" });
+            return;
+          }
+
+          const ataOk = await ensureTreasuryQuestAta(connection, treasuryKp, questMintPk);
+          if (!ataOk.ok) {
+            sendJson(res, 503, { error: "treasury_quest_ata", message: ataOk.reason });
             return;
           }
 
