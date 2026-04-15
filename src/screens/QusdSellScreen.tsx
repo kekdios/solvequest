@@ -12,6 +12,7 @@ import { isDemoMode, useAuthMode } from "../auth/sessionAuth";
 
 const USDC_ICON = "/prize-usdc.png";
 const QUEST_ICON = "/prize-quest.png";
+const PRIZE_CONTACT_EMAIL = "privacyemail369@gmail.com";
 
 const card: CSSProperties = {
   border: "1px solid var(--border)",
@@ -185,6 +186,7 @@ export default function QusdSellScreen({
           <p style={{ margin: 0, color: "var(--muted)" }}>
             Prize and QUEST purchase run on the live app with a signed-in account. Demo mode uses local balances only.
           </p>
+          <PrizeContactLine style={{ marginTop: 16 }} />
         </div>
         <SybilProofNote />
       </div>
@@ -231,6 +233,8 @@ export default function QusdSellScreen({
         </span>{" "}
         to receive QUEST at <strong>{mult.toLocaleString()} QUSD per 1 QUEST</strong>.
       </p>
+
+      <PrizeContactLine />
 
       <div style={card}>
         <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 8 }}>Your QUSD balance</div>
@@ -376,6 +380,26 @@ export default function QusdSellScreen({
 
       <SybilProofNote />
     </div>
+  );
+}
+
+function PrizeContactLine({ style }: { style?: CSSProperties }) {
+  return (
+    <p
+      style={{
+        marginTop: 14,
+        fontSize: 14,
+        lineHeight: 1.55,
+        color: "var(--muted)",
+        maxWidth: 640,
+        ...style,
+      }}
+    >
+      To Claim Prize Contact{" "}
+      <a href={`mailto:${PRIZE_CONTACT_EMAIL}`} style={{ color: "var(--accent)", wordBreak: "break-all" }}>
+        {PRIZE_CONTACT_EMAIL}
+      </a>
+    </p>
   );
 }
 
