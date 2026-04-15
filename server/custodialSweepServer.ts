@@ -16,7 +16,10 @@ import {
   getAssociatedTokenAddressSync,
   getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
-import { deriveSweepFeePayerKeypairFromMaster } from "./custodialHdDerive";
+import {
+  deriveSweepFeePayerKeypairFromMaster,
+  RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX,
+} from "./custodialHdDerive";
 import { MAINNET_USDC_MINT } from "./solanaUsdcScan";
 
 const READ_COMMITMENT = "confirmed" as const;
@@ -71,6 +74,40 @@ function resolveSweepFeePayerKeypair(
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, reason: `SOLANA_SWEEP_FEE_PAYER_FROM_MASTER: ${msg}` };
   }
+}
+
+/** Public-only metadata for admin UI (pubkey + path); never exposes key material. */
+export type SweepFeePayerPubkeyInfo =
+  | { mode: "custodial_pays" }
+  | { mode: "explicit"; pubkey: string }
+  | { mode: "from_master"; pubkey: string; derivation_index: number; path: string }
+  | { mode: "config_error"; message: string };
+
+export function getSweepFeePayerPubkeyInfo(env: NodeJS.ProcessEnv): SweepFeePayerPubkeyInfo {
+  const explicitB64 = (env.SOLANA_SWEEP_FEE_PAYER_KEY_B64 ?? "").trim();
+  const fromMaster =
+    env.SOLANA_SWEEP_FEE_PAYER_FROM_MASTER === "1" || env.SOLANA_SWEEP_FEE_PAYER_FROM_MASTER === "true";
+
+  const resolved = resolveSweepFeePayerKeypair(env);
+  if (resolved && !resolved.ok) {
+    return { mode: "config_error", message: resolved.reason };
+  }
+  if (!resolved) {
+    return { mode: "custodial_pays" };
+  }
+  const pubkey = resolved.keypair.publicKey.toBase58();
+  if (explicitB64) {
+    return { mode: "explicit", pubkey };
+  }
+  if (fromMaster) {
+    return {
+      mode: "from_master",
+      pubkey,
+      derivation_index: RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX,
+      path: `m/44'/501'/${RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX}'/0'`,
+    };
+  }
+  return { mode: "custodial_pays" };
 }
 
 export type CustodialSweepResult =

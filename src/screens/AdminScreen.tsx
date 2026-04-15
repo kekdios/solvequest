@@ -12,12 +12,14 @@ import {
   fetchAdminCustodyDebug,
   fetchAdminMe,
   fetchAdminNonce,
+  fetchAdminSweepFeePayerInfo,
   postAdminCustodialSweep,
   postAdminDepositScan,
   postAdminLogout,
   postAdminVerify,
   type AdminCustodialSweepResponse,
   type AdminCustodyDebugResponse,
+  type AdminSweepFeePayerInfoResponse,
   uint8ToBase64,
 } from "../lib/adminApi";
 import { getSolanaRpcEndpoint } from "../deposit/chainConfig";
@@ -53,12 +55,23 @@ function AdminSolanaCustody({
   const [serverSnapLoading, setServerSnapLoading] = useState(true);
   const [serverSnapErr, setServerSnapErr] = useState<string | null>(null);
 
+  const [feePayerInfo, setFeePayerInfo] = useState<AdminSweepFeePayerInfoResponse | null>(null);
+  const [feePayerErr, setFeePayerErr] = useState<string | null>(null);
+
   const loadServerSnap = useCallback(() => {
     setServerSnapLoading(true);
     setServerSnapErr(null);
-    void fetchAdminCustodyDebug()
-      .then(setServerSnap)
-      .catch((e: unknown) => setServerSnapErr(e instanceof Error ? e.message : String(e)))
+    setFeePayerErr(null);
+    void Promise.all([fetchAdminCustodyDebug(), fetchAdminSweepFeePayerInfo()])
+      .then(([snap, fee]) => {
+        setServerSnap(snap);
+        setFeePayerInfo(fee);
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        setServerSnapErr(msg);
+        setFeePayerErr(msg);
+      })
       .finally(() => setServerSnapLoading(false));
   }, []);
 
@@ -148,6 +161,70 @@ function AdminSolanaCustody({
             )}
           </>
         ) : null}
+      </div>
+
+      <div style={s.custodyServerCard}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <h3 style={s.custodyServerH3}>Sweep fee payer (fund with SOL)</h3>
+          <button type="button" style={s.custodyRefreshBtn} disabled={serverSnapLoading} onClick={() => loadServerSnap()}>
+            {serverSnapLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+        {feePayerErr && !feePayerInfo ? (
+          <p style={s.err}>{feePayerErr}</p>
+        ) : feePayerInfo?.mode === "custodial_pays" ? (
+          <p style={s.custodyHint}>
+            Central fee payer is <strong>off</strong>. Each custodial <code style={s.inlineCode}>sol_receive_address</code>{" "}
+            pays its own tx fees, or set <code style={s.inlineCode}>SOLANA_SWEEP_FEE_PAYER_KEY_B64</code> or{" "}
+            <code style={s.inlineCode}>SOLANA_SWEEP_FEE_PAYER_FROM_MASTER=1</code> on the server.
+          </p>
+        ) : feePayerInfo?.mode === "config_error" ? (
+          <p style={s.err} role="alert">
+            {feePayerInfo.message}
+          </p>
+        ) : feePayerInfo && (feePayerInfo.mode === "explicit" || feePayerInfo.mode === "from_master") ? (
+          <>
+            <p style={s.custodyHint}>
+              {feePayerInfo.mode === "from_master" ? (
+                <>
+                  Derived from <code style={s.inlineCode}>SOLANA_CUSTODIAL_MASTER_KEY_B64</code> at reserved HD path (same
+                  entropy as deposits; fund this pubkey for sweep fees).
+                </>
+              ) : (
+                <>From <code style={s.inlineCode}>SOLANA_SWEEP_FEE_PAYER_KEY_B64</code>.</>
+              )}
+            </p>
+            {feePayerInfo.mode === "from_master" ? (
+              <p style={{ ...s.custodyMono, marginTop: 6 }}>
+                <span style={s.custodyK}>Path</span> {feePayerInfo.path}
+              </p>
+            ) : null}
+            <p style={{ ...s.custodyMono, marginTop: 6 }}>
+              <span style={s.custodyK}>Pubkey</span>{" "}
+              <a
+                href={`https://solscan.io/account/${feePayerInfo.pubkey}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={s.custodySigA}
+              >
+                {feePayerInfo.pubkey}
+              </a>
+            </p>
+            <p style={s.custodyMono}>
+              <span style={s.custodyK}>SOL balance</span>{" "}
+              {feePayerInfo.sol_lamports == null
+                ? feePayerInfo.rpc_error
+                  ? `— (${feePayerInfo.rpc_error})`
+                  : "—"
+                : `${(feePayerInfo.sol_lamports / LAMPORTS_PER_SOL).toFixed(6)}`}
+            </p>
+            <p style={{ ...s.custodyHint, marginTop: 8 }}>
+              RPC: <code style={s.inlineCode}>{feePayerInfo.rpc_url}</code>
+            </p>
+          </>
+        ) : (
+          <p style={s.custodyHint}>Loading…</p>
+        )}
       </div>
 
       <div style={s.custodyField}>

@@ -18,6 +18,53 @@ export type AdminCustodyDebugResponse = {
   rpc_error?: string;
 };
 
+/** GET /api/admin/sweep-fee-payer-info — pubkey to fund for central sweep fees (admin session). */
+export type AdminSweepFeePayerInfoResponse =
+  | {
+      ok: true;
+      mode: "custodial_pays";
+      sol_lamports: number | null;
+      rpc_url: string;
+      rpc_error?: string;
+    }
+  | {
+      ok: true;
+      mode: "config_error";
+      message: string;
+      sol_lamports: number | null;
+      rpc_url: string;
+    }
+  | {
+      ok: true;
+      mode: "explicit";
+      pubkey: string;
+      sol_lamports: number | null;
+      rpc_url: string;
+      rpc_error?: string;
+    }
+  | {
+      ok: true;
+      mode: "from_master";
+      pubkey: string;
+      derivation_index: number;
+      path: string;
+      sol_lamports: number | null;
+      rpc_url: string;
+      rpc_error?: string;
+    };
+
+export async function fetchAdminSweepFeePayerInfo(): Promise<AdminSweepFeePayerInfoResponse> {
+  const r = await fetch(`${base}/sweep-fee-payer-info`, { credentials: "include" });
+  const data = (await r.json()) as AdminSweepFeePayerInfoResponse | { ok?: false; error?: string };
+  if (r.status === 401) {
+    throw new Error("Not signed in");
+  }
+  if (!r.ok || !data || typeof data !== "object" || !("ok" in data) || !data.ok) {
+    throw new Error(typeof data === "object" && data && "error" in data ? String(data.error) : r.statusText);
+  }
+  return data as AdminSweepFeePayerInfoResponse;
+}
+
 export async function fetchAdminCustodyDebug(): Promise<AdminCustodyDebugResponse> {
   const r = await fetch(`${base}/custody-debug`, { credentials: "include" });
   const data = (await r.json()) as AdminCustodyDebugResponse | { ok?: false; error?: string };

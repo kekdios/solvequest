@@ -10,6 +10,7 @@ import { loadEnv } from "vite";
 import { Connection, PublicKey } from "@solana/web3.js";
 import nacl from "tweetnacl";
 import { runCustodialSweepOrchestration } from "../server/adminCustodialSweepOrchestrator";
+import { getSweepFeePayerPubkeyInfo } from "../server/custodialSweepServer";
 import { runDepositScanOnce } from "../server/depositScanWorker";
 import { getUsdcAta, MAINNET_USDC_MINT } from "../server/solanaUsdcScan";
 
@@ -223,6 +224,68 @@ export function createAdminApiMiddleware(
             usdc_balance_ui: null,
             ata_exists: false,
             recent_signatures: [] as { signature: string; slot: number | null; blockTime: number | null }[],
+            rpc_url: rpcDefault,
+            rpc_error: msg,
+          });
+        }
+      })();
+      return;
+    }
+
+    /** Sweep fee payer pubkey (central fees) — for funding SOL; no secrets returned. */
+    if (req.method === "GET" && url === "/api/admin/sweep-fee-payer-info") {
+      const sess = adminSessionOk(req.headers.cookie, sessions);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "unauthorized" });
+        return;
+      }
+      const envMerged = { ...process.env, ...env } as NodeJS.ProcessEnv;
+      const info = getSweepFeePayerPubkeyInfo(envMerged);
+      const rpcDefault =
+        envMerged.SOLANA_RPC_URL?.trim() ||
+        envMerged.SOLANA_RPC_PROXY_TARGET?.trim() ||
+        "https://api.mainnet-beta.solana.com";
+
+      if (info.mode === "custodial_pays" || info.mode === "config_error") {
+        sendJson(res, 200, {
+          ok: true,
+          ...info,
+          sol_lamports: null as number | null,
+          rpc_url: rpcDefault,
+        });
+        return;
+      }
+
+      let ownerPk: PublicKey;
+      try {
+        ownerPk = new PublicKey(info.pubkey);
+      } catch {
+        sendJson(res, 200, {
+          ok: true,
+          ...info,
+          sol_lamports: null,
+          rpc_url: rpcDefault,
+          rpc_error: "invalid_pubkey",
+        });
+        return;
+      }
+
+      void (async () => {
+        try {
+          const conn = new Connection(rpcDefault, "confirmed");
+          const solLamports = await conn.getBalance(ownerPk, "confirmed");
+          sendJson(res, 200, {
+            ok: true,
+            ...info,
+            sol_lamports: solLamports,
+            rpc_url: rpcDefault,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          sendJson(res, 200, {
+            ok: true,
+            ...info,
+            sol_lamports: null,
             rpc_url: rpcDefault,
             rpc_error: msg,
           });
