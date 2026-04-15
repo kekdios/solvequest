@@ -47,7 +47,7 @@ Vite (dev/build) also reads project `.env` / `.env.local` per Vite rules for **`
 | Solana | `SOLANA_RPC_PROXY_TARGET` or `SOLANA_RPC_URL`, **`SOLANA_TREASURY_ADDRESS`** + **`SOLANA_TREASURY_KEY_B64`** (server; treasury pubkey also exposed read-only via **`GET /api/config/treasury`**). Optional **`VITE_*`** for RPC tuning in the browser (see `src/lib/solanaChainConfig.ts`). |
 | HD master (optional) | **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** (server-only) — only if you do **not** set **`SOLANA_TREASURY_KEY_B64`** and instead derive the treasury key via HD (`server/solanaHdDerive.ts`). |
 | Buy QUSD (worker) | `QUSD_MULTIPLIER` / `VITE_QUSD_MULTIPLIER`, optional **`SOLVEQUEST_DEPOSIT_SCAN`** + interval — background USDC→QUSD crediting from each account’s **`sol_receive_address`**. |
-| Sell QUSD (API) | `QUEST_MINT`, `QUEST_MULTIPLIER`; optional **`PRIZE_AMOUNT`** / **`CLAIM_QUEST_AMOUNT`** (marketing copy on the Sell QUSD screen). Requires JWT/auth configured like other `/api/*` routes. |
+| Sell QUSD (API) | `QUEST_MINT`, `QUEST_MULTIPLIER`; optional **`PRIZE_AMOUNT`** / **`CLAIM_QUEST_AMOUNT`** (marketing copy on the **Prize** screen). Requires JWT/auth configured like other `/api/*` routes. |
 | Server | `PORT` (production default often **3000** in code, but **systemd** may set e.g. **3001**—must match nginx) |
 
 On the **droplet**, ensure the process **working directory** is the app root (e.g. `/opt/solvequest`) so `.env` / `backend/.env` resolve correctly.

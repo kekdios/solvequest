@@ -63,7 +63,7 @@ export default function QusdSellScreen({
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadErr("Could not load sell configuration.");
+        setLoadErr("Could not load prize configuration.");
       });
     return () => {
       cancelled = true;
@@ -129,7 +129,7 @@ export default function QusdSellScreen({
       setSellOk(
         sig
           ? `Sent ${qa != null ? `${qa} QUEST` : "QUEST"} — signature ${sig.slice(0, 12)}…`
-          : "Sale completed.",
+          : "Purchase completed.",
       );
       setQusdDraft("");
       await refreshMe();
@@ -145,7 +145,7 @@ export default function QusdSellScreen({
     return (
       <div style={card}>
         <p style={{ margin: 0, color: "var(--muted)" }}>
-          Selling QUSD for QUEST runs on the live app with a signed-in account. Demo mode uses local balances only.
+          Prize and QUEST purchase run on the live app with a signed-in account. Demo mode uses local balances only.
         </p>
       </div>
     );
@@ -216,11 +216,11 @@ export default function QusdSellScreen({
       </div>
 
       <div style={card}>
-        <label style={uiFieldLabel} htmlFor="qusd-sell-amount">
-          QUSD to spend (receive QUEST)
+        <label style={uiFieldLabel} htmlFor="prize-qusd-buy">
+          QUSD to spend (buy QUEST)
         </label>
         <input
-          id="qusd-sell-amount"
+          id="prize-qusd-buy"
           type="text"
           inputMode="decimal"
           placeholder="0"
@@ -238,7 +238,7 @@ export default function QusdSellScreen({
 
         {!solReceiveVerified ? (
           <p role="status" style={{ marginTop: 14, fontSize: 14, color: "var(--muted)" }}>
-            Verify your Solana address on the <strong>Account</strong> page to sell QUSD for QUEST.{" "}
+            Verify your Solana address on the <strong>Account</strong> page to enable QUEST purchases.{" "}
             {serverDepositAddress ? `Current address: ${serverDepositAddress.slice(0, 8)}…` : null}
           </p>
         ) : null}
@@ -260,7 +260,7 @@ export default function QusdSellScreen({
           disabled={busy || !solReceiveVerified}
           onClick={() => void submitSell()}
         >
-          {busy ? "Processing…" : "Sell QUSD"}
+          {busy ? "Processing…" : "Buy QUEST"}
         </button>
       </div>
     </div>

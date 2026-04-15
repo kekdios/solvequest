@@ -74,7 +74,7 @@ const mainAppItems: { id: AppScreen; label: string; Icon: () => ReactNode }[] = 
   { id: "landing", label: "Home", Icon: NavIconHome },
   { id: "trade", label: "Perpetuals", Icon: NavIconPerps },
   { id: "history", label: "History", Icon: NavIconHistory },
-  { id: "sellQusd", label: "Sell QUSD", Icon: NavIconPrize },
+  { id: "sellQusd", label: "Prize", Icon: NavIconPrize },
   { id: "account", label: "Account", Icon: NavIconAccount },
   { id: "quickstart", label: "Quick start", Icon: NavIconBook },
 ];

@@ -223,8 +223,8 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
     lead: "Closed perpetual trades (newest first).",
   },
   sellQusd: {
-    title: "Sell QUSD",
-    lead: "Prize pool, spend QUSD for QUEST, and balances.",
+    title: "Prize",
+    lead: "Prize pool, QUEST purchase with QUSD, and balances.",
   },
   account: {
     title: "Account",
