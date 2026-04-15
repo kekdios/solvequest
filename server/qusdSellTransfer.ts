@@ -1,5 +1,6 @@
 /**
  * Send QUEST (SPL) from treasury to a user wallet; treasury keypair matches HD derivation (see treasurySigningKeypair).
+ * Used by the **Sell QUSD** flow (QUSD ledger debit → QUEST to verified address).
  */
 import {
   Connection,
@@ -23,7 +24,7 @@ const READ_COMMITMENT = "confirmed" as const;
 /** Native SOL buffer beyond rent + signature fee so preflight is conservative. */
 const SOL_HEADROOM_LAMPORTS = 100_000;
 
-export type PrizePreflightOk = {
+export type QusdSellPreflightOk = {
   treasuryQuestRaw: bigint;
   treasurySolLamports: number;
   decimals: number;
@@ -42,7 +43,7 @@ export async function preflightTreasuryQuestSend(
   userOwner: PublicKey,
   amountRaw: bigint,
 ): Promise<
-  | { ok: true; details: PrizePreflightOk }
+  | { ok: true; details: QusdSellPreflightOk }
   | { ok: false; reason: string }
 > {
   if (amountRaw <= 0n) {
@@ -123,7 +124,7 @@ export async function sendQuestFromTreasuryToUser(
   questMint: PublicKey,
   userOwner: PublicKey,
   amountRaw: bigint,
-  preflight: PrizePreflightOk,
+  preflight: QusdSellPreflightOk,
 ): Promise<{ ok: true; signature: string } | { ok: false; reason: string }> {
   const { decimals, tokenProgram, treasuryAta, userAta, userNeedsAta } = preflight;
 

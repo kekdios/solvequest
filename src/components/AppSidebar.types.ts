@@ -3,7 +3,6 @@ export type AppScreen =
   | "quickstart"
   | "trade"
   | "history"
-  | "prize"
+  | "sellQusd"
   | "account"
-  | "auth"
-  | "admin";
+  | "auth";

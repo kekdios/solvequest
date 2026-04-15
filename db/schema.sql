@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   sol_receive_address TEXT,
   /** Set when the user completed on-chain verification (address locked after this). */
   sol_receive_verified_at INTEGER,
+  /* Legacy — unused for new accounts; user deposit addresses are user-verified only. */
   custodial_seckey_enc TEXT,
-  /** HD path index m/44'/501'/<n>'/0'; null for legacy encrypted-only or pre-HD rows. */
   custodial_derivation_index INTEGER,
   sync_version INTEGER NOT NULL DEFAULT 0
 );

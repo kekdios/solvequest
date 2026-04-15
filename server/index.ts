@@ -1,5 +1,5 @@
 /**
- * Express server: /api/* (auth, account, admin), Solana RPC proxy, static SPA + fallback.
+ * Express server: /api/* (auth, account, QUSD sell), Solana RPC proxy, static SPA + fallback.
  */
 import "./loadEnv";
 import express from "express";
@@ -10,9 +10,8 @@ import { PublicKey } from "@solana/web3.js";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { createUserAuthMiddleware } from "../plugins/userAuthApiPlugin";
 import { createAccountApiMiddleware } from "../plugins/accountApiPlugin";
-import { createAdminApiMiddleware } from "../plugins/adminApiPlugin";
-import { createPrizeApiMiddleware } from "../plugins/prizeApiPlugin";
-import { startDepositScanWorker } from "./depositScanWorker";
+import { createQusdSellApiMiddleware } from "../plugins/qusdSellApiPlugin";
+import { startQusdBuyScanWorker } from "./qusdBuyScanWorker";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -49,11 +48,9 @@ app.get("/version", (_req, res) => {
   res.json({ version: appVersion });
 });
 
-/** Public: lets the admin custody sweep UI use SOLANA_TREASURY_ADDRESS without a Vite rebuild. */
+/** Public: treasury base58 for deposit UI without a Vite rebuild. */
 app.get("/api/config/treasury", (_req, res) => {
-  const raw =
-    process.env.SOLANA_TREASURY_ADDRESS?.trim() ||
-    process.env.VITE_SOLANA_TREASURY_ADDRESS?.trim();
+  const raw = process.env.SOLANA_TREASURY_ADDRESS?.trim();
   res.setHeader("Cache-Control", "no-store");
   if (!raw) {
     res.json({ address: null });
@@ -68,8 +65,7 @@ app.get("/api/config/treasury", (_req, res) => {
 
 app.use(createUserAuthMiddleware(env, mode));
 app.use(createAccountApiMiddleware(env, root));
-app.use(createPrizeApiMiddleware(env, root));
-app.use(createAdminApiMiddleware(env, mode, root));
+app.use(createQusdSellApiMiddleware(env, root));
 
 const solanaTarget =
   env.SOLANA_RPC_PROXY_TARGET?.trim() || "https://api.mainnet-beta.solana.com";
@@ -122,5 +118,5 @@ app.listen(port, () => {
       `[server] API + Solana proxy on http://127.0.0.1:${port} — Vite proxies /api and /solana-rpc here`,
     );
   }
-  startDepositScanWorker(root, process.env);
+  startQusdBuyScanWorker(root, process.env);
 });

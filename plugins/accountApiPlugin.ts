@@ -15,7 +15,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
-import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
+import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
 import {
   getLedgerBalances,
   insertAddressVerificationBonus,
@@ -187,7 +187,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       /** WAL + busy wait — deposit worker / concurrent reads were contending on the same file without this. */
       db.pragma("journal_mode = WAL");
       db.pragma("busy_timeout = 8000");
-      ensureCustodialHdSchema(db);
+      ensureAccountsSchema(db);
       return db;
     } catch (e) {
       console.error("[account-api] open db:", e);
@@ -281,15 +281,6 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         mePayload.sync_version = Number((row as AccountRow).sync_version ?? 0);
         mePayload.account_active =
           database != null ? accountHasSolanaDeposit(database, accountId) : false;
-        const custodialRow = row as {
-          custodial_seckey_enc?: string | null;
-          custodial_derivation_index?: number | null;
-        };
-        /** `!= null` is false for `undefined`, so use explicit checks. HD index 0 must count as custodial. */
-        const di = custodialRow.custodial_derivation_index;
-        const diNum = di === null || di === undefined ? NaN : Number(di);
-        const hasHdIndex = Number.isFinite(diNum) && diNum >= 0;
-        mePayload.custodial_deposit = Boolean(custodialRow.custodial_seckey_enc || hasHdIndex);
         sendJson(res, 200, mePayload);
       } catch (e) {
         console.error("[account-api] GET /api/account/me:", e);

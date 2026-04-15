@@ -1,13 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useReducer,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from "react";
 import { SessionAuthProvider, useAuthMode, isDemoMode, useSessionAuth } from "./auth/sessionAuth";
 import { getDefaultDemoAppState, loadDemoAppState, saveDemoAppState } from "./lib/demoPersistence";
 import { buildAccountStatePutBody, putAccountState, type AccountStatePutBody } from "./lib/accountSync";
@@ -28,16 +19,9 @@ import LandingPage from "./screens/LandingPage";
 import AccountScreen from "./screens/AccountScreen";
 import QuickStartScreen from "./screens/QuickStartScreen";
 import HistoryScreen from "./screens/HistoryScreen";
-import PrizeScreen from "./screens/PrizeScreen";
+import QusdSellScreen from "./screens/QusdSellScreen";
 import AuthScreen from "./screens/AuthScreen";
 import AppSidebar, { type AppScreen } from "./components/AppSidebar";
-import {
-  getAdminPublicOrigin,
-  getMainSitePublicOrigin,
-  isAdminSubdomainHost,
-} from "./lib/appHost";
-
-const AdminScreen = lazy(() => import("./screens/AdminScreen"));
 
 type State = DemoAppState;
 
@@ -238,9 +222,9 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
     title: "History",
     lead: "Closed perpetual trades (newest first).",
   },
-  prize: {
-    title: "Prize",
-    lead: "Prize pool, QUEST purchase with QUSD, and balances.",
+  sellQusd: {
+    title: "Sell QUSD",
+    lead: "Prize pool, spend QUSD for QUEST, and balances.",
   },
   account: {
     title: "Account",
@@ -249,10 +233,6 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   auth: {
     title: "Login / Register",
     lead: "Email code — register or sign in. Optional 7-day remember-me.",
-  },
-  admin: {
-    title: "Admin",
-    lead: "Solana wallet sign-in for operators.",
   },
 };
 
@@ -496,74 +476,21 @@ function AppInner() {
     return () => window.clearInterval(id);
   }, [demo, user?.email, authLoading, ledgerAccountRow?.id, clearSessionAndLedger]);
 
-  const lastNonAdminScreen = useRef<AppScreen>("landing");
+  const lastPopStateScreen = useRef<AppScreen>("landing");
 
-  const [screen, setScreen] = useState<AppScreen>(() => {
-    if (typeof window === "undefined") return "landing";
-    if (isAdminSubdomainHost()) return "admin";
-    return "landing";
-  });
-
-  /** Main site: /admin URL → admin subdomain only. */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (isAdminSubdomainHost()) return;
-    if (window.location.pathname.startsWith("/admin")) {
-      window.location.replace(
-        `${getAdminPublicOrigin()}${window.location.pathname}${window.location.search}${window.location.hash}`,
-      );
-    }
-  }, []);
-
-  /** Main site must never keep Admin screen (menu removed; deep links redirect). */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (isAdminSubdomainHost()) return;
-    if (screen === "admin") {
-      window.location.replace(getAdminPublicOrigin());
-    }
-  }, [screen]);
-
-  /** Admin subdomain: only Admin (or Auth). */
-  useEffect(() => {
-    if (!isAdminSubdomainHost()) return;
-    if (screen === "auth") return;
-    if (screen !== "admin") setScreen("admin");
-  }, [screen]);
+  const [screen, setScreen] = useState<AppScreen>("landing");
 
   useEffect(() => {
-    if (screen === "auth" && user) setScreen(isAdminSubdomainHost() ? "admin" : "trade");
+    if (screen === "auth" && user) setScreen("trade");
   }, [screen, user]);
 
   useEffect(() => {
-    if (screen !== "admin") lastNonAdminScreen.current = screen;
-  }, [screen]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (isAdminSubdomainHost()) {
-      window.history.replaceState({}, "", "/");
-      return;
-    }
-    const pathAdmin = window.location.pathname.startsWith("/admin");
-    if (screen === "admin" && !pathAdmin) {
-      window.history.replaceState({}, "", "/admin");
-    } else if (screen !== "admin" && pathAdmin) {
-      window.history.replaceState({}, "", "/");
-    }
+    lastPopStateScreen.current = screen;
   }, [screen]);
 
   useEffect(() => {
     const onPop = () => {
-      if (isAdminSubdomainHost()) {
-        setScreen("admin");
-        return;
-      }
-      if (window.location.pathname.startsWith("/admin")) {
-        window.location.href = getAdminPublicOrigin();
-        return;
-      }
-      setScreen(lastNonAdminScreen.current);
+      setScreen(lastPopStateScreen.current);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -573,8 +500,6 @@ function AppInner() {
   const [hlFeedError, setHlFeedError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && isAdminSubdomainHost()) return;
-
     const ac = new AbortController();
 
     const pull = () => {
@@ -633,11 +558,7 @@ function AppInner() {
               type="button"
               style={styles.logoBtn}
               onClick={() => {
-                if (isAdminSubdomainHost()) {
-                  window.location.href = getMainSitePublicOrigin();
-                } else {
-                  setScreen("landing");
-                }
+                setScreen("landing");
               }}
               aria-label="Home"
             >
@@ -649,7 +570,7 @@ function AppInner() {
                 height={44}
               />
             </button>
-            {demo && !isAdminSubdomainHost() ? (
+            {demo ? (
               <span style={styles.demoBadge} title="Anonymous demo — state saved in this browser only">
                 Demo
               </span>
@@ -684,12 +605,7 @@ function AppInner() {
       </header>
 
       <div className="app-body">
-        <AppSidebar
-          screen={screen}
-          onNavigate={setScreen}
-          variant={isAdminSubdomainHost() ? "adminSubdomain" : "mainApp"}
-          mainSiteOrigin={getMainSitePublicOrigin()}
-        />
+        <AppSidebar screen={screen} onNavigate={setScreen} />
         <main
           className="app-main"
           style={screen === "landing" ? styles.mainLanding : styles.main}
@@ -705,24 +621,8 @@ function AppInner() {
 
           {screen === "landing" && <LandingPage onStartNow={() => setScreen("trade")} />}
 
-          {screen === "admin" && (
-            <Suspense fallback={<p style={styles.muted}>Loading admin…</p>}>
-              <AdminScreen
-                onNavigateHome={() => {
-                  window.location.href = getMainSitePublicOrigin();
-                }}
-                onCustodialUsdcCredited={() => {
-                  /* USDC → QUSD credits run server-side (deposit worker); avoid double-counting. */
-                }}
-              />
-            </Suspense>
-          )}
-
           {screen === "auth" && (
-            <AuthScreen
-              onSuccess={() => setScreen(isAdminSubdomainHost() ? "admin" : "trade")}
-              onContinueDemo={() => setScreen(isAdminSubdomainHost() ? "admin" : "trade")}
-            />
+            <AuthScreen onSuccess={() => setScreen("trade")} onContinueDemo={() => setScreen("trade")} />
           )}
 
           {screen === "quickstart" && (
@@ -734,8 +634,8 @@ function AppInner() {
 
           {screen === "history" && <HistoryScreen />}
 
-          {screen === "prize" && (
-            <PrizeScreen
+          {screen === "sellQusd" && (
+            <QusdSellScreen
               qusdUnlocked={state.qusd.unlocked}
               solReceiveVerified={ledgerAccountRow?.sol_receive_verified_at != null}
               serverDepositAddress={ledgerAccountRow?.sol_receive_address?.trim() || null}

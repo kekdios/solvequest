@@ -385,7 +385,7 @@ select {
   }
 }
 
-/* App pages (Account, Auth, Quick Start, Admin, etc.) — log rows + shared root */
+/* App pages (Account, Auth, Quick Start, etc.) — log rows + shared root */
 .app-page .app-page-log-row {
   transition: background-color 0.12s ease;
 }

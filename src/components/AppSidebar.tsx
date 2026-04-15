@@ -6,9 +6,6 @@ export type { AppScreen } from "./AppSidebar.types";
 type Props = {
   screen: AppScreen;
   onNavigate: (screen: AppScreen) => void;
-  /** Main app: full nav without Admin. Admin host: link home + Admin only. */
-  variant: "mainApp" | "adminSubdomain";
-  mainSiteOrigin: string;
 };
 
 const iconWrap: CSSProperties = {
@@ -73,20 +70,11 @@ function NavIconAccount() {
   );
 }
 
-function NavIconAdmin() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
-
 const mainAppItems: { id: AppScreen; label: string; Icon: () => ReactNode }[] = [
   { id: "landing", label: "Home", Icon: NavIconHome },
   { id: "trade", label: "Perpetuals", Icon: NavIconPerps },
   { id: "history", label: "History", Icon: NavIconHistory },
-  { id: "prize", label: "Prize", Icon: NavIconPrize },
+  { id: "sellQusd", label: "Sell QUSD", Icon: NavIconPrize },
   { id: "account", label: "Account", Icon: NavIconAccount },
   { id: "quickstart", label: "Quick start", Icon: NavIconBook },
 ];
@@ -95,37 +83,7 @@ const mainAppItems: { id: AppScreen; label: string; Icon: () => ReactNode }[] = 
 const APP_VERSION_SEMVER = "1.0.0";
 const APP_VERSION_DATE = "12-Apr-26";
 
-export default function AppSidebar({ screen, onNavigate, variant, mainSiteOrigin }: Props) {
-  if (variant === "adminSubdomain") {
-    return (
-      <aside className="app-sidebar" aria-label="Admin">
-        <div className="app-sidebar-top">
-          <nav className="app-sidebar-nav">
-            <a
-              href={mainSiteOrigin}
-              className="app-sidebar-item"
-              rel="noopener noreferrer"
-            >
-              <span style={iconWrap} aria-hidden>
-                <NavIconHome />
-              </span>
-              Main site
-            </a>
-            <div className="app-sidebar-item app-sidebar-item--on app-sidebar-item--static" role="presentation">
-              <span style={iconWrap} aria-hidden>
-                <NavIconAdmin />
-              </span>
-              Admin
-            </div>
-          </nav>
-        </div>
-        <footer className="app-sidebar-footer" title={`Solve Quest ${APP_VERSION_SEMVER}`}>
-          v{APP_VERSION_SEMVER} · {APP_VERSION_DATE}
-        </footer>
-      </aside>
-    );
-  }
-
+export default function AppSidebar({ screen, onNavigate }: Props) {
   return (
     <aside className="app-sidebar" aria-label="Primary">
       <div className="app-sidebar-top">

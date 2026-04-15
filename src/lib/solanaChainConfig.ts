@@ -57,23 +57,10 @@ export function makeConnection(): Connection {
   return new Connection(getSolanaRpcEndpoint(), READ_COMMITMENT);
 }
 
-export function treasuryPubkey(): PublicKey | null {
-  const raw = typeof import.meta !== "undefined" ? import.meta.env?.VITE_SOLANA_TREASURY_ADDRESS : undefined;
-  if (!raw || typeof raw !== "string" || raw.length < 32) return null;
-  try {
-    return new PublicKey(raw.trim());
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Treasury for browser-side sweeps: `VITE_SOLANA_TREASURY_ADDRESS` at build time, else
- * `GET /api/config/treasury` (reads server `SOLANA_TREASURY_ADDRESS` — no rebuild needed).
+ * Treasury pubkey from `GET /api/config/treasury` (server `SOLANA_TREASURY_ADDRESS`).
  */
 export async function resolveTreasuryPubkey(): Promise<PublicKey | null> {
-  const fromVite = treasuryPubkey();
-  if (fromVite) return fromVite;
   try {
     const r = await fetch("/api/config/treasury", { credentials: "same-origin" });
     if (!r.ok) return null;
@@ -85,7 +72,7 @@ export async function resolveTreasuryPubkey(): Promise<PublicKey | null> {
   }
 }
 
-/** Canonical base58 treasury (`VITE_*` or `GET /api/config/treasury` → `SOLANA_TREASURY_ADDRESS`). */
+/** Canonical base58 treasury from `GET /api/config/treasury`. */
 export async function resolveTreasuryAddressBase58(): Promise<string | null> {
   const pk = await resolveTreasuryPubkey();
   return pk?.toBase58() ?? null;

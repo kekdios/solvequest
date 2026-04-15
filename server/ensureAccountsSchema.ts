@@ -1,12 +1,11 @@
 /**
- * Adds `custodial_derivation_index` + unique partial index when missing (older DBs).
- * Idempotent. Called on every SQLite open in the API and deposit worker.
+ * Idempotent SQLite fixes for `accounts` (older DBs). Called when opening the DB in API / deposit worker.
  */
 import type Database from "better-sqlite3";
 
 type SqliteDb = InstanceType<typeof Database>;
 
-export function ensureCustodialHdSchema(database: SqliteDb): void {
+export function ensureAccountsSchema(database: SqliteDb): void {
   const hasAccounts = database
     .prepare(`SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'accounts' LIMIT 1`)
     .get() as { ok: number } | undefined;
@@ -16,7 +15,7 @@ export function ensureCustodialHdSchema(database: SqliteDb): void {
   const has = cols.some((c) => c.name === "custodial_derivation_index");
   if (!has) {
     database.exec(`ALTER TABLE accounts ADD COLUMN custodial_derivation_index INTEGER;`);
-    console.log("[sqlite] Added column accounts.custodial_derivation_index");
+    console.log("[sqlite] Added column accounts.custodial_derivation_index (legacy)");
   }
   database.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_custodial_derivation_unique
@@ -30,7 +29,7 @@ export function ensureCustodialHdSchema(database: SqliteDb): void {
     console.log("[sqlite] Added column accounts.sol_receive_verified_at");
   }
 
-  /** Legacy server-assigned HD (or encrypted) deposit addresses count as verified — no duplicate QUSD bonus. */
+  /** Legacy rows: server-assigned deposit addresses before user-verified flow. */
   try {
     database.exec(`
       UPDATE accounts SET sol_receive_verified_at = COALESCE(updated_at, created_at)
@@ -42,6 +41,6 @@ export function ensureCustodialHdSchema(database: SqliteDb): void {
         );
     `);
   } catch {
-    /* older DBs without custodial columns */
+    /* older DBs without optional columns */
   }
 }

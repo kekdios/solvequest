@@ -24,7 +24,7 @@ function QrIcon({ size = 18 }: { size?: number }) {
 }
 
 type Props = {
-  /** Address to show: user deposit wallet or `SOLANA_TREASURY_ADDRESS` (treasury). */
+  /** Address to show (e.g. user’s verified receive wallet, or treasury when using variant `treasury`). */
   serverDepositAddress?: string | null;
   /** When set and there is no address yet, show this instead of an endless “Loading…”. */
   depositAddressError?: string | null;

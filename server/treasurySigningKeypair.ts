@@ -7,20 +7,19 @@
  *    - **32 bytes** — `Keypair.fromSeed` (32-byte seed only).
  *    - **66 bytes** — try 64-byte secret at offset 0 or 2 (some exports add a 2-byte prefix).
  *    Public key must match SOLANA_TREASURY_ADDRESS.
- * 2. **SOLANA_TREASURY_DERIVATION_INDEX** — HD path m/44'/501'/<n>'/0' from SOLANA_CUSTODIAL_MASTER_KEY_B64.
+ * 2. **SOLANA_TREASURY_DERIVATION_INDEX** — HD path m/44'/501'/<n>'/0' from **SOLANA_CUSTODIAL_MASTER_KEY_B64** (treasury HD only).
  * 3. Scan indices 0 .. SOLANA_TREASURY_MAX_SCAN−1 (default 50_000).
  */
 import { Keypair, PublicKey } from "@solana/web3.js";
 import {
   RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX,
-  deriveCustodialKeypairFromIndex,
-} from "./custodialHdDerive";
+  deriveHdKeypairFromIndex,
+} from "./solanaHdDerive";
 
 const DEFAULT_MAX_SCAN = 50_000;
 
 function treasuryPubkeyFromEnv(env: NodeJS.ProcessEnv): PublicKey | null {
-  const s =
-    (env.SOLANA_TREASURY_ADDRESS ?? env.VITE_SOLANA_TREASURY_ADDRESS ?? "").trim();
+  const s = (env.SOLANA_TREASURY_ADDRESS ?? "").trim();
   if (!s) return null;
   try {
     return new PublicKey(s);
@@ -84,10 +83,16 @@ function keypairFromTreasurySecretB64(
     }
   }
 
-  const tried = keypairs.map((k) => k.publicKey.toBase58()).join(", ") || "none";
+  const uniq = [...new Set(keypairs.map((k) => k.publicKey.toBase58()))];
+  const derived = uniq.length ? uniq.join(", ") : "none (could not parse a Solana key from these bytes)";
+  const want = treasuryPk.toBase58();
+  const alt = uniq[0];
+  const hint = alt
+    ? ` Export the keypair for ${want}, or change SOLANA_TREASURY_ADDRESS to ${alt} if that is the wallet that should hold QUEST and pay fees.`
+    : " Check that the value is base64 of a Solana JSON keypair (64 numbers) or 32-byte seed.";
   return {
     ok: false,
-    reason: `SOLANA_TREASURY_KEY_B64 does not match SOLANA_TREASURY_ADDRESS. Derived candidate pubkeys: ${tried}`,
+    reason: `Treasury key mismatch: derived pubkey(s) ${derived}; SOLANA_TREASURY_ADDRESS expects ${want}.${hint}`,
   };
 }
 
@@ -120,11 +125,11 @@ export function resolveTreasurySigningKeypair(
     if (idx === RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX) {
       return {
         ok: false,
-        reason: "SOLANA_TREASURY_DERIVATION_INDEX cannot equal the reserved sweep fee-payer index.",
+        reason: "SOLANA_TREASURY_DERIVATION_INDEX cannot equal the reserved HD index.",
       };
     }
     try {
-      const kp = deriveCustodialKeypairFromIndex(idx, env);
+      const kp = deriveHdKeypairFromIndex(idx, env);
       if (!kp.publicKey.equals(treasuryPk)) {
         return {
           ok: false,
@@ -146,7 +151,7 @@ export function resolveTreasurySigningKeypair(
   for (let i = 0; i < maxScan; i++) {
     if (i === RESERVED_SWEEP_FEE_PAYER_DERIVATION_INDEX) continue;
     try {
-      const kp = deriveCustodialKeypairFromIndex(i, env);
+      const kp = deriveHdKeypairFromIndex(i, env);
       if (kp.publicKey.equals(treasuryPk)) {
         if (process.env.NODE_ENV !== "production") {
           console.warn(
@@ -161,7 +166,7 @@ export function resolveTreasurySigningKeypair(
   }
 
   try {
-    deriveCustodialKeypairFromIndex(0, env);
+    deriveHdKeypairFromIndex(0, env);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, reason: msg };
@@ -169,6 +174,6 @@ export function resolveTreasurySigningKeypair(
 
   return {
     ok: false,
-    reason: `No HD index 0..${maxScan - 1} matches SOLANA_TREASURY_ADDRESS. Set SOLANA_TREASURY_DERIVATION_INDEX to the correct custodial index, or set SOLANA_TREASURY_KEY_B64 to the base64-encoded 64-byte secret key for SOLANA_TREASURY_ADDRESS (when the treasury is not derived from SOLANA_CUSTODIAL_MASTER_KEY_B64).`,
+    reason: `No HD index 0..${maxScan - 1} matches SOLANA_TREASURY_ADDRESS. Set SOLANA_TREASURY_DERIVATION_INDEX to the correct index, or set SOLANA_TREASURY_KEY_B64 to the base64-encoded secret for SOLANA_TREASURY_ADDRESS (when the treasury is not derived from SOLANA_CUSTODIAL_MASTER_KEY_B64).`,
   };
 }

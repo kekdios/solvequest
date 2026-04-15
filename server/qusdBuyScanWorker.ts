@@ -1,17 +1,15 @@
 /**
- * Polls Solana mainnet for USDC SPL deposits to each account's sol_receive_address,
- * Appends `qusd_ledger` + deposit_credits, bumps sync_version.
+ * Buy QUSD (Solana): poll mainnet for USDC SPL to each account's verified `sol_receive_address`,
+ * append `qusd_ledger` + `deposit_credits`, bump `sync_version`.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { Connection, PublicKey } from "@solana/web3.js";
 import Database from "better-sqlite3";
 import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
-import { resolveCustodialDepositKeypair } from "./depositWalletCrypto";
 import { insertSolanaUsdcCredit } from "./qusdLedger";
-import { sweepCustodialDepositToTreasury } from "./custodialSweepServer";
 import { getUsdcAtaBalanceUi, scanNewUsdcDeposits, type ScanLedger } from "./solanaUsdcScan";
-import { ensureCustodialHdSchema } from "./ensureCustodialHdSchema";
+import { ensureAccountsSchema } from "./ensureAccountsSchema";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -20,7 +18,7 @@ export function openDepositDatabase(dbPath: string): SqliteDb {
   database.pragma("foreign_keys = ON");
   database.pragma("journal_mode = WAL");
   database.pragma("busy_timeout = 8000");
-  ensureCustodialHdSchema(database);
+  ensureAccountsSchema(database);
   return database;
 }
 
@@ -41,10 +39,10 @@ export function rpcUrl(env: NodeJS.ProcessEnv): string {
 }
 
 /**
- * One full pass over all accounts with a deposit address (USDC scan + optional custodial sweep).
- * Used by POST /api/admin/deposit-scan. Opens and closes the DB for each run.
+ * One full pass over all accounts with a deposit address (USDC scan → QUSD credit).
+ * Opens and closes the DB for each run.
  */
-export async function runDepositScanOnce(
+export async function runQusdBuyScanOnce(
   root: string,
   env: NodeJS.ProcessEnv,
 ): Promise<{ ok: true; accountsScanned: number } | { ok: false; error: string }> {
@@ -82,7 +80,7 @@ export async function runDepositScanOnce(
       try {
         await processAccount(database, connection, accountId, addr, qusdPerUsdc, env);
       } catch (e) {
-        console.error(`[deposit-scan] account ${accountId}:`, e);
+        console.error(`[qusd-buy] account ${accountId}:`, e);
       }
     }
     return { ok: true, accountsScanned: rows.length };
@@ -95,11 +93,11 @@ export async function runDepositScanOnce(
   }
 }
 
-/** Opt-in background polling: set SOLVEQUEST_DEPOSIT_SCAN=1 (or true). Default is off — use admin “Scan now” or this env. */
-export function startDepositScanWorker(root: string, env: NodeJS.ProcessEnv): void {
+/** Opt-in background polling: set SOLVEQUEST_DEPOSIT_SCAN=1 (or true). Default is off. */
+export function startQusdBuyScanWorker(root: string, env: NodeJS.ProcessEnv): void {
   const enabled = env.SOLVEQUEST_DEPOSIT_SCAN === "1" || env.SOLVEQUEST_DEPOSIT_SCAN === "true";
   if (!enabled) {
-    console.log("[deposit-scan] background polling disabled (set SOLVEQUEST_DEPOSIT_SCAN=1 to enable)");
+    console.log("[qusd-buy] background polling disabled (set SOLVEQUEST_DEPOSIT_SCAN=1 to enable)");
     return;
   }
 
@@ -115,14 +113,14 @@ export function startDepositScanWorker(root: string, env: NodeJS.ProcessEnv): vo
   const getDb = (): SqliteDb | null => {
     if (db) return db;
     if (!fs.existsSync(dbPath)) {
-      console.warn(`[deposit-scan] database missing at ${dbPath} — skipping worker`);
+      console.warn(`[qusd-buy] database missing at ${dbPath} — skipping worker`);
       return null;
     }
     try {
       db = openSqlite(dbPath);
       return db;
     } catch (e) {
-      console.error("[deposit-scan] open db:", e);
+      console.error("[qusd-buy] open db:", e);
       return null;
     }
   };
@@ -142,7 +140,7 @@ export function startDepositScanWorker(root: string, env: NodeJS.ProcessEnv): vo
         )
         .all() as { id: string; sol_receive_address: string }[];
     } catch (e) {
-      console.error("[deposit-scan] list accounts:", e);
+      console.error("[qusd-buy] list accounts:", e);
       return;
     }
 
@@ -150,7 +148,7 @@ export function startDepositScanWorker(root: string, env: NodeJS.ProcessEnv): vo
       try {
         await processAccount(database, connection, accountId, addr, qusdPerUsdc, env);
       } catch (e) {
-        console.error(`[deposit-scan] account ${accountId}:`, e);
+        console.error(`[qusd-buy] account ${accountId}:`, e);
       }
     }
   };
@@ -158,14 +156,9 @@ export function startDepositScanWorker(root: string, env: NodeJS.ProcessEnv): vo
   void tick();
   setInterval(() => void tick(), intervalMs);
   console.log(
-    `[deposit-scan] every ${intervalMs}ms → ${dbPath} (RPC ${rpcUrl(env).slice(0, 48)}…; QUSD_MULTIPLIER=${qusdPerUsdc})`,
+    `[qusd-buy] every ${intervalMs}ms → ${dbPath} (RPC ${rpcUrl(env).slice(0, 48)}…; QUSD_MULTIPLIER=${qusdPerUsdc})`,
   );
 }
-
-export type ProcessAccountOptions = {
-  /** When true, deposit sync runs but custodial sweep is skipped (used by admin guided sweep). */
-  skipCustodialSweep?: boolean;
-};
 
 export async function processAccount(
   database: SqliteDb,
@@ -174,13 +167,12 @@ export async function processAccount(
   solReceiveAddress: string,
   qusdPerUsdc: number,
   env: NodeJS.ProcessEnv,
-  opts?: ProcessAccountOptions,
 ): Promise<void> {
   let owner: PublicKey;
   try {
     owner = new PublicKey(solReceiveAddress.trim());
   } catch {
-    console.warn(`[deposit-scan] invalid sol_receive_address for ${accountId}`);
+    console.warn(`[qusd-buy] invalid sol_receive_address for ${accountId}`);
     return;
   }
 
@@ -206,7 +198,7 @@ export async function processAccount(
     database.prepare(`DELETE FROM deposit_scan_state WHERE account_id = ?`).run(accountId);
     ledger = { watermarkUsdcAta: null };
     console.warn(
-      `[deposit-scan] cleared stale watermark for ${accountId.slice(0, 8)}… (USDC on-chain, no deposit_credits)`,
+      `[qusd-buy] cleared stale watermark for ${accountId.slice(0, 8)}… (USDC on-chain, no deposit_credits)`,
     );
   }
 
@@ -229,7 +221,7 @@ export async function processAccount(
         )
         .run(creditedAt, accountId);
       console.log(
-        `[deposit-scan] credited ${accountId.slice(0, 8)}… +${qusd.toFixed(2)} QUSD (${amountUsdc} USDC) sig ${signature.slice(0, 10)}…`,
+        `[qusd-buy] credited ${accountId.slice(0, 8)}… +${qusd.toFixed(2)} QUSD (${amountUsdc} USDC) sig ${signature.slice(0, 10)}…`,
       );
     },
   );
@@ -252,43 +244,4 @@ export async function processAccount(
        ON CONFLICT(account_id) DO UPDATE SET watermark_signature = excluded.watermark_signature`,
     )
     .run(accountId, next.watermarkUsdcAta);
-
-  if (opts?.skipCustodialSweep) {
-    return;
-  }
-
-  const sweepOn =
-    env.SOLVEQUEST_CUSTODIAL_SWEEP === "1" || env.SOLVEQUEST_CUSTODIAL_SWEEP === "true";
-  if (!sweepOn) return;
-
-  let crow: { custodial_seckey_enc: string | null; custodial_derivation_index: number | null } | undefined;
-  try {
-    crow = database
-      .prepare(`SELECT custodial_seckey_enc, custodial_derivation_index FROM accounts WHERE id = ?`)
-      .get(accountId) as
-      | { custodial_seckey_enc: string | null; custodial_derivation_index: number | null }
-      | undefined;
-  } catch {
-    return;
-  }
-  const kp = crow ? resolveCustodialDepositKeypair(crow, env) : null;
-  if (!kp) {
-    console.warn(
-      `[deposit-scan] sweep skipped ${accountId.slice(0, 8)}… — no custodial key (set accounts.custodial_derivation_index or legacy custodial_seckey_enc).`,
-    );
-    return;
-  }
-
-  try {
-    const r = await sweepCustodialDepositToTreasury(connection, env, kp);
-    if (r.ok) {
-      console.log(
-        `[deposit-scan] custodial sweep ${accountId.slice(0, 8)}… +${r.sweptUsdc.toFixed(4)} USDC (tx ${r.signature.slice(0, 12)}…)`,
-      );
-    } else {
-      console.warn(`[deposit-scan] custodial sweep not executed ${accountId.slice(0, 8)}…: ${r.reason}`);
-    }
-  } catch (e) {
-    console.warn(`[deposit-scan] custodial sweep failed ${accountId.slice(0, 8)}…:`, e);
-  }
 }

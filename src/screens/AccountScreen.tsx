@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
-import { resolveTreasuryAddressBase58 } from "../deposit/chainConfig";
 import { QUSD_PER_USD } from "../engine/qusdVault";
 import { QusdAmount, QusdIcon } from "../Qusd";
 
@@ -43,38 +42,12 @@ export default function AccountScreen({
   const [draftAddress, setDraftAddress] = useState("");
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [treasuryAddress, setTreasuryAddress] = useState<string | null>(null);
-  const [treasuryLoadState, setTreasuryLoadState] = useState<"idle" | "loading" | "missing">("idle");
-
   const verified = Boolean(solReceiveVerified);
   const displayAddr = serverDepositAddress?.trim() ?? "";
 
   useEffect(() => {
     if (verified && displayAddr) setDraftAddress(displayAddr);
   }, [verified, displayAddr]);
-
-  useEffect(() => {
-    if (isDemo || !verified) {
-      setTreasuryAddress(null);
-      setTreasuryLoadState("idle");
-      return;
-    }
-    let cancelled = false;
-    setTreasuryLoadState("loading");
-    void resolveTreasuryAddressBase58().then((addr) => {
-      if (cancelled) return;
-      if (addr) {
-        setTreasuryAddress(addr);
-        setTreasuryLoadState("idle");
-      } else {
-        setTreasuryAddress(null);
-        setTreasuryLoadState("missing");
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [isDemo, verified]);
 
   const submitVerify = useCallback(async () => {
     const addr = draftAddress.trim();
@@ -208,34 +181,26 @@ export default function AccountScreen({
               <h2 style={s.buyMoreTitle}>Buy More QUSD</h2>
             </div>
             <p style={s.buyMoreLead}>
-              USDC sent to our treasury address is converted to QUSD at{" "}
-              <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong>. Your verified wallet
-              address is credited as QUSD after on-chain confirmation.
+              Send <strong style={{ color: "var(--text)" }}>USDC (SPL)</strong> on Solana to{" "}
+              <strong style={{ color: "var(--text)" }}>your verified address</strong> below. The server credits QUSD
+              at <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong> after on-chain
+              confirmation.
             </p>
             <div style={s.receiveAddressesBlock}>
               <Suspense fallback={<p style={s.suspenseFallback}>Loading…</p>}>
-                {treasuryLoadState === "loading" ? (
-                  <p style={s.suspenseFallback}>Loading treasury address…</p>
-                ) : treasuryLoadState === "missing" || !treasuryAddress ? (
-                  <p style={s.treasuryMissing} role="status">
-                    Treasury address unavailable. Set <code style={s.inlineCodeEnv}>SOLANA_TREASURY_ADDRESS</code> (or{" "}
-                    <code style={s.inlineCodeEnv}>VITE_SOLANA_TREASURY_ADDRESS</code>) on the server.
-                  </p>
-                ) : (
-                  <TestReceiveAddresses
-                    serverDepositAddress={treasuryAddress}
-                    depositAddressError={null}
-                    addressReady
-                    variant="treasury"
-                    depositHintOverride={
-                      <>
-                        Only send <strong style={s.buyMoreHintStrong}>USDC</strong> on the{" "}
-                        <strong style={s.buyMoreHintStrong}>Solana Network</strong> — treasury address (
-                        <code style={s.inlineCodeEnv}>SOLANA_TREASURY_ADDRESS</code>)
-                      </>
-                    }
-                  />
-                )}
+                <TestReceiveAddresses
+                  serverDepositAddress={displayAddr}
+                  depositAddressError={null}
+                  addressReady
+                  variant="user_deposit"
+                  depositHintOverride={
+                    <>
+                      Only send <strong style={s.buyMoreHintStrong}>USDC</strong> on the{" "}
+                      <strong style={s.buyMoreHintStrong}>Solana Network</strong> to this <strong>verified</strong>{" "}
+                      wallet — your linked receive address for QUSD credits.
+                    </>
+                  }
+                />
               </Suspense>
             </div>
             <p style={s.depositBuySell}>
@@ -255,7 +220,6 @@ const s: Record<string, CSSProperties> = {
   wrap: { display: "flex", flexDirection: "column", gap: 16 },
   metricsStack: { display: "flex", flexDirection: "column", gap: 16 },
   err: { margin: "8px 0 0", fontSize: 13, color: "var(--danger)" },
-  treasuryMissing: { margin: "8px 0 0", fontSize: 13, lineHeight: 1.5, color: "var(--muted)" },
   buyMorePanel: {
     width: "100%",
     background:

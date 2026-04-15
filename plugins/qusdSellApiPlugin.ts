@@ -1,7 +1,9 @@
 /**
- * GET /api/prize/config — public prize copy + QUEST mint.
- * GET /api/prize/me — auth: QUSD, verification, QUEST balance.
- * POST /api/prize/buy-quest — auth: spend QUSD, treasury sends QUEST to verified address.
+ * Sell QUSD (Solana): spend QUSD from the ledger; treasury sends QUEST to the verified receive address.
+ *
+ * GET /api/qusd/sell/config — public copy + QUEST mint.
+ * GET /api/qusd/sell/me — auth: QUSD, verification, QUEST balance.
+ * POST /api/qusd/sell — auth: spend QUSD, treasury sends QUEST to verified address.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -20,20 +22,20 @@ import {
 } from "@solana/spl-token";
 import { z } from "zod";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
-import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
+import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
 import {
   getLedgerBalances,
   insertQuestPurchaseRefund,
   insertQuestPurchaseSpend,
 } from "../server/qusdLedger";
-import { preflightTreasuryQuestSend, sendQuestFromTreasuryToUser } from "../server/prizeQuestTransfer";
+import { preflightTreasuryQuestSend, sendQuestFromTreasuryToUser } from "../server/qusdSellTransfer";
 import { resolveTreasurySigningKeypair } from "../server/treasurySigningKeypair";
 
 type SqliteDb = InstanceType<typeof Database>;
 
 const USER_COOKIE = "auth_token";
 
-const buyBodyZ = z.object({
+const sellBodyZ = z.object({
   qusd_amount: z.number().finite().positive(),
 });
 
@@ -109,7 +111,7 @@ async function fetchQuestTokenBalanceHuman(
   }
 }
 
-export function createPrizeApiMiddleware(env: Record<string, string>, root: string): Connect.NextHandleFunction {
+export function createQusdSellApiMiddleware(env: Record<string, string>, root: string): Connect.NextHandleFunction {
   const jwtSecret = env.JWT_SECRET;
   const jwtOk = Boolean(jwtSecret && jwtSecret !== "change-this-secret-key");
   const dbPath = resolveSolvequestDbPath(root, env);
@@ -123,10 +125,10 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
       db.pragma("foreign_keys = ON");
       db.pragma("journal_mode = WAL");
       db.pragma("busy_timeout = 8000");
-      ensureCustodialHdSchema(db);
+      ensureAccountsSchema(db);
       return db;
     } catch (e) {
-      console.error("[prize-api] open db:", e);
+      console.error("[qusd-sell-api] open db:", e);
       return null;
     }
   };
@@ -142,12 +144,12 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
 
   return (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
     const url = req.url?.split("?")[0] ?? "";
-    if (!url.startsWith("/api/prize")) {
+    if (!url.startsWith("/api/qusd/sell")) {
       next();
       return;
     }
 
-    if (req.method === "GET" && url === "/api/prize/config") {
+    if (req.method === "GET" && url === "/api/qusd/sell/config") {
       const prizeAmount = parseEnvNumber(env.PRIZE_AMOUNT, 0);
       const claimQuestAmount = parseEnvNumber(env.CLAIM_QUEST_AMOUNT, 0);
       const questMultiplier = parseEnvNumber(env.QUEST_MULTIPLIER, 1000);
@@ -166,7 +168,7 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
       return;
     }
 
-    if (req.method === "GET" && url === "/api/prize/me") {
+    if (req.method === "GET" && url === "/api/qusd/sell/me") {
       void (async () => {
         const token = parseCookies(req.headers.cookie)[USER_COOKIE];
         if (!token) {
@@ -211,7 +213,7 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
               const mint = new PublicKey(questMintStr);
               questBalance = await fetchQuestTokenBalanceHuman(connection, owner, mint);
             } catch (e) {
-              console.error("[prize-api] quest balance:", e);
+              console.error("[qusd-sell-api] quest balance:", e);
               questBalance = null;
             }
           }
@@ -223,9 +225,9 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
             quest_balance: questBalance,
           });
         } catch (e) {
-          console.error("[prize-api] GET /api/prize/me:", e);
+          console.error("[qusd-sell-api] GET /api/qusd/sell/me:", e);
           sendJson(res, 500, {
-            error: "prize_me_failed",
+            error: "qusd_sell_me_failed",
             message: e instanceof Error ? e.message : String(e),
           });
         }
@@ -233,7 +235,7 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
       return;
     }
 
-    if (req.method === "POST" && url === "/api/prize/buy-quest") {
+    if (req.method === "POST" && url === "/api/qusd/sell") {
       void (async () => {
         const token = parseCookies(req.headers.cookie)[USER_COOKIE];
         if (!token) {
@@ -252,9 +254,9 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
           return;
         }
 
-        let body: z.infer<typeof buyBodyZ>;
+        let body: z.infer<typeof sellBodyZ>;
         try {
-          body = buyBodyZ.parse(JSON.parse((await readBody(req)) || "{}"));
+          body = sellBodyZ.parse(JSON.parse((await readBody(req)) || "{}"));
         } catch (e) {
           sendJson(res, 400, {
             error: "invalid_body",
@@ -301,7 +303,7 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
           if (verifiedAt == null) {
             sendJson(res, 403, {
               error: "sol_address_not_verified",
-              message: "Verify your Solana address on the Account page before buying QUEST.",
+              message: "Verify your Solana address on the Account page before selling QUSD for QUEST.",
             });
             return;
           }
@@ -412,9 +414,9 @@ export function createPrizeApiMiddleware(env: Record<string, string>, root: stri
             buy_id: buyId,
           });
         } catch (e) {
-          console.error("[prize-api] POST /api/prize/buy-quest:", e);
+          console.error("[qusd-sell-api] POST /api/qusd/sell:", e);
           sendJson(res, 500, {
-            error: "quest_buy_failed",
+            error: "qusd_sell_failed",
             message: e instanceof Error ? e.message : String(e),
           });
         }

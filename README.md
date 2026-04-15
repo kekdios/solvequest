@@ -1,6 +1,6 @@
 # Solve Quest
 
-Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), **email (OTP) auth**, **Solana USDC → QUSD** deposits, and an **admin** area (wallet sign-in, deposit tooling).
+Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), **email (OTP) auth**, and Solana flows: **buy QUSD** (USDC to your verified address → server credits QUSD) and **sell QUSD** (QUSD → QUEST from treasury).
 
 **Stack:** React 19 + Vite · Express (`server/index.ts`) · SQLite (`better-sqlite3`) · Solana (web3.js, SPL).
 
@@ -25,11 +25,13 @@ Minimum env for local auth/API: set **`JWT_SECRET`** (and email OTP vars if you 
 | `npm run db:init` | Create/apply `db/schema.sql` to `data/solvequest.db` |
 | `npm run db:migrate` | Prints reminder — use `db:init` for a fresh DB |
 | `npm run db:provision` | Optional: seed account + signup ledger row |
+| `npm run treasury:gen` | New treasury: prints server `.env` lines plus **Base58** + JSON for wallet import (wallets don’t use base64) |
+| `npm run treasury:b64-to-wallet -- <B64>` | Turn existing `SOLANA_TREASURY_KEY_B64` into Base58 / JSON for wallets |
 | `npm test` | Typecheck + Hyperliquid feed smoke script |
 
 ## Docs
 
-- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana (deposit scan, **`POST /api/admin/custodial-sweep`**, treasury, **fund custodial address with SOL for sweep fees**), droplet notes. Default production SSH (matches `scripts/deploy.sh`): **`ssh root@152.42.168.173`**.
+- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana (QUSD buy scan worker, sell API, treasury), droplet notes. Default production SSH (matches `scripts/deploy.sh`): **`ssh root@152.42.168.173`**.
 
 ## Repository
 

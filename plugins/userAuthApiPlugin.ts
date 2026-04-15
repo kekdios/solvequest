@@ -14,7 +14,7 @@ import Database from "better-sqlite3";
 import { Resend } from "resend";
 import { z } from "zod";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
-import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
+import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
 import { insertEmailOtpVerificationBonus } from "../server/qusdLedger";
 
 const USER_COOKIE = "auth_token";
@@ -268,7 +268,7 @@ export function createUserAuthMiddleware(env: Record<string, string>, mode: stri
               database.pragma("foreign_keys = ON");
               database.pragma("journal_mode = WAL");
               database.pragma("busy_timeout = 8000");
-              ensureCustodialHdSchema(database);
+              ensureAccountsSchema(database);
               const { accountId } = ensureAccountRowForEmail(database, email);
               insertEmailOtpVerificationBonus(database, accountId, Date.now());
               database.close();

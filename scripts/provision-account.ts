@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import Database from "better-sqlite3";
 import { Keypair } from "@solana/web3.js";
-import { ensureCustodialHdSchema } from "../server/ensureCustodialHdSchema";
+import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
 import {
   ADDRESS_VERIFICATION_BONUS_QUSD,
   EMAIL_OTP_VERIFICATION_BONUS_QUSD,
@@ -27,7 +27,7 @@ const now = Date.now();
 
 const db = new Database(outPath);
 try {
-  ensureCustodialHdSchema(db);
+  ensureAccountsSchema(db);
   const kp = Keypair.generate();
   const solAddr = kp.publicKey.toBase58();
 

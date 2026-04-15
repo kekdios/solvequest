@@ -15,14 +15,14 @@ const card: CSSProperties = {
   background: "var(--panel)",
 };
 
-type PrizeConfig = {
+type QusdSellConfig = {
   prize_amount: number;
   claim_quest_amount: number;
   quest_multiplier: number;
   quest_mint: string | null;
 };
 
-type PrizeMe = {
+type QusdSellMe = {
   qusd_unlocked: number;
   sol_receive_verified: boolean;
   sol_receive_address: string | null;
@@ -36,7 +36,7 @@ type Props = {
   onRefreshAccount?: () => void | Promise<void>;
 };
 
-export default function PrizeScreen({
+export default function QusdSellScreen({
   qusdUnlocked,
   solReceiveVerified,
   serverDepositAddress,
@@ -45,25 +45,25 @@ export default function PrizeScreen({
   const authMode = useAuthMode();
   const demo = isDemoMode(authMode);
 
-  const [config, setConfig] = useState<PrizeConfig | null>(null);
-  const [me, setMe] = useState<PrizeMe | null>(null);
+  const [config, setConfig] = useState<QusdSellConfig | null>(null);
+  const [me, setMe] = useState<QusdSellMe | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [qusdDraft, setQusdDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [buyErr, setBuyErr] = useState<string | null>(null);
-  const [buyOk, setBuyOk] = useState<string | null>(null);
+  const [sellErr, setSellErr] = useState<string | null>(null);
+  const [sellOk, setSellOk] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/prize/config", { credentials: "same-origin" })
+    void fetch("/api/qusd/sell/config", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j) => {
         if (cancelled) return;
-        setConfig(j as PrizeConfig);
+        setConfig(j as QusdSellConfig);
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadErr("Could not load prize configuration.");
+        setLoadErr("Could not load sell configuration.");
       });
     return () => {
       cancelled = true;
@@ -73,12 +73,12 @@ export default function PrizeScreen({
   const refreshMe = useCallback(async () => {
     if (demo) return;
     try {
-      const r = await fetch("/api/prize/me", { credentials: "include" });
+      const r = await fetch("/api/qusd/sell/me", { credentials: "include" });
       if (!r.ok) {
         setMe(null);
         return;
       }
-      setMe((await r.json()) as PrizeMe);
+      setMe((await r.json()) as QusdSellMe);
     } catch {
       setMe(null);
     }
@@ -93,22 +93,22 @@ export default function PrizeScreen({
   const previewQuest =
     Number.isFinite(qusdNum) && qusdNum > 0 ? Math.round((qusdNum / mult) * 1e6) / 1e6 : null;
 
-  const submitBuy = useCallback(async () => {
+  const submitSell = useCallback(async () => {
     if (demo || busy) return;
-    setBuyErr(null);
-    setBuyOk(null);
+    setSellErr(null);
+    setSellOk(null);
     const q = Number.parseFloat(qusdDraft.replace(/,/g, ""));
     if (!Number.isFinite(q) || q <= 0) {
-      setBuyErr("Enter a positive QUSD amount.");
+      setSellErr("Enter a positive QUSD amount.");
       return;
     }
     if (!solReceiveVerified) {
-      setBuyErr("Verify your Solana address on the Account page first.");
+      setSellErr("Verify your Solana address on the Account page first.");
       return;
     }
     setBusy(true);
     try {
-      const r = await fetch("/api/prize/buy-quest", {
+      const r = await fetch("/api/qusd/sell", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -121,21 +121,21 @@ export default function PrizeScreen({
         quest_amount?: number;
       };
       if (!r.ok) {
-        setBuyErr(j.message || j.error || `Request failed (${r.status})`);
+        setSellErr(j.message || j.error || `Request failed (${r.status})`);
         return;
       }
       const sig = j.signature;
       const qa = j.quest_amount;
-      setBuyOk(
+      setSellOk(
         sig
           ? `Sent ${qa != null ? `${qa} QUEST` : "QUEST"} — signature ${sig.slice(0, 12)}…`
-          : "Purchase completed.",
+          : "Sale completed.",
       );
       setQusdDraft("");
       await refreshMe();
       await onRefreshAccount?.();
     } catch (e) {
-      setBuyErr(e instanceof Error ? e.message : "Network error");
+      setSellErr(e instanceof Error ? e.message : "Network error");
     } finally {
       setBusy(false);
     }
@@ -145,7 +145,7 @@ export default function PrizeScreen({
     return (
       <div style={card}>
         <p style={{ margin: 0, color: "var(--muted)" }}>
-          Prize and QUEST purchase run on the live app with a signed-in account. Demo mode uses local balances only.
+          Selling QUSD for QUEST runs on the live app with a signed-in account. Demo mode uses local balances only.
         </p>
       </div>
     );
@@ -184,12 +184,12 @@ export default function PrizeScreen({
           />
           {claimAmt.toLocaleString(undefined, { maximumFractionDigits: 6 })} QUEST
         </strong>
-        . You can purchase QUEST tokens with your{" "}
+        . Spend{" "}
         <span style={{ whiteSpace: "nowrap" }}>
           <QusdIcon size={16} />
           <strong> QUSD</strong>
         </span>{" "}
-        at a rate of <strong>{mult.toLocaleString()} QUSD per 1 QUEST</strong>.
+        to receive QUEST at <strong>{mult.toLocaleString()} QUSD per 1 QUEST</strong>.
       </p>
 
       <div style={card}>
@@ -216,11 +216,11 @@ export default function PrizeScreen({
       </div>
 
       <div style={card}>
-        <label style={uiFieldLabel} htmlFor="prize-qusd-buy">
-          QUSD to spend (buy QUEST)
+        <label style={uiFieldLabel} htmlFor="qusd-sell-amount">
+          QUSD to spend (receive QUEST)
         </label>
         <input
-          id="prize-qusd-buy"
+          id="qusd-sell-amount"
           type="text"
           inputMode="decimal"
           placeholder="0"
@@ -238,19 +238,19 @@ export default function PrizeScreen({
 
         {!solReceiveVerified ? (
           <p role="status" style={{ marginTop: 14, fontSize: 14, color: "var(--muted)" }}>
-            Verify your Solana address on the <strong>Account</strong> page to enable QUEST purchases.{" "}
+            Verify your Solana address on the <strong>Account</strong> page to sell QUSD for QUEST.{" "}
             {serverDepositAddress ? `Current address: ${serverDepositAddress.slice(0, 8)}…` : null}
           </p>
         ) : null}
 
-        {buyErr ? (
+        {sellErr ? (
           <p role="alert" style={{ marginTop: 12, color: "var(--danger)", fontSize: 14 }}>
-            {buyErr}
+            {sellErr}
           </p>
         ) : null}
-        {buyOk ? (
+        {sellOk ? (
           <p role="status" style={{ marginTop: 12, color: "var(--ok)", fontSize: 14 }}>
-            {buyOk}
+            {sellOk}
           </p>
         ) : null}
 
@@ -258,9 +258,9 @@ export default function PrizeScreen({
           type="button"
           style={{ ...uiBtnPrimary, marginTop: 14, opacity: busy || !solReceiveVerified ? 0.6 : 1 }}
           disabled={busy || !solReceiveVerified}
-          onClick={() => void submitBuy()}
+          onClick={() => void submitSell()}
         >
-          {busy ? "Processing…" : "Buy QUEST"}
+          {busy ? "Processing…" : "Sell QUSD"}
         </button>
       </div>
     </div>
