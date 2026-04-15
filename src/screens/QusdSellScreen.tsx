@@ -180,10 +180,13 @@ export default function QusdSellScreen({
 
   if (demo) {
     return (
-      <div style={card}>
-        <p style={{ margin: 0, color: "var(--muted)" }}>
-          Prize and QUEST purchase run on the live app with a signed-in account. Demo mode uses local balances only.
-        </p>
+      <div>
+        <div style={card}>
+          <p style={{ margin: 0, color: "var(--muted)" }}>
+            Prize and QUEST purchase run on the live app with a signed-in account. Demo mode uses local balances only.
+          </p>
+        </div>
+        <SybilProofNote />
       </div>
     );
   }
@@ -370,6 +373,29 @@ export default function QusdSellScreen({
           </p>
         ) : null}
       </div>
+
+      <SybilProofNote />
+    </div>
+  );
+}
+
+function SybilProofNote() {
+  return (
+    <div
+      style={{
+        ...card,
+        marginTop: 20,
+        maxWidth: 640,
+      }}
+    >
+      <h2 style={{ margin: "0 0 10px", fontSize: "1rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
+        Sybil Proof
+      </h2>
+      <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--muted)" }}>
+        <strong style={{ color: "var(--text)" }}>QUSD cannot be transferred between users.</strong> QUEST is only
+        ever sent from the project treasury—not routed from other wallets—so balances can’t be pooled by opening
+        multiple accounts and consolidating QUEST into a single address.
+      </p>
     </div>
   );
 }
