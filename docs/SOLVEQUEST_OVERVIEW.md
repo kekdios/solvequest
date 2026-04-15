@@ -9,7 +9,7 @@ This document describes what the **current** Solve Quest app does, how it is str
 ## What the app is
 
 - **Solve Quest** is a **single deployment**: a **Vite + React 19** SPA (`src/`) and an **Express** server (`server/index.ts`) that serves **`/api/*`**, proxies **Solana JSON-RPC** at **`/solana-rpc`**, and in production serves the **built static site** from **`dist/`** with SPA fallback.
-- **Product surface**: landing, email OTP auth, **perpetual-style trading UI** (Hyperliquid-derived index marks), **QUSD** balances, **history** of closed perps, **buy QUSD** (Solana USDC → QUSD crediting via verified receive address + server scan), **sell QUSD** (QUSD → QUEST from treasury), and account settings.
+- **Product surface**: landing, email OTP auth, in-app **Quick start** (sidebar), **perpetual-style trading UI** (**Trade** screen; Hyperliquid-derived index marks), **QUSD** balances, **history** of closed perps, **buy QUSD** (Solana USDC → QUSD crediting via verified receive address + server scan), **sell QUSD** (QUSD → QUEST from treasury), and account settings.
 - **Branding / public site**: production is commonly exposed at **`https://solvequest.io`** (DNS → your VPS; exact IP is **not fixed in code**—use DNS or your host’s dashboard).
 
 ---
@@ -193,6 +193,7 @@ After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10
 
 - **Users**: email OTP via **Resend** + **JWT** cookie (`auth_token`).
 - **Account state**: client **`PUT /api/account/state`** with optimistic locking on **`sync_version`**.
+
 ---
 
 ## Issues resolved (historical context)

@@ -5,7 +5,7 @@
 ## Goals
 
 1. **Anonymous demo**: Users land and use the app with the **free bonus QUSD** with **no registration** and **no Solana address**.
-2. **Clear UI**: Header shows **“Demo”** when in demo mode.
+2. **Clear UI**: The header shows **“Demo”** when in demo mode.
 3. **Demo persistence**: Account state and transaction history live **only in the browser** (`localStorage` / demo-specific keys as implemented).
 4. **Registration gate**: **Email + OTP** required for server-backed account features.
 5. **Solana deposit address**: User links **their own** wallet via **`POST /api/account/verify-solana-address`**; the server stores **`sol_receive_address`** and does **not** generate user keys.

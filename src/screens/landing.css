@@ -193,11 +193,24 @@
 
 .lp-leverage-tagline {
   margin: 0 auto 24px;
-  max-width: 36ch;
+  max-width: min(100%, 52ch);
   font-size: 1rem;
   font-weight: 650;
   letter-spacing: 0.04em;
+  line-height: 1.45;
+  text-align: center;
   color: color-mix(in srgb, var(--accent) 88%, var(--text));
+}
+
+.lp-leverage-tagline-qusd {
+  display: inline-block;
+  vertical-align: -0.22em;
+  width: 1.35em;
+  height: 1.35em;
+  border-radius: 6px;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .lp-cta-row {

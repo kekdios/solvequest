@@ -212,7 +212,7 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   },
   quickstart: {
     title: "Quick Start",
-    lead: "A short path from here to your first perpetual trade.",
+    lead: "From QUSD basics to your first trade in a few steps.",
   },
   trade: {
     title: "Trade",

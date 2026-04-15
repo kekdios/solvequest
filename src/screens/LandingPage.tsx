@@ -123,7 +123,18 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
               </p>
             </div>
           </div>
-          <p className="lp-leverage-tagline">Automatic 100x Leverage</p>
+          <p className="lp-leverage-tagline">
+            Multiple{" "}
+            <img
+              src="/icon-qusd.png"
+              alt=""
+              className="lp-leverage-tagline-qusd"
+              width={24}
+              height={24}
+              decoding="async"
+            />{" "}
+            10,000 QUSD awarded to verified active users daily
+          </p>
           <div className="lp-cta-row">
             <button type="button" className="lp-btn-primary" onClick={onStartNow}>
               Start Now
@@ -137,15 +148,15 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
           How It Works
         </h2>
         <p className="lp-section-lead">
-          Three steps from idea to execution—without watching charts all day.
+          Three steps from sign-up to execution—without watching charts all day.
         </p>
         <div className="lp-grid-3">
           <article className="lp-card">
             <span className="lp-step-num" aria-hidden>
               1
             </span>
-            <h3>Verify Email</h3>
-            <p>Verify Your Solana Wallet Address</p>
+            <h3>Verify email and wallet</h3>
+            <p>Sign in with email (OTP), then verify your Solana receive address on Account for deposits and prizes.</p>
           </article>
           <article className="lp-card">
             <span className="lp-step-num" aria-hidden>
@@ -195,8 +206,8 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
               <IconChart />
             </span>
             <div>
-              <h3>Real Market Data</h3>
-              <p>We sync directly with Hyperliquid price feeds for full transparency</p>
+              <h3>Real market data</h3>
+              <p>We sync directly with Hyperliquid price feeds for full transparency.</p>
             </div>
           </div>
           <div className="lp-feature">
@@ -204,8 +215,8 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
               <IconSpark />
             </span>
             <div>
-              <h3>No Experience Needed</h3>
-              <p>Beginner-friendly. No complex trading knowledge required</p>
+              <h3>No experience required</h3>
+              <p>Beginner-friendly—no advanced trading knowledge required.</p>
             </div>
           </div>
           <div className="lp-feature">
@@ -213,8 +224,8 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
               <IconAutomation />
             </span>
             <div>
-              <h3>Automation Proof</h3>
-              <p>Designed to ensure a level playing field</p>
+              <h3>Automation proof</h3>
+              <p>Designed to help keep the field level for everyone.</p>
             </div>
           </div>
         </div>
@@ -222,7 +233,7 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
 
       <section className="lp-section" aria-labelledby="lp-protect-heading">
         <h2 id="lp-protect-heading" className="lp-section-title">
-          Understand the risk
+          Understand the risks
         </h2>
         <p className="lp-section-lead" style={{ marginBottom: 20 }}>
           Perpetuals use leverage: adverse moves can reduce or wipe allocated margin quickly.
@@ -245,7 +256,7 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
           Start Now
         </button>
         <p className="lp-urgency lp-urgency--prize">
-          <span className="lp-urgency-lead">Get Verified to Compete -</span>{" "}
+          <span className="lp-urgency-lead">Get verified to compete —</span>{" "}
           <span className="lp-urgency-prize">
             <img src="/prize-usdc.png" alt="" className="lp-urgency-usdc" width={26} height={26} decoding="async" />
             <span>

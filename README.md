@@ -10,10 +10,12 @@ Web app for **perpetual-style trading** against Hyperliquid-derived index marks,
 npm install
 # Add .env at repo root (and optionally backend/.env) — see docs/SOLVEQUEST_OVERVIEW.md
 npm run db:init        # creates data/solvequest.db from db/schema.sql
-npm run dev            # API + Vite (dev API defaults to port 3001, Vite proxies /api)
+npm run dev            # API + Vite (dev API defaults to port 3001; Vite proxies /api)
 ```
 
-Minimum env for local auth/API: set **`JWT_SECRET`** (and email OTP vars if you use `/api/auth` — see `plugins/userAuthApiPlugin.ts`). Load order: **`.env`** then **`backend/.env`** (see `server/loadEnv.ts`).
+After the app loads, use the in-app **Quick start** screen (sidebar) for a user-facing walkthrough of QUSD, **Trade**, and positions.
+
+**Minimum env** for local auth/API: set **`JWT_SECRET`** (and email OTP variables if you use `/api/auth` — see `plugins/userAuthApiPlugin.ts`). Load order: **`.env`**, then **`backend/.env`** (see `server/loadEnv.ts`).
 
 ## Scripts
 

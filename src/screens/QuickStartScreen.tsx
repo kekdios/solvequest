@@ -10,32 +10,32 @@ const STEPS: { title: string; body: string }[] = [
   {
     title: "Know your QUSD",
     body:
-      "Perps draw from your **QUSD** balance for margin. You get **10,000 QUSD** when the account row is created, **10,000 QUSD** on first successful **email code** verification, and **10,000 QUSD** when you verify a **Solana address** on **Account**. USDC (SPL) sent to that address credits as QUSD after confirmation. In **demo mode**, balances stay in this browser only.",
+      "Perpetual-style trades use your **QUSD** balance for margin. You can earn up to **30,000 QUSD** in one-time credits: **10,000** when your account is created, **10,000** after your first successful **email (OTP)** verification, and **10,000** when you verify a **Solana** receive address on **Account**. USDC (SPL) sent to that address credits as QUSD after on-chain confirmation. Promotions may include additional awards for verified users (for example, **10,000 QUSD** daily for active users—see the home page and in-app notices). In **demo mode**, balances stay in this browser only.",
   },
   {
-    title: "Open Perpetuals",
+    title: "Open Trade",
     body:
-      "Choose **Perpetuals** in the sidebar. The strip at the top shows your **QUSD** balance. Index prices update from Hyperliquid (live where available).",
+      "Choose **Trade** in the sidebar. The top strip shows your **QUSD** balance. Index marks update from Hyperliquid where available.",
   },
   {
     title: "Pick a market",
     body:
-      "Use the tabs (BTC, ETH, SOL, GOLD, …) to choose which index you’re trading. The large chart area shows that market’s context; your order is always in the right-hand column.",
+      "Use the tabs (BTC, ETH, SOL, GOLD, …) to select an index. The chart shows that market’s context; your order controls stay in the right-hand column.",
   },
   {
     title: "Choose direction",
     body:
-      "Tap **Up (long)** if you think the index goes up, or **Down (short)** if you think it goes down.",
+      "Tap **Up (long)** if you expect the index to rise, or **Down (short)** if you expect it to fall.",
   },
   {
     title: "Set size and open",
     body:
-      "Enter **margin (QUSD tokens)** in the right column. Leverage is **100× (fixed)**—PnL = margin × index % move × 100. **Remaining** (margin + PnL) hits zero on a large enough adverse move (~1% vs entry at 100× long). Margin must be ≤ your **QUSD** balance. Use the main action (**Up** / **Down** on the market) to open.",
+      "Enter **margin (QUSD)** in the right column. Leverage is fixed at **100×**: PnL ≈ margin × index % move × 100. **Remaining** (margin + PnL) reaches zero on a large enough adverse move (about **1%** against a 100× long at entry). Margin cannot exceed your **QUSD** balance. Use **Up** or **Down** on the market to open.",
   },
   {
     title: "Manage the trade",
     body:
-      "On **Perpetuals**, your open positions appear in the table below the order form. Use **Close** to exit. Settlement is **margin + PnL** back to QUSD.",
+      "On **Trade**, open positions appear in the table below the order form. Tap **Close** to exit. Settlement returns **margin + PnL** to QUSD.",
   },
 ];
 
@@ -60,8 +60,8 @@ export default function QuickStartScreen({ onGoToPerps, onGoToAccount }: Props) 
   return (
     <div className="app-page" style={s.wrap}>
       <p style={s.lead}>
-        Follow these steps once—then use <strong style={{ color: "var(--text)" }}>Perpetuals</strong> whenever
-        you want to trade.
+        Follow these steps once, then open <strong style={{ color: "var(--text)" }}>Trade</strong> from the sidebar
+        whenever you want to place or manage positions.
       </p>
 
       <ol style={s.list}>
@@ -80,7 +80,7 @@ export default function QuickStartScreen({ onGoToPerps, onGoToAccount }: Props) 
 
       <div style={s.ctaBar}>
         <button type="button" style={s.btnPrimary} onClick={onGoToPerps}>
-          Open Perpetuals
+          Open Trade
         </button>
         <button type="button" style={s.btnGhost} onClick={onGoToAccount}>
           Account
