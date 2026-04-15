@@ -215,7 +215,7 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
     lead: "A short path from here to your first perpetual trade.",
   },
   trade: {
-    title: "Perpetuals",
+    title: "Trade",
     lead: "",
   },
   history: {

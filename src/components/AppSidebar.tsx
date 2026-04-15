@@ -72,7 +72,7 @@ function NavIconAccount() {
 
 const mainAppItems: { id: AppScreen; label: string; Icon: () => ReactNode }[] = [
   { id: "landing", label: "Home", Icon: NavIconHome },
-  { id: "trade", label: "Perpetuals", Icon: NavIconPerps },
+  { id: "trade", label: "Trade", Icon: NavIconPerps },
   { id: "history", label: "History", Icon: NavIconHistory },
   { id: "sellQusd", label: "Prize", Icon: NavIconPrize },
   { id: "account", label: "Account", Icon: NavIconAccount },
