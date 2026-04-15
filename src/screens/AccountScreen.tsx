@@ -112,6 +112,23 @@ export default function AccountScreen({
   return (
     <div className="app-page" style={s.wrap}>
       <div style={s.metricsStack}>
+        <div className="account-balance-grid">
+          <section style={s.statHero} aria-label="QUSD balance">
+            <p style={s.statLabel}>QUSD balance</p>
+            <div style={s.statHeroValue}>
+              <QusdAmount
+                value={qusdUnlocked}
+                maximumFractionDigits={2}
+                strong
+                color="var(--accent)"
+                iconSize={STAT_ICON_LG}
+                amountStyle={statAmountStyle}
+              />
+            </div>
+            <p style={s.statSub}>Available for perpetual margin and withdrawals per product rules.</p>
+          </section>
+        </div>
+
         <section
           style={{ ...s.statHero, ...s.walletPanelTop }}
           aria-label="Solana address and USDC deposits"
@@ -216,23 +233,6 @@ export default function AccountScreen({
             </>
           )}
         </section>
-
-        <div className="account-balance-grid">
-          <section style={s.statHero} aria-label="QUSD balance">
-            <p style={s.statLabel}>QUSD balance</p>
-            <div style={s.statHeroValue}>
-              <QusdAmount
-                value={qusdUnlocked}
-                maximumFractionDigits={2}
-                strong
-                color="var(--accent)"
-                iconSize={STAT_ICON_LG}
-                amountStyle={statAmountStyle}
-              />
-            </div>
-            <p style={s.statSub}>Available for perpetual margin and withdrawals per product rules.</p>
-          </section>
-        </div>
       </div>
     </div>
   );
