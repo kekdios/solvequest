@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import "./landing.css";
 
 type Props = {
@@ -53,13 +54,56 @@ function IconSpark({ className }: { className?: string }) {
 }
 
 export default function LandingPage({ onStartNow }: Props) {
+  const [prizeAmount, setPrizeAmount] = useState<number | null | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/qusd/sell/config", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { prize_amount?: number } | null) => {
+        if (cancelled || !j) return;
+        const n = j.prize_amount;
+        setPrizeAmount(typeof n === "number" && Number.isFinite(n) ? n : null);
+      })
+      .catch(() => {
+        if (!cancelled) setPrizeAmount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const usdPart =
+    prizeAmount === undefined
+      ? "…"
+      : prizeAmount === null
+        ? "—"
+        : prizeAmount.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
   return (
     <div className="lp">
       <section className="lp-hero" aria-labelledby="lp-hero-heading">
         <div className="lp-hero-inner">
           <p className="lp-eyebrow">Solve Quest</p>
-          <h1 id="lp-hero-heading" className="lp-title">
-            Turn Market Direction Into Daily Profits
+          <h1 id="lp-hero-heading" className="lp-title lp-title--prize-hero">
+            <span className="lp-title-shine">Compete for</span>{" "}
+            <span
+              className="lp-title-prize-amount"
+              aria-label={
+                typeof prizeAmount === "number" ? `Prize pool about ${prizeAmount} USDC` : undefined
+              }
+            >
+              <img
+                src="/prize-usdc.png"
+                alt=""
+                className="lp-title-usdc-icon"
+                width={44}
+                height={44}
+                decoding="async"
+              />
+              <span className="lp-title-shine lp-title-usd">${usdPart}</span>
+            </span>{" "}
+            <span className="lp-title-shine">PRIZE</span>
           </h1>
           <p className="lp-sub">Powered by AI. Synced with Hyperliquid. QUSD margin in one place.</p>
           <div className="lp-qusd-ribbon">

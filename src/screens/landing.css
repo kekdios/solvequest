@@ -66,6 +66,47 @@
   color: transparent;
 }
 
+.lp-title--prize-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2em 0.35em;
+  max-width: min(100%, 22rem);
+  width: 100%;
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: inherit;
+}
+
+.lp-title-shine {
+  background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 45%, var(--accent) 160%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lp-title-prize-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lp-title-usdc-icon {
+  width: clamp(36px, 8vw, 44px);
+  height: clamp(36px, 8vw, 44px);
+  object-fit: contain;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.lp-title-usd {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
 .lp-sub {
   font-size: clamp(1rem, 2vw, 1.125rem);
   color: var(--muted);
