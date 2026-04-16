@@ -94,26 +94,30 @@ export default function VisitorsScreen() {
       {loading && rows.length === 0 ? (
         <p style={{ color: "var(--muted)" }}>Loading…</p>
       ) : (
-        <table className="data-table" style={{ width: "100%", fontSize: 13 }}>
-          <thead>
-            <tr>
-              <th>Date / time</th>
-              <th>IP</th>
-              <th>Location</th>
-              <th>Page</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td className="mono">{fmtVisitorTs(row.created_at)}</td>
-                <td className="mono">{row.ip}</td>
-                <td>{row.location}</td>
-                <td className="mono">{row.path}</td>
+        <div className="app-table-scroll">
+          <table className="data-table" style={{ width: "100%", minWidth: 480, fontSize: 13 }}>
+            <thead>
+              <tr>
+                <th>Date / time</th>
+                <th>IP</th>
+                <th>Location</th>
+                <th>Page</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="mono">{fmtVisitorTs(row.created_at)}</td>
+                  <td className="mono">{row.ip}</td>
+                  <td style={{ wordBreak: "break-word" }}>{row.location}</td>
+                  <td className="mono" style={{ wordBreak: "break-all" }}>
+                    {row.path}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {rows.length === 0 && !loading && !error ? (

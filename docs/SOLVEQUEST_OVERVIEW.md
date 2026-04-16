@@ -9,8 +9,14 @@ This document describes what the **current** Solve Quest app does, how it is str
 ## What the app is
 
 - **Solve Quest** is a **single deployment**: a **Vite + React 19** SPA (`src/`) and an **Express** server (`server/index.ts`) that serves **`/api/*`**, proxies **Solana JSON-RPC** at **`/solana-rpc`**, and in production serves the **built static site** from **`dist/`** with SPA fallback.
-- **Product surface**: landing, email OTP auth, in-app **Quick start** (sidebar), **perpetual-style trading UI** (**Trade** screen; Hyperliquid-derived index marks), **QUSD** balances, **history** of closed perps, **buy QUSD** (Solana USDC → QUSD crediting via verified receive address + server scan), **sell QUSD** (QUSD → QUEST from treasury), **Leaderboard** (public **`GET /api/leaderboard`** — top accounts by ledger QUSD, masked email), and account settings.
+- **Product surface**: landing, email OTP auth, in-app **Quick start** (sidebar), **perpetual-style trading UI** (**Trade** screen; Hyperliquid-derived index marks), **QUSD** balances, **history** of closed perps, **buy QUSD** (Solana USDC → QUSD crediting via verified receive address + server scan), **sell QUSD** (QUSD → QUEST from treasury), **Prize** (config-driven pool copy), **Leaderboard** (public **`GET /api/leaderboard`** — top accounts by ledger QUSD, masked email), optional **Visitors** (admin), and account settings.
+- **Default route (SPA)**: after **`/api/auth/me`** resolves, a **signed-in** user is taken to **Trade** once per full page load; **not signed in** → **Home** (landing). Users can still open **Home** from the sidebar while logged in.
 - **Branding / public site**: production is commonly exposed at **`https://solvequest.io`** (DNS → your VPS; exact IP is **not fixed in code**—use DNS or your host’s dashboard).
+
+### Mobile / narrow viewports
+
+- **`index.html`**: `viewport` meta (`width=device-width`, `initial-scale=1`).
+- **`src/index.css`**: Responsive **`--app-pad-*`**; **`≤768px`**: main column layout, sidebar becomes a **horizontal scroll** nav; **`≤800px`**: perps chart + order stack; **`≤560px`**: index mark grid **2 columns**; **`≤520px`**: perps symbol tabs scroll horizontally; account balance cards stack **`≤720px`**. **`main`** uses **`min-width: 0`** and **`overflow-y: auto`** for scroll. Wide **data tables** use **`.app-table-scroll`** (horizontal scroll + touch momentum) where needed.
 
 ---
 
@@ -84,6 +90,7 @@ Defaults below match **`scripts/deploy.sh`** and **`scripts/solvequest.service.e
 - **`qusd_ledger`**: append-only rows (`unlocked_delta`, `locked_delta`). The API merges **unlocked + locked** into a single spendable QUSD balance for clients; legacy **`vault_interest`** rows remain in historical data only.
 - **`perp_open_positions` / `perp_transactions`**: open positions and closed trade history.
 - **`deposit_credits`**, **`deposit_scan_state`**: on-chain deposit idempotency and scan watermarks.
+- **`visitors`**: optional analytics rows (IP, geo label, logical path, timestamp) from **`POST /api/visitors/log`**; listed via **`GET /api/admin/visitors`** when **`ADMIN_EMAIL`** matches the JWT user.
 
 ### Server SQLite settings (implementation detail)
 
@@ -194,6 +201,7 @@ After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10
 
 - **Users**: email OTP via **Resend** + **JWT** cookie (`auth_token`).
 - **Account state**: client **`PUT /api/account/state`** with optimistic locking on **`sync_version`**.
+- **Public APIs** (no JWT): **`GET /api/qusd/sell/config`** (prize pool marketing numbers), **`GET /api/leaderboard`** (top QUSD totals; optional cookie highlights the current user’s row).
 
 ---
 

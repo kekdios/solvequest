@@ -1,6 +1,6 @@
 # Implementation plan: Demo mode, registration, user-verified Solana
 
-> **Note:** Wallet-based admin routes and `/api/admin/*` were **removed**. Server-side **user** HD deposit generation and custodial USDC sweep were **removed**; deposit scan credits QUSD from the user’s verified **`sol_receive_address`**.
+> **Note:** Wallet-based **trading** admin routes were **removed**. **Visitor** analytics uses **`ADMIN_EMAIL`** + **`GET /api/admin/visitors`** (see `plugins/visitorsApiPlugin.ts`). Server-side **user** HD deposit generation and custodial USDC sweep were **removed**; deposit scan credits QUSD from the user’s verified **`sol_receive_address`**.
 
 ## Goals
 
@@ -9,6 +9,7 @@
 3. **Demo persistence**: Account state and transaction history live **only in the browser** (`localStorage` / demo-specific keys as implemented).
 4. **Registration gate**: **Email + OTP** required for server-backed account features.
 5. **Solana deposit address**: User links **their own** wallet via **`POST /api/account/verify-solana-address`**; the server stores **`sol_receive_address`** and does **not** generate user keys.
+6. **Signed-in entry**: With a valid JWT session, the SPA opens on **Trade** after auth resolves (see `App.tsx`); **Home** remains available from the sidebar.
 
 ---
 

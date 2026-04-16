@@ -95,40 +95,42 @@ export default function LeaderboardScreen() {
       {rows.length === 0 && !loadErr ? (
         <p style={{ color: "var(--muted)", marginTop: 12 }}>No balances to show yet.</p>
       ) : (
-        <table className="data-table" style={{ width: "100%", maxWidth: 560, fontSize: 13, marginTop: 12 }}>
-          <thead>
-            <tr>
-              <th style={{ width: 56 }}>#</th>
-              <th>Player</th>
-              <th style={{ textAlign: "right" }}>QUSD</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr
-                key={r.account_id}
-                style={
-                  r.is_you
-                    ? { background: "color-mix(in srgb, var(--accent) 10%, transparent)" }
-                    : undefined
-                }
-              >
-                <td className="mono">{r.rank}</td>
-                <td>
-                  {r.label}
-                  {r.is_you ? (
-                    <span style={{ marginLeft: 8, fontSize: 11, color: "var(--accent)", fontWeight: 600 }}>
-                      (you)
-                    </span>
-                  ) : null}
-                </td>
-                <td className="mono" style={{ textAlign: "right" }}>
-                  {r.qusd.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                </td>
+        <div className="app-table-scroll" style={{ marginTop: 12 }}>
+          <table className="data-table" style={{ width: "100%", minWidth: 280, fontSize: 13 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 56 }}>#</th>
+                <th>Player</th>
+                <th style={{ textAlign: "right" }}>QUSD</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr
+                  key={r.account_id}
+                  style={
+                    r.is_you
+                      ? { background: "color-mix(in srgb, var(--accent) 10%, transparent)" }
+                      : undefined
+                  }
+                >
+                  <td className="mono">{r.rank}</td>
+                  <td style={{ wordBreak: "break-word" }}>
+                    {r.label}
+                    {r.is_you ? (
+                      <span style={{ marginLeft: 8, fontSize: 11, color: "var(--accent)", fontWeight: 600 }}>
+                        (you)
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="mono" style={{ textAlign: "right" }}>
+                    {r.qusd.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 # Solve Quest
 
-Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), **email (OTP) auth**, and Solana flows: **buy QUSD** (USDC to your verified address → server credits QUSD) and **sell QUSD** (QUSD → QUEST from treasury).
+Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), **email (OTP) auth**, **Leaderboard** (top QUSD balances), and Solana flows: **buy QUSD** (USDC to your verified address → server credits QUSD) and **sell QUSD** (QUSD → QUEST from treasury). With a valid sign-in session, the SPA opens on **Trade**; without a session, it opens on **Home** (landing).
 
 **Stack:** React 19 + Vite · Express (`server/index.ts`) · SQLite (`better-sqlite3`) · Solana (web3.js, SPL).
 

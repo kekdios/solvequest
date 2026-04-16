@@ -60,8 +60,10 @@ export default function QuickStartScreen({ onGoToPerps, onGoToAccount }: Props) 
   return (
     <div className="app-page" style={s.wrap}>
       <p style={s.lead}>
-        Follow these steps once, then open <strong style={{ color: "var(--text)" }}>Trade</strong> from the sidebar
-        whenever you want to place or manage positions.
+        After you sign in, the app opens on <strong style={{ color: "var(--text)" }}>Trade</strong> when you load the
+        site; you can use <strong style={{ color: "var(--text)" }}>Home</strong> in the sidebar anytime. Follow these
+        steps once, then open <strong style={{ color: "var(--text)" }}>Trade</strong> whenever you want to place or
+        manage positions.
       </p>
 
       <ol style={s.list}>
