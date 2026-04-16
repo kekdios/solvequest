@@ -93,6 +93,15 @@
   color: var(--text);
 }
 
+.lp-hero-nodeposit {
+  margin: clamp(10px, 2vw, 16px) auto 0;
+  max-width: 36ch;
+  font-size: clamp(0.95rem, 2.2vw, 1.05rem);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--accent) 88%, var(--text));
+  line-height: 1.4;
+}
+
 /* Inline text + icon: avoid inline-flex here — it shifts the baseline and looks “floating”. */
 .lp-hero-prize-line {
   white-space: nowrap;

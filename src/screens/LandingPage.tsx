@@ -172,6 +172,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
               .
             </span>
           </p>
+          <p className="lp-hero-nodeposit">No deposit required to start.</p>
 
           <div className="lp-hero-aside">
             <figure className="lp-hero-media">
@@ -204,9 +205,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             </p>
           </div>
 
-          <p className="lp-sub lp-sub--hero">
-            Trade using Hyperliquid index prices. No deposit required to start.
-          </p>
+          <p className="lp-sub lp-sub--hero">Trade using Hyperliquid index prices.</p>
           <ul className="lp-hero-pills" aria-label="What you get">
             <li className="lp-hero-pill">
               <img src="/icon-qusd.png" alt="" width={20} height={20} />
