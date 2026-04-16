@@ -218,7 +218,7 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   },
   trade: {
     title: "Trade",
-    lead: "Opens here when you load the app while signed in. Index marks from Hyperliquid.",
+    lead: "",
   },
   history: {
     title: "History",
