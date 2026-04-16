@@ -131,7 +131,20 @@ export default function AppSidebar({ screen, onNavigate, showVisitors }: Props) 
         </nav>
       </div>
       <footer className="app-sidebar-footer" title={`Solve Quest ${APP_VERSION_SEMVER}`}>
-        v{APP_VERSION_SEMVER} · {APP_VERSION_DATE}
+        <div className="app-sidebar-legal">
+          <button type="button" className="app-sidebar-legal-btn" onClick={() => onNavigate("terms")}>
+            Terms
+          </button>
+          <span className="app-sidebar-legal-sep" aria-hidden>
+            ·
+          </span>
+          <button type="button" className="app-sidebar-legal-btn" onClick={() => onNavigate("privacy")}>
+            Privacy
+          </button>
+        </div>
+        <div className="app-sidebar-version">
+          v{APP_VERSION_SEMVER} · {APP_VERSION_DATE}
+        </div>
       </footer>
     </aside>
   );

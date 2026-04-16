@@ -920,3 +920,38 @@ button.lp-text-link:hover {
     text-align: center;
   }
 }
+
+.lp-legal-footer {
+  max-width: var(--lp-max);
+  margin: 0 auto;
+  padding: clamp(28px, 4vw, 40px) var(--lp-gutter) clamp(32px, 5vw, 48px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.lp-legal-link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.lp-legal-link:hover {
+  color: var(--accent);
+}
+
+.lp-legal-sep {
+  color: var(--muted);
+  font-size: 0.875rem;
+  user-select: none;
+}

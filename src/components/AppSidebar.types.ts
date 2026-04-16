@@ -7,4 +7,6 @@ export type AppScreen =
   | "leaderboard"
   | "account"
   | "visitors"
-  | "auth";
+  | "auth"
+  | "terms"
+  | "privacy";

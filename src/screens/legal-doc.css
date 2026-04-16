@@ -1,0 +1,55 @@
+/* Shared prose layout for Terms & Privacy */
+.legal-doc {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding-bottom: var(--space-32);
+}
+
+.legal-doc p,
+.legal-doc li {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.legal-doc strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.legal-doc h2 {
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--text);
+  margin: 1.75rem 0 0.65rem;
+  letter-spacing: -0.02em;
+}
+
+.legal-doc h2:first-of-type {
+  margin-top: 0;
+}
+
+.legal-doc ul {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.legal-doc li {
+  margin-bottom: 0.4rem;
+}
+
+.legal-doc .legal-meta {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin: 0 0 1.25rem;
+}
+
+.legal-doc a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.legal-doc a:hover {
+  color: color-mix(in srgb, var(--accent) 88%, white);
+}

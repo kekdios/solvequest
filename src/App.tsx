@@ -23,6 +23,8 @@ import QusdSellScreen from "./screens/QusdSellScreen";
 import VisitorsScreen from "./screens/VisitorsScreen";
 import LeaderboardScreen from "./screens/LeaderboardScreen";
 import AuthScreen from "./screens/AuthScreen";
+import TermsScreen from "./screens/TermsScreen";
+import PrivacyScreen from "./screens/PrivacyScreen";
 import AppSidebar, { type AppScreen } from "./components/AppSidebar";
 
 type State = DemoAppState;
@@ -243,6 +245,14 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   auth: {
     title: "Login / Register",
     lead: "Email code — register or sign in. Optional 7-day remember-me.",
+  },
+  terms: {
+    title: "Terms of Service",
+    lead: "Rules for using Solve Quest.",
+  },
+  privacy: {
+    title: "Privacy Policy",
+    lead: "How we collect and use information.",
   },
 };
 
@@ -667,6 +677,8 @@ function AppInner() {
             <LandingPage
               onStartNow={() => setScreen("trade")}
               onGoToPrize={() => setScreen("sellQusd")}
+              onTerms={() => setScreen("terms")}
+              onPrivacy={() => setScreen("privacy")}
             />
           )}
 
@@ -728,6 +740,10 @@ function AppInner() {
           )}
 
           {screen === "visitors" && ledgerAccountRow?.is_admin === true ? <VisitorsScreen /> : null}
+
+          {screen === "terms" && <TermsScreen />}
+
+          {screen === "privacy" && <PrivacyScreen />}
         </main>
       </div>
     </div>

@@ -5,6 +5,8 @@ type Props = {
   onStartNow: () => void;
   /** Navigate to Prize (sell QUSD) screen — used for in-app links from the landing copy. */
   onGoToPrize?: () => void;
+  onTerms?: () => void;
+  onPrivacy?: () => void;
 };
 
 function IconChart({ className }: { className?: string }) {
@@ -65,7 +67,7 @@ type LandingStats = {
   accounts_with_email: number | null;
 };
 
-export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
+export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivacy }: Props) {
   const [prizeAmount, setPrizeAmount] = useState<number | null | undefined>(undefined);
   const [lbRows, setLbRows] = useState<LeaderboardPreviewRow[]>([]);
   const [lbLoading, setLbLoading] = useState(true);
@@ -426,6 +428,20 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
           </span>
         </p>
       </section>
+
+      {onTerms && onPrivacy ? (
+        <footer className="lp-legal-footer">
+          <button type="button" className="lp-legal-link" onClick={onTerms}>
+            Terms of Service
+          </button>
+          <span className="lp-legal-sep" aria-hidden>
+            ·
+          </span>
+          <button type="button" className="lp-legal-link" onClick={onPrivacy}>
+            Privacy Policy
+          </button>
+        </footer>
+      ) : null}
     </div>
   );
 }
