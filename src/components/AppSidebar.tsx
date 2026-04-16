@@ -103,7 +103,7 @@ const visitorsItem = { id: "visitors" as const, label: "Visitors", Icon: NavIcon
 
 /** Shown in sidebar footer: semver + release stamp (d-mmm-yy). */
 const APP_VERSION_SEMVER = "1.0.0";
-const APP_VERSION_DATE = "12-Apr-26";
+const APP_VERSION_DATE = "16-Apr-26";
 
 export default function AppSidebar({ screen, onNavigate, showVisitors }: Props) {
   const mainAppItems = showVisitors ? [...mainAppItemsBase, visitorsItem] : mainAppItemsBase;
