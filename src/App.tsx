@@ -26,6 +26,7 @@ import AuthScreen from "./screens/AuthScreen";
 import TermsScreen from "./screens/TermsScreen";
 import PrivacyScreen from "./screens/PrivacyScreen";
 import AppSidebar, { type AppScreen } from "./components/AppSidebar";
+import MobileNavDrawer from "./components/MobileNavDrawer";
 
 type State = DemoAppState;
 
@@ -501,6 +502,11 @@ function AppInner() {
   const openedLoggedInToTrade = useRef(false);
 
   const [screen, setScreen] = useState<AppScreen>("landing");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [screen]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -603,28 +609,42 @@ function AppInner() {
     >
       <header className="app-top-header" style={styles.topHeader}>
         <div className="app-header-top" style={styles.headerTop}>
-          <div style={styles.logoRow}>
+          <div style={styles.headerStart}>
             <button
               type="button"
-              style={styles.logoBtn}
-              onClick={() => {
-                setScreen("landing");
-              }}
-              aria-label="Home"
+              className="app-header-menu-btn"
+              aria-label="Open menu"
+              aria-expanded={mobileNavOpen}
+              aria-controls="app-mobile-nav-panel"
+              onClick={() => setMobileNavOpen(true)}
             >
-              <img
-                src="/logo-solve-quest.png"
-                alt=""
-                style={styles.logo}
-                width={180}
-                height={44}
-              />
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+              </svg>
             </button>
-            {demo ? (
-              <span style={styles.demoBadge} title="Anonymous demo — state saved in this browser only">
-                Demo
-              </span>
-            ) : null}
+            <div style={styles.logoRow}>
+              <button
+                type="button"
+                style={styles.logoBtn}
+                onClick={() => {
+                  setScreen("landing");
+                }}
+                aria-label="Home"
+              >
+                <img
+                  src="/logo-solve-quest.png"
+                  alt=""
+                  style={styles.logo}
+                  width={180}
+                  height={44}
+                />
+              </button>
+              {demo ? (
+                <span style={styles.demoBadge} title="Anonymous demo — state saved in this browser only">
+                  Demo
+                </span>
+              ) : null}
+            </div>
           </div>
           <div style={styles.navRight}>
             {user ? (
@@ -653,6 +673,14 @@ function AppInner() {
           </div>
         </div>
       </header>
+
+      <MobileNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        screen={screen}
+        onNavigate={setScreen}
+        showVisitors={ledgerAccountRow?.is_admin === true}
+      />
 
       <div className="app-body">
         <AppSidebar
@@ -808,6 +836,14 @@ const styles: Record<string, CSSProperties> = {
     gap: 16,
     minHeight: 56,
     padding: "10px 0",
+  },
+  headerStart: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minWidth: 0,
+    flex: 1,
   },
   logoRow: {
     display: "flex",
