@@ -131,7 +131,10 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
           </h1>
           <p className="lp-hero-lead">
             Start with <strong>30,000 free QUSD</strong>, climb the leaderboard, and compete for{" "}
-            <strong className="lp-hero-prize">${usdPart} USDC</strong>.
+            <span className="lp-hero-prize-line">
+              <img src="/prize-usdc.png" alt="" width={24} height={24} className="lp-hero-usdc-icon" />
+              <strong className="lp-hero-prize">${usdPart} USDC</strong>
+            </span>.
           </p>
           <p className="lp-sub lp-sub--hero">
             Trade real market prices synced with Hyperliquid. No deposit required to start.

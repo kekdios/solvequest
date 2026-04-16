@@ -83,6 +83,24 @@
   color: color-mix(in srgb, var(--accent) 92%, #fff);
 }
 
+.lp-hero-prize-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.lp-hero-usdc-icon {
+  flex-shrink: 0;
+  width: 1.35em;
+  height: 1.35em;
+  max-width: 28px;
+  max-height: 28px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
 .lp-hero-prize {
   font-variant-numeric: tabular-nums;
 }
