@@ -132,7 +132,7 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
           <p className="lp-hero-lead">
             Start with <strong>30,000 free QUSD</strong>, climb the leaderboard, and compete for{" "}
             <span className="lp-hero-prize-line">
-              <img src="/prize-usdc.png" alt="" width={24} height={24} className="lp-hero-usdc-icon" />
+              <img src="/prize-usdc.png" alt="" width={20} height={20} className="lp-hero-usdc-icon" />
               <strong className="lp-hero-prize">${usdPart} USDC</strong>
             </span>.
           </p>
