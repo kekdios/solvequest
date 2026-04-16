@@ -69,6 +69,8 @@ type LandingStats = {
 
 export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivacy }: Props) {
   const [prizeAmount, setPrizeAmount] = useState<number | null | undefined>(undefined);
+  const [claimQuestAmount, setClaimQuestAmount] = useState<number | null | undefined>(undefined);
+  const [questMultiplier, setQuestMultiplier] = useState<number | null | undefined>(undefined);
   const [lbRows, setLbRows] = useState<LeaderboardPreviewRow[]>([]);
   const [lbLoading, setLbLoading] = useState(true);
   const [stats, setStats] = useState<LandingStats | null>(null);
@@ -83,10 +85,21 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
       .then(([cfg, lb, st]) => {
         if (cancelled) return;
         if (cfg && typeof cfg === "object" && "prize_amount" in cfg) {
-          const n = (cfg as { prize_amount?: number }).prize_amount;
+          const c = cfg as {
+            prize_amount?: number;
+            claim_quest_amount?: number;
+            quest_multiplier?: number;
+          };
+          const n = c.prize_amount;
           setPrizeAmount(typeof n === "number" && Number.isFinite(n) ? n : null);
+          const cq = c.claim_quest_amount;
+          setClaimQuestAmount(typeof cq === "number" && Number.isFinite(cq) ? cq : null);
+          const qm = c.quest_multiplier;
+          setQuestMultiplier(typeof qm === "number" && Number.isFinite(qm) ? qm : null);
         } else {
           setPrizeAmount(null);
+          setClaimQuestAmount(null);
+          setQuestMultiplier(null);
         }
         const rows =
           lb && typeof lb === "object" && Array.isArray((lb as { rows?: unknown }).rows)
@@ -107,6 +120,8 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
       .catch(() => {
         if (!cancelled) {
           setPrizeAmount(null);
+          setClaimQuestAmount(null);
+          setQuestMultiplier(null);
           setLbRows([]);
           setLbLoading(false);
         }
@@ -123,40 +138,57 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
         ? "—"
         : prizeAmount.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
+  const claimQuestStr =
+    claimQuestAmount === undefined
+      ? "…"
+      : claimQuestAmount === null
+        ? "—"
+        : claimQuestAmount.toLocaleString(undefined, { maximumFractionDigits: 6 });
+
+  const questMultStr =
+    questMultiplier === undefined
+      ? "…"
+      : questMultiplier === null
+        ? "—"
+        : questMultiplier.toLocaleString(undefined, { maximumFractionDigits: 0 });
+
   return (
     <div className="lp">
       <section className="lp-hero" aria-labelledby="lp-hero-heading">
-        <div className="lp-hero-inner">
-          <p className="lp-eyebrow">Solve Quest</p>
-          <h1 id="lp-hero-heading" className="lp-title lp-title--game">
-            Compete in a Trading Game
-          </h1>
-          <p className="lp-hero-lead">
-            Start with <strong>30,000 free QUSD</strong>, climb the leaderboard, and compete for{" "}
-            <span className="lp-hero-prize-line">
-              <img src="/prize-usdc.png" alt="" width={20} height={20} className="lp-hero-usdc-icon" />
-              <strong className="lp-hero-prize">${usdPart} USDC</strong>
-            </span>.
-          </p>
-          <p className="lp-sub lp-sub--hero">
-            Trade real market prices synced with Hyperliquid. No deposit required to start.
-          </p>
-          <ul className="lp-hero-pills" aria-label="What you get">
-            <li className="lp-hero-pill">
-              <img src="/icon-qusd.png" alt="" width={20} height={20} />
-              <span>
-                <strong>30,000 QUSD</strong> bonus when fully verified
+        <div className="lp-hero-inner lp-hero-inner--split">
+          <div className="lp-hero-copy">
+            <p className="lp-eyebrow">Solve Quest</p>
+            <h1 id="lp-hero-heading" className="lp-title lp-title--game">
+              Compete in a Paper Trading Game
+            </h1>
+            <p className="lp-hero-tagline">Crypto paper trading on Solana · Real index marks</p>
+            <p className="lp-hero-lead">
+              Start with <strong>30,000 free QUSD</strong>, climb the leaderboard, and compete for{" "}
+              <span className="lp-hero-prize-line">
+                <img src="/prize-usdc.png" alt="" width={20} height={20} className="lp-hero-usdc-icon" />
+                <strong className="lp-hero-prize">${usdPart} USDC</strong>
               </span>
-            </li>
-            <li className="lp-hero-pill">
-              <IconChart />
-              <span>Live leaderboard</span>
-            </li>
-            <li className="lp-hero-pill">
-              <img src="/prize-usdc.png" alt="" width={20} height={20} />
-              <span>Season prize pool</span>
-            </li>
-          </ul>
+              .
+            </p>
+            <p className="lp-sub lp-sub--hero">
+              Trade using Hyperliquid index prices. No deposit required to start.
+            </p>
+            <ul className="lp-hero-pills" aria-label="What you get">
+              <li className="lp-hero-pill">
+                <img src="/icon-qusd.png" alt="" width={20} height={20} />
+                <span>
+                  <strong>30,000 QUSD</strong> bonus when fully verified
+                </span>
+              </li>
+              <li className="lp-hero-pill">
+                <IconChart />
+                <span>Live leaderboard</span>
+              </li>
+              <li className="lp-hero-pill">
+                <img src="/prize-usdc.png" alt="" width={20} height={20} />
+                <span>Season prize pool</span>
+              </li>
+            </ul>
           <p className="lp-leverage-tagline lp-leverage-tagline--tight">
             Multiple{" "}
             <img
@@ -174,6 +206,38 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
               Start Now
             </button>
             <p className="lp-cta-hint">Email verification takes ~10 seconds.</p>
+          </div>
+          </div>
+
+          <div className="lp-hero-aside">
+            <figure className="lp-hero-media">
+              <img
+                src="/trade-gif.gif"
+                alt="Recording of the Solve Quest trade screen with charts and order controls"
+                className="lp-hero-gif"
+                width={960}
+                height={540}
+                loading="eager"
+                decoding="async"
+              />
+              <figcaption className="lp-hero-media-caption">
+                In-app terminal preview — index marks from Hyperliquid.
+              </figcaption>
+            </figure>
+            <p className="lp-trust-strip">
+              <span className="lp-trust-kicker">Attribution</span>
+              <span className="lp-trust-line">
+                Index prices:{" "}
+                <a href="https://hyperliquid.xyz/" target="_blank" rel="noopener noreferrer">
+                  Hyperliquid
+                </a>
+                . Deposits and on-chain USDC use your verified{" "}
+                <a href="https://solana.com/" target="_blank" rel="noopener noreferrer">
+                  Solana
+                </a>{" "}
+                receive address (see Account).
+              </span>
+            </p>
           </div>
         </div>
       </section>
@@ -261,6 +325,67 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
         </div>
       </section>
 
+      <section className="lp-section lp-prize-faq" aria-labelledby="lp-faq-heading">
+        <h2 id="lp-faq-heading" className="lp-section-title">
+          How prizes &amp; USDC work
+        </h2>
+        <p className="lp-section-lead lp-section-lead--tight">
+          Short answers — full rules, QUEST purchase, and timing are on the{" "}
+          {onGoToPrize ? (
+            <button type="button" className="lp-text-link" onClick={onGoToPrize}>
+              Prize
+            </button>
+          ) : (
+            "Prize"
+          )}{" "}
+          page.
+        </p>
+        <div className="lp-faq-list">
+          <details className="lp-faq-item">
+            <summary>What is QUSD vs real USDC?</summary>
+            <p>
+              <strong>QUSD</strong> is in-game balance for paper trading: you allocate it to positions, and closed trades
+              settle back into QUSD. It is not cash in your bank. <strong>USDC</strong> in the seasonal prize pool is a
+              real stablecoin; how eligibility, winners, and payouts work is defined on the Prize page and may change
+              between seasons.
+            </p>
+          </details>
+          <details className="lp-faq-item">
+            <summary>How does trading performance connect to the USDC pool?</summary>
+            <p>
+              You compete using QUSD on the leaderboard. To bridge toward prize eligibility, the app uses{" "}
+              <strong>QUEST</strong> (on Solana): you spend QUSD to buy QUEST at the configured rate (currently{" "}
+              <strong>{questMultStr} QUSD per 1 QUEST</strong>). Holding at least{" "}
+              <strong>{claimQuestStr} QUEST</strong> is required to <em>claim</em> prize qualification as described on
+              the Prize screen — read that page for the authoritative rules.
+            </p>
+          </details>
+          <details className="lp-faq-item">
+            <summary>When and how is USDC paid?</summary>
+            <p>
+              Payout schedules, seasons, and any tiers or winner counts are published on the{" "}
+              {onGoToPrize ? (
+                <button type="button" className="lp-text-link" onClick={onGoToPrize}>
+                  Prize
+                </button>
+              ) : (
+                "Prize"
+              )}{" "}
+              page. USDC moves on <strong>Solana</strong> to the receive address you verify on <strong>Account</strong>.
+              If anything is unclear, use the contact email on Prize.
+            </p>
+          </details>
+          <details className="lp-faq-item">
+            <summary>Do I need to deposit money to start?</summary>
+            <p>
+              No — you can begin with promotional QUSD after email verification. Optional USDC deposits to your Solana
+              address are only if you choose to fund activity that way; the game itself is built around paper-style QUSD
+              trading first.
+            </p>
+          </details>
+        </div>
+      </section>
+
       <section className="lp-section" aria-labelledby="lp-how-heading">
         <h2 id="lp-how-heading" className="lp-section-title">
           How it works
@@ -325,7 +450,13 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             </span>
             <div>
               <h3>Real market data</h3>
-              <p>We sync directly with Hyperliquid price feeds for full transparency.</p>
+              <p>
+                Index marks from{" "}
+                <a href="https://hyperliquid.xyz/" target="_blank" rel="noopener noreferrer" className="lp-inline-link">
+                  Hyperliquid
+                </a>{" "}
+                — same reference prices as in the trade terminal.
+              </p>
             </div>
           </div>
           <div className="lp-feature">
