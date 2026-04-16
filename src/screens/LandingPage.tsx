@@ -160,7 +160,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           <h1 id="lp-hero-heading" className="lp-title lp-title--game">
             Compete in a Trading Game
           </h1>
-          <p className="lp-hero-tagline">Crypto paper trading on Solana · Real index marks</p>
+          <p className="lp-hero-tagline">Crypto trading on Solana · Real index marks</p>
           <p className="lp-hero-lead">
             Start with <strong>30,000 free QUSD</strong>, climb the leaderboard,{" "}
             <span className="lp-hero-compete">
@@ -346,7 +346,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           <details className="lp-faq-item">
             <summary>What is QUSD vs real USDC?</summary>
             <p>
-              <strong>QUSD</strong> is in-game balance for paper trading: you allocate it to positions, and closed trades
+              <strong>QUSD</strong> is in-game balance for simulated trading: you allocate it to positions, and closed trades
               settle back into QUSD. It is not cash in your bank. <strong>USDC</strong> in the seasonal prize pool is a
               real stablecoin; how eligibility, winners, and payouts work is defined on the Prize page and may change
               between seasons.
@@ -381,8 +381,8 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             <summary>Do I need to deposit money to start?</summary>
             <p>
               No — you can begin with promotional QUSD after email verification. Optional USDC deposits to your Solana
-              address are only if you choose to fund activity that way; the game itself is built around paper-style QUSD
-              trading first.
+              address are only if you choose to fund activity that way; the game itself is built around QUSD trading
+              first.
             </p>
           </details>
         </div>
