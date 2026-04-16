@@ -196,14 +196,6 @@
 }
 
 /* GIF sits below the “compete for … USDC” line (single column) */
-.lp-hero-tagline {
-  font-size: 0.9375rem;
-  color: var(--muted);
-  margin: -6px auto 14px;
-  max-width: 36ch;
-  line-height: 1.45;
-}
-
 .lp-hero-aside {
   position: relative;
   z-index: 1;

@@ -160,7 +160,6 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           <h1 id="lp-hero-heading" className="lp-title lp-title--game">
             Compete in a Trading Game
           </h1>
-          <p className="lp-hero-tagline">Crypto trading on Solana · Real index marks</p>
           <p className="lp-hero-lead">
             Start with <strong>30,000 free QUSD</strong>, climb the leaderboard,{" "}
             <span className="lp-hero-compete">
