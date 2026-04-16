@@ -7,6 +7,8 @@ const TestReceiveAddresses = lazy(() => import("../components/TestReceiveAddress
 
 const CHANGENOW_URL = "https://changenow.io/";
 
+const QUEST_ICON = "/prize-quest.png";
+
 const LINK_VERIFY_BONUS_QUSD = 10_000;
 
 /** Stat value text was 2rem; reduced by 40% → 60% scale. */
@@ -42,8 +44,35 @@ export default function AccountScreen({
   const [draftAddress, setDraftAddress] = useState("");
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  /** On-chain QUEST from `/api/qusd/sell/me` (same logic as Prize page). */
+  const [questBalance, setQuestBalance] = useState<number | null>(null);
+  const [questLoading, setQuestLoading] = useState(() => !isDemo);
   const verified = Boolean(solReceiveVerified);
   const displayAddr = serverDepositAddress?.trim() ?? "";
+
+  const loadQuestFromSellMe = useCallback(async () => {
+    if (isDemo) return;
+    setQuestLoading(true);
+    try {
+      const r = await fetch("/api/qusd/sell/me", { credentials: "include" });
+      if (!r.ok) {
+        setQuestBalance(null);
+        return;
+      }
+      const j = (await r.json()) as { quest_balance?: number | null };
+      const q = j.quest_balance;
+      setQuestBalance(typeof q === "number" && Number.isFinite(q) ? q : null);
+    } catch {
+      setQuestBalance(null);
+    } finally {
+      setQuestLoading(false);
+    }
+  }, [isDemo]);
+
+  useEffect(() => {
+    if (isDemo) return;
+    void loadQuestFromSellMe();
+  }, [isDemo, loadQuestFromSellMe, qusdUnlocked, verified, displayAddr]);
 
   useEffect(() => {
     if (verified && displayAddr) setDraftAddress(displayAddr);
@@ -73,12 +102,13 @@ export default function AccountScreen({
         return;
       }
       await onRefreshAccount?.();
+      await loadQuestFromSellMe();
     } catch (e) {
       setVerifyError(e instanceof Error ? e.message : "Network error");
     } finally {
       setVerifyBusy(false);
     }
-  }, [draftAddress, verifyBusy, verified, onRefreshAccount]);
+  }, [draftAddress, verifyBusy, verified, loadQuestFromSellMe, onRefreshAccount]);
 
   return (
     <div className="app-page" style={s.wrap}>
@@ -98,6 +128,28 @@ export default function AccountScreen({
             </div>
             <p style={s.statSub}>Available for perpetual margin and withdrawals per product rules.</p>
           </section>
+          {!isDemo ? (
+            <section style={s.statHero} aria-label="QUEST balance on-chain">
+              <p style={s.statLabel}>QUEST (on-chain)</p>
+              <div style={s.statHeroValue}>
+                <img
+                  src={QUEST_ICON}
+                  alt=""
+                  width={STAT_ICON_LG}
+                  height={STAT_ICON_LG}
+                  style={{ objectFit: "contain", flexShrink: 0 }}
+                />
+                <span className="mono" style={{ ...statAmountStyle, color: "var(--accent)" }}>
+                  {questLoading ? "…" : questBalance == null ? "—" : questBalance.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                </span>
+              </div>
+              <p style={s.statSub}>
+                {verified
+                  ? "At your verified Solana address (same source as the Prize page)."
+                  : "Verify a Solana address below to load your QUEST balance."}
+              </p>
+            </section>
+          ) : null}
         </div>
 
         <section
