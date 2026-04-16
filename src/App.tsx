@@ -487,8 +487,21 @@ function AppInner() {
   }, [demo, user?.email, authLoading, ledgerAccountRow?.id, clearSessionAndLedger]);
 
   const lastPopStateScreen = useRef<AppScreen>("landing");
+  /** After session resolves, send logged-in users to Trade once per page load (not when they choose Home). */
+  const openedLoggedInToTrade = useRef(false);
 
   const [screen, setScreen] = useState<AppScreen>("landing");
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      openedLoggedInToTrade.current = false;
+      return;
+    }
+    if (openedLoggedInToTrade.current) return;
+    openedLoggedInToTrade.current = true;
+    setScreen("trade");
+  }, [authLoading, user]);
 
   useEffect(() => {
     if (screen === "visitors" && ledgerAccountRow?.is_admin !== true) {
