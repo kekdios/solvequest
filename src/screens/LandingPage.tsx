@@ -155,59 +155,23 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
   return (
     <div className="lp">
       <section className="lp-hero" aria-labelledby="lp-hero-heading">
-        <div className="lp-hero-inner lp-hero-inner--split">
-          <div className="lp-hero-copy">
-            <p className="lp-eyebrow">Solve Quest</p>
-            <h1 id="lp-hero-heading" className="lp-title lp-title--game">
-              Compete in a Paper Trading Game
-            </h1>
-            <p className="lp-hero-tagline">Crypto paper trading on Solana · Real index marks</p>
-            <p className="lp-hero-lead">
-              Start with <strong>30,000 free QUSD</strong>, climb the leaderboard, and compete for{" "}
+        <div className="lp-hero-inner">
+          <p className="lp-eyebrow">Solve Quest</p>
+          <h1 id="lp-hero-heading" className="lp-title lp-title--game">
+            Compete in a Trading Game
+          </h1>
+          <p className="lp-hero-tagline">Crypto paper trading on Solana · Real index marks</p>
+          <p className="lp-hero-lead">
+            Start with <strong>30,000 free QUSD</strong>, climb the leaderboard,{" "}
+            <span className="lp-hero-compete">
+              and compete for{" "}
               <span className="lp-hero-prize-line">
-                <img src="/prize-usdc.png" alt="" width={20} height={20} className="lp-hero-usdc-icon" />
+                <img src="/prize-usdc.png" alt="" width={26} height={26} className="lp-hero-usdc-icon" />
                 <strong className="lp-hero-prize">${usdPart} USDC</strong>
               </span>
               .
-            </p>
-            <p className="lp-sub lp-sub--hero">
-              Trade using Hyperliquid index prices. No deposit required to start.
-            </p>
-            <ul className="lp-hero-pills" aria-label="What you get">
-              <li className="lp-hero-pill">
-                <img src="/icon-qusd.png" alt="" width={20} height={20} />
-                <span>
-                  <strong>30,000 QUSD</strong> bonus when fully verified
-                </span>
-              </li>
-              <li className="lp-hero-pill">
-                <IconChart />
-                <span>Live leaderboard</span>
-              </li>
-              <li className="lp-hero-pill">
-                <img src="/prize-usdc.png" alt="" width={20} height={20} />
-                <span>Season prize pool</span>
-              </li>
-            </ul>
-          <p className="lp-leverage-tagline lp-leverage-tagline--tight">
-            Multiple{" "}
-            <img
-              src="/icon-qusd.png"
-              alt=""
-              className="lp-leverage-tagline-qusd"
-              width={22}
-              height={22}
-              decoding="async"
-            />{" "}
-            10,000 QUSD awarded to verified active users daily
+            </span>
           </p>
-          <div className="lp-cta-stack">
-            <button type="button" className="lp-btn-primary" onClick={onStartNow}>
-              Start Now
-            </button>
-            <p className="lp-cta-hint">Email verification takes ~10 seconds.</p>
-          </div>
-          </div>
 
           <div className="lp-hero-aside">
             <figure className="lp-hero-media">
@@ -238,6 +202,44 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
                 receive address (see Account).
               </span>
             </p>
+          </div>
+
+          <p className="lp-sub lp-sub--hero">
+            Trade using Hyperliquid index prices. No deposit required to start.
+          </p>
+          <ul className="lp-hero-pills" aria-label="What you get">
+            <li className="lp-hero-pill">
+              <img src="/icon-qusd.png" alt="" width={20} height={20} />
+              <span>
+                <strong>30,000 QUSD</strong> bonus when fully verified
+              </span>
+            </li>
+            <li className="lp-hero-pill">
+              <IconChart />
+              <span>Live leaderboard</span>
+            </li>
+            <li className="lp-hero-pill">
+              <img src="/prize-usdc.png" alt="" width={20} height={20} />
+              <span>Season prize pool</span>
+            </li>
+          </ul>
+          <p className="lp-leverage-tagline lp-leverage-tagline--tight">
+            Multiple{" "}
+            <img
+              src="/icon-qusd.png"
+              alt=""
+              className="lp-leverage-tagline-qusd"
+              width={22}
+              height={22}
+              decoding="async"
+            />{" "}
+            10,000 QUSD awarded to verified active users daily
+          </p>
+          <div className="lp-cta-stack">
+            <button type="button" className="lp-btn-primary" onClick={onStartNow}>
+              Start Now
+            </button>
+            <p className="lp-cta-hint">Email verification takes ~10 seconds.</p>
           </div>
         </div>
       </section>

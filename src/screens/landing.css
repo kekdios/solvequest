@@ -83,9 +83,26 @@
   color: color-mix(in srgb, var(--accent) 92%, #fff);
 }
 
+/* Larger callout: “…and compete for $X USDC.” */
+.lp-hero-compete {
+  display: inline;
+  font-size: clamp(1.14rem, 3.1vw, 1.55rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.35;
+  color: var(--text);
+}
+
 /* Inline text + icon: avoid inline-flex here — it shifts the baseline and looks “floating”. */
 .lp-hero-prize-line {
   white-space: nowrap;
+}
+
+.lp-hero-compete .lp-hero-usdc-icon {
+  max-width: 30px;
+  max-height: 30px;
+  width: 1.15em;
+  height: 1.15em;
 }
 
 .lp-hero-usdc-icon {
@@ -106,6 +123,7 @@
 
 .lp-sub--hero {
   max-width: 40ch;
+  margin-top: clamp(16px, 3vw, 26px);
   margin-bottom: 20px;
 }
 
@@ -168,25 +186,7 @@
   margin-bottom: 16px;
 }
 
-/* Hero: copy + GIF (see LandingPage) */
-.lp-hero-inner--split {
-  display: grid;
-  gap: clamp(24px, 4vw, 40px);
-  align-items: center;
-  max-width: min(1100px, 100%);
-}
-
-@media (min-width: 900px) {
-  .lp-hero-inner--split {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 440px);
-  }
-}
-
-.lp-hero-copy {
-  position: relative;
-  z-index: 1;
-}
-
+/* GIF sits below the “compete for … USDC” line (single column) */
 .lp-hero-tagline {
   font-size: 0.9375rem;
   color: var(--muted);
@@ -199,7 +199,8 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  min-width: 0;
+  max-width: min(42rem, 100%);
+  margin: clamp(14px, 2.5vw, 24px) auto 0;
 }
 
 .lp-hero-media {
@@ -240,12 +241,6 @@
   flex-direction: column;
   gap: 6px;
   text-align: center;
-}
-
-@media (min-width: 900px) {
-  .lp-trust-strip {
-    text-align: left;
-  }
 }
 
 .lp-trust-kicker {
