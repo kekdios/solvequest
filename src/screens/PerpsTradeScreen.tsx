@@ -95,15 +95,6 @@ export default function PerpsTradeScreen({
 
   return (
     <div style={s.wrap}>
-      <div style={s.qusdPageStrip} aria-label="QUSD balance">
-        <QusdIcon size={18} />
-        <span style={s.qusdPageStripInner}>
-          <span>QUSD</span>{" "}
-          <strong style={{ color: "var(--text)" }} className="mono">
-            {formatUsd(qusdUnlocked)}
-          </strong>
-        </span>
-      </div>
       <div className="perps-layout">
         <div style={s.chartCard}>
           <div style={s.chartHeader}>
@@ -148,11 +139,6 @@ export default function PerpsTradeScreen({
               </div>
             ))}
           </div>
-          <p style={s.chartHint}>
-            {feedLive && priceFeed
-              ? `Hyperliquid: allMids for BTC, ETH, SOL; HIP-3 dex xyz markPx for GOLD, SILVER, CL (OIL). ~${priceFeed.intervalMs / 1000}s poll. Fixed ${DEFAULT_PERP_LEVERAGE}×: PnL = margin × (Δindex) × ${DEFAULT_PERP_LEVERAGE}; remaining = margin + PnL (≤0 ⇒ wiped).`
-              : "Prices come only from Hyperliquid (both main and xyz feeds). Trading is disabled until the feed is live."}
-          </p>
         </div>
 
         <div className="perps-order-card" style={s.orderCard}>
@@ -448,22 +434,6 @@ function formatPrice(n: number): string {
 
 const s: Record<string, CSSProperties> = {
   wrap: { display: "flex", flexDirection: "column", gap: 16 },
-  qusdPageStrip: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "8px 14px",
-    padding: "12px 16px",
-    marginBottom: 4,
-    borderRadius: 10,
-    border: "1px solid color-mix(in srgb, var(--accent) 22%, var(--border))",
-    background: "color-mix(in srgb, var(--accent) 6%, var(--surface))",
-    fontSize: 13,
-    color: "var(--muted)",
-  },
-  qusdPageStripInner: { display: "inline-flex", flexWrap: "wrap", alignItems: "baseline", gap: 6 },
-  qusdPageStripQ: { fontWeight: 600, color: "var(--text)" },
-  qusdPageStripSep: { opacity: 0.45, userSelect: "none" },
   chartHeaderActions: {
     display: "flex",
     flexWrap: "wrap",
@@ -559,7 +529,6 @@ const s: Record<string, CSSProperties> = {
     border: "1px solid color-mix(in srgb, var(--danger) 35%, var(--border))",
   },
   feedConnecting: { margin: "0 0 12px", fontSize: 13, color: "var(--muted)" },
-  chartHint: { margin: "14px 0 0", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 },
   orderCard: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
