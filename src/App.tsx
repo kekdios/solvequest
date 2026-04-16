@@ -20,6 +20,7 @@ import AccountScreen from "./screens/AccountScreen";
 import QuickStartScreen from "./screens/QuickStartScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import QusdSellScreen from "./screens/QusdSellScreen";
+import VisitorsScreen from "./screens/VisitorsScreen";
 import AuthScreen from "./screens/AuthScreen";
 import AppSidebar, { type AppScreen } from "./components/AppSidebar";
 
@@ -229,6 +230,10 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   account: {
     title: "Account",
     lead: "",
+  },
+  visitors: {
+    title: "Visitors",
+    lead: "Recent SPA views (IP, location, page).",
   },
   auth: {
     title: "Login / Register",
@@ -481,6 +486,23 @@ function AppInner() {
   const [screen, setScreen] = useState<AppScreen>("landing");
 
   useEffect(() => {
+    if (screen === "visitors" && ledgerAccountRow?.is_admin !== true) {
+      setScreen("trade");
+    }
+  }, [screen, ledgerAccountRow?.is_admin]);
+
+  /** Log logical app screen as path for visitor analytics (no PII). */
+  useEffect(() => {
+    const path = `/${screen}`;
+    void fetch("/api/visitors/log", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    }).catch(() => {});
+  }, [screen]);
+
+  useEffect(() => {
     if (screen === "auth" && user) setScreen("trade");
   }, [screen, user]);
 
@@ -605,7 +627,11 @@ function AppInner() {
       </header>
 
       <div className="app-body">
-        <AppSidebar screen={screen} onNavigate={setScreen} />
+        <AppSidebar
+          screen={screen}
+          onNavigate={setScreen}
+          showVisitors={ledgerAccountRow?.is_admin === true}
+        />
         <main
           className="app-main"
           style={screen === "landing" ? styles.mainLanding : styles.main}
@@ -675,6 +701,8 @@ function AppInner() {
               onRefreshAccount={refreshAccountFromServer}
             />
           )}
+
+          {screen === "visitors" && ledgerAccountRow?.is_admin === true ? <VisitorsScreen /> : null}
         </main>
       </div>
     </div>

@@ -6,6 +6,8 @@ export type { AppScreen } from "./AppSidebar.types";
 type Props = {
   screen: AppScreen;
   onNavigate: (screen: AppScreen) => void;
+  /** Show Visitors (admin) when JWT user matches server ADMIN_EMAIL. */
+  showVisitors?: boolean;
 };
 
 const iconWrap: CSSProperties = {
@@ -70,7 +72,16 @@ function NavIconAccount() {
   );
 }
 
-const mainAppItems: { id: AppScreen; label: string; Icon: () => ReactNode }[] = [
+function NavIconVisitors() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+const mainAppItemsBase: { id: AppScreen; label: string; Icon: () => ReactNode }[] = [
   { id: "landing", label: "Home", Icon: NavIconHome },
   { id: "trade", label: "Trade", Icon: NavIconPerps },
   { id: "history", label: "History", Icon: NavIconHistory },
@@ -79,11 +90,14 @@ const mainAppItems: { id: AppScreen; label: string; Icon: () => ReactNode }[] = 
   { id: "quickstart", label: "Quick start", Icon: NavIconBook },
 ];
 
+const visitorsItem = { id: "visitors" as const, label: "Visitors", Icon: NavIconVisitors };
+
 /** Shown in sidebar footer: semver + release stamp (d-mmm-yy). */
 const APP_VERSION_SEMVER = "1.0.0";
 const APP_VERSION_DATE = "12-Apr-26";
 
-export default function AppSidebar({ screen, onNavigate }: Props) {
+export default function AppSidebar({ screen, onNavigate, showVisitors }: Props) {
+  const mainAppItems = showVisitors ? [...mainAppItemsBase, visitorsItem] : mainAppItemsBase;
   return (
     <aside className="app-sidebar" aria-label="Primary">
       <div className="app-sidebar-top">

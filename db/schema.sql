@@ -111,3 +111,14 @@ CREATE TABLE IF NOT EXISTS perp_open_positions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_perp_open_account ON perp_open_positions (account_id);
+
+/** Anonymous and signed-in SPA views: IP, resolved location label, logical app path, timestamp. */
+CREATE TABLE IF NOT EXISTS visitors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at INTEGER NOT NULL,
+  ip TEXT NOT NULL,
+  location TEXT NOT NULL,
+  path TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_visitors_created ON visitors (created_at DESC);

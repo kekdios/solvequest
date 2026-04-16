@@ -28,6 +28,8 @@ export type PersistedAccountRow = {
   open_perp_positions?: import("../engine/perps").PerpPosition[];
   /** True after at least one Solana USDC deposit was credited (`deposit_credits`). */
   account_active?: boolean;
+  /** True when JWT email matches server `ADMIN_EMAIL` (sidebar Visitors, admin APIs). */
+  is_admin?: boolean;
 };
 
 export type PerpTxnType = "open" | "close";

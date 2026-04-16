@@ -5,4 +5,5 @@ export type AppScreen =
   | "history"
   | "sellQusd"
   | "account"
+  | "visitors"
   | "auth";

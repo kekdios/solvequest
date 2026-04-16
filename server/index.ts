@@ -11,6 +11,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import { createUserAuthMiddleware } from "../plugins/userAuthApiPlugin";
 import { createAccountApiMiddleware } from "../plugins/accountApiPlugin";
 import { createQusdSellApiMiddleware } from "../plugins/qusdSellApiPlugin";
+import { createVisitorsApiMiddleware } from "../plugins/visitorsApiPlugin";
 import { startQusdBuyScanWorker } from "./qusdBuyScanWorker";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -36,6 +37,7 @@ const port = isProd
   : Number(process.env.API_PORT || process.env.PORT || 3001);
 
 const app = express();
+app.set("trust proxy", 1);
 const env = envRecord();
 const mode = isProd ? "production" : "development";
 
@@ -66,6 +68,7 @@ app.get("/api/config/treasury", (_req, res) => {
 app.use(createUserAuthMiddleware(env, mode));
 app.use(createAccountApiMiddleware(env, root));
 app.use(createQusdSellApiMiddleware(env, root));
+app.use(createVisitorsApiMiddleware(env, root));
 
 const solanaTarget =
   env.SOLANA_RPC_PROXY_TARGET?.trim() || "https://api.mainnet-beta.solana.com";

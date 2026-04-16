@@ -17,6 +17,8 @@ After the app loads, use the in-app **Quick start** screen (sidebar) for a user-
 
 **Minimum env** for local auth/API: set **`JWT_SECRET`** (and email OTP variables if you use `/api/auth` — see `plugins/userAuthApiPlugin.ts`). Load order: **`.env`**, then **`backend/.env`** (see `server/loadEnv.ts`).
 
+Optional **`ADMIN_EMAIL`**: when it matches the signed-in user’s email (case-insensitive), the **Visitors** sidebar item and `GET /api/admin/visitors` are enabled. Visitor rows are stored in SQLite (`visitors` table) via `POST /api/visitors/log` from the SPA.
+
 ## Scripts
 
 | Command | Purpose |

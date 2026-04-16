@@ -16,6 +16,7 @@ import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
 import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
+import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
 import {
   getLedgerBalances,
   insertAddressVerificationBonus,
@@ -188,6 +189,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       db.pragma("journal_mode = WAL");
       db.pragma("busy_timeout = 8000");
       ensureAccountsSchema(db);
+      ensureVisitorsSchema(db);
       return db;
     } catch (e) {
       console.error("[account-api] open db:", e);
@@ -281,6 +283,8 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         mePayload.sync_version = Number((row as AccountRow).sync_version ?? 0);
         mePayload.account_active =
           database != null ? accountHasSolanaDeposit(database, accountId) : false;
+        const adminEmail = env.ADMIN_EMAIL?.trim().toLowerCase();
+        mePayload.is_admin = Boolean(adminEmail && email === adminEmail);
         sendJson(res, 200, mePayload);
       } catch (e) {
         console.error("[account-api] GET /api/account/me:", e);

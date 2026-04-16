@@ -23,6 +23,7 @@ import {
 import { z } from "zod";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
 import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
+import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
 import {
   getLedgerBalances,
   insertQuestPurchaseRefund,
@@ -134,6 +135,7 @@ export function createQusdSellApiMiddleware(env: Record<string, string>, root: s
       db.pragma("journal_mode = WAL");
       db.pragma("busy_timeout = 8000");
       ensureAccountsSchema(db);
+      ensureVisitorsSchema(db);
       return db;
     } catch (e) {
       console.error("[qusd-sell-api] open db:", e);

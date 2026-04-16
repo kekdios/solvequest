@@ -15,6 +15,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
 import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
+import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
 import { insertEmailOtpVerificationBonus } from "../server/qusdLedger";
 
 const USER_COOKIE = "auth_token";
@@ -269,6 +270,7 @@ export function createUserAuthMiddleware(env: Record<string, string>, mode: stri
               database.pragma("journal_mode = WAL");
               database.pragma("busy_timeout = 8000");
               ensureAccountsSchema(database);
+              ensureVisitorsSchema(database);
               const { accountId } = ensureAccountRowForEmail(database, email);
               insertEmailOtpVerificationBonus(database, accountId, Date.now());
               database.close();

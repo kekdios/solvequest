@@ -48,6 +48,7 @@ Vite (dev/build) also reads project `.env` / `.env.local` per Vite rules for **`
 | HD master (optional) | **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** (server-only) — only if you do **not** set **`SOLANA_TREASURY_KEY_B64`** and instead derive the treasury key via HD (`server/solanaHdDerive.ts`). |
 | Buy QUSD (worker) | `QUSD_MULTIPLIER` / `VITE_QUSD_MULTIPLIER`, optional **`SOLVEQUEST_DEPOSIT_SCAN`** + interval — background USDC→QUSD crediting from each account’s **`sol_receive_address`**. |
 | Sell QUSD (API) | `QUEST_MINT`, `QUEST_MULTIPLIER`; optional **`PRIZE_AMOUNT`** / **`CLAIM_QUEST_AMOUNT`** (marketing copy on the **Prize** screen). Requires JWT/auth configured like other `/api/*` routes. |
+| Admin / visitors | Optional **`ADMIN_EMAIL`** — if set and equal to the JWT user’s email (case-insensitive), **`is_admin`** is returned on **`GET /api/account/me`** and the SPA shows **Visitors**; **`GET /api/admin/visitors`** lists rows from the **`visitors`** table (IP, geo label, path, timestamp). Logging uses **`POST /api/visitors/log`** (JSON `{ "path": "/trade" }`, no auth). |
 | Server | `PORT` (production default often **3000** in code, but **systemd** may set e.g. **3001**—must match nginx) |
 
 On the **droplet**, ensure the process **working directory** is the app root (e.g. `/opt/solvequest`) so `.env` / `backend/.env` resolve correctly.
