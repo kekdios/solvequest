@@ -29,6 +29,12 @@ type Props = {
     sourceLabel: string;
   };
   onNavigateToAccount: () => void;
+  /** Open Login / Register (demo users). */
+  onGoToAuth?: () => void;
+  /** False until signed-in user has verified Solana on Account; hide bonus banner when true. */
+  bonusSetupComplete: boolean;
+  /** Anonymous demo session — affects reminder copy. */
+  isDemo: boolean;
   qusdUnlocked: number;
 };
 
@@ -43,6 +49,9 @@ export default function PerpsTradeScreen({
   onClose,
   priceFeed,
   onNavigateToAccount,
+  onGoToAuth,
+  bonusSetupComplete,
+  isDemo,
   qusdUnlocked,
 }: Props) {
   const [symbol, setSymbol] = useState<PerpSymbol>("BTC-PERP");
@@ -93,8 +102,37 @@ export default function PerpsTradeScreen({
     onOpen({ symbol, side, notionalUsdc: allocateQusd, leverage: DEFAULT_PERP_LEVERAGE });
   };
 
+  const showBonusReminder = !bonusSetupComplete;
+
   return (
     <div style={s.wrap}>
+      {showBonusReminder ? (
+        <div style={s.bonusReminder} role="status">
+          {isDemo ? (
+            <p style={s.bonusReminderText}>
+              <strong style={{ color: "var(--text)" }}>Bonus QUSD:</strong> Register with your email and verify a
+              Solana address on{" "}
+              <button type="button" style={s.bonusReminderBtn} onClick={onNavigateToAccount}>
+                Account
+              </button>{" "}
+              to receive onboarding credits.{" "}
+              {onGoToAuth ? (
+                <button type="button" style={s.bonusReminderBtn} onClick={onGoToAuth}>
+                  Login / Register
+                </button>
+              ) : null}
+            </p>
+          ) : (
+            <p style={s.bonusReminderText}>
+              <strong style={{ color: "var(--text)" }}>Bonus QUSD:</strong> Verify your Solana address on{" "}
+              <button type="button" style={s.bonusReminderBtn} onClick={onNavigateToAccount}>
+                Account
+              </button>{" "}
+              to receive your credit.
+            </p>
+          )}
+        </div>
+      ) : null}
       <div className="perps-layout">
         <div style={s.chartCard}>
           <div style={s.chartHeader}>
@@ -434,6 +472,31 @@ function formatPrice(n: number): string {
 
 const s: Record<string, CSSProperties> = {
   wrap: { display: "flex", flexDirection: "column", gap: 16 },
+  bonusReminder: {
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1px solid color-mix(in srgb, var(--warn) 35%, var(--border))",
+    background: "color-mix(in srgb, var(--warn) 12%, var(--panel))",
+    boxSizing: "border-box",
+    maxWidth: "100%",
+  },
+  bonusReminderText: {
+    margin: 0,
+    fontSize: 13,
+    lineHeight: 1.55,
+    color: "var(--muted)",
+  },
+  bonusReminderBtn: {
+    background: "none",
+    border: "none",
+    padding: 0,
+    margin: 0,
+    font: "inherit",
+    fontWeight: 700,
+    color: "var(--accent)",
+    textDecoration: "underline",
+    cursor: "pointer",
+  },
   chartHeaderActions: {
     display: "flex",
     flexWrap: "wrap",

@@ -707,6 +707,11 @@ function AppInner() {
                 sourceLabel: "Hyperliquid",
               }}
               onNavigateToAccount={() => setScreen("account")}
+              onGoToAuth={() => setScreen("auth")}
+              bonusSetupComplete={
+                !demo && Boolean(user) && ledgerAccountRow?.sol_receive_verified_at != null
+              }
+              isDemo={demo}
               qusdUnlocked={state.qusd.unlocked}
             />
           )}
