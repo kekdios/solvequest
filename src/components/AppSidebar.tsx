@@ -63,6 +63,14 @@ function NavIconPrize() {
   );
 }
 
+function NavIconLeaderboard() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M8 21V7M16 21v-6M12 21V3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function NavIconAccount() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -86,6 +94,7 @@ const mainAppItemsBase: { id: AppScreen; label: string; Icon: () => ReactNode }[
   { id: "trade", label: "Trade", Icon: NavIconPerps },
   { id: "history", label: "History", Icon: NavIconHistory },
   { id: "sellQusd", label: "Prize", Icon: NavIconPrize },
+  { id: "leaderboard", label: "Leaderboard", Icon: NavIconLeaderboard },
   { id: "account", label: "Account", Icon: NavIconAccount },
   { id: "quickstart", label: "Quick start", Icon: NavIconBook },
 ];

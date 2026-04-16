@@ -4,6 +4,7 @@ export type AppScreen =
   | "trade"
   | "history"
   | "sellQusd"
+  | "leaderboard"
   | "account"
   | "visitors"
   | "auth";

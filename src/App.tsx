@@ -21,6 +21,7 @@ import QuickStartScreen from "./screens/QuickStartScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import QusdSellScreen from "./screens/QusdSellScreen";
 import VisitorsScreen from "./screens/VisitorsScreen";
+import LeaderboardScreen from "./screens/LeaderboardScreen";
 import AuthScreen from "./screens/AuthScreen";
 import AppSidebar, { type AppScreen } from "./components/AppSidebar";
 
@@ -226,6 +227,10 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   sellQusd: {
     title: "Prize",
     lead: "Prize pool, QUEST purchase with QUSD, and balances.",
+  },
+  leaderboard: {
+    title: "Leaderboard",
+    lead: "Top QUSD balances and prize pool details.",
   },
   account: {
     title: "Account",
@@ -673,6 +678,8 @@ function AppInner() {
               onRefreshAccount={refreshAccountFromServer}
             />
           )}
+
+          {screen === "leaderboard" && <LeaderboardScreen />}
 
           {screen === "trade" && (
             <PerpsTradeScreen

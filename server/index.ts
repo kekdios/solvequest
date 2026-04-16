@@ -12,6 +12,7 @@ import { createUserAuthMiddleware } from "../plugins/userAuthApiPlugin";
 import { createAccountApiMiddleware } from "../plugins/accountApiPlugin";
 import { createQusdSellApiMiddleware } from "../plugins/qusdSellApiPlugin";
 import { createVisitorsApiMiddleware } from "../plugins/visitorsApiPlugin";
+import { createLeaderboardApiMiddleware } from "../plugins/leaderboardApiPlugin";
 import { startQusdBuyScanWorker } from "./qusdBuyScanWorker";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +70,7 @@ app.use(createUserAuthMiddleware(env, mode));
 app.use(createAccountApiMiddleware(env, root));
 app.use(createQusdSellApiMiddleware(env, root));
 app.use(createVisitorsApiMiddleware(env, root));
+app.use(createLeaderboardApiMiddleware(env, root));
 
 const solanaTarget =
   env.SOLANA_RPC_PROXY_TARGET?.trim() || "https://api.mainnet-beta.solana.com";
