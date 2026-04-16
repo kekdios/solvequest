@@ -66,6 +66,91 @@
   color: transparent;
 }
 
+.lp-title--game {
+  max-width: min(100%, 22ch);
+}
+
+.lp-hero-lead {
+  font-size: clamp(1.05rem, 2.4vw, 1.25rem);
+  line-height: 1.45;
+  color: var(--text);
+  max-width: 42ch;
+  margin: 0 auto 12px;
+}
+
+.lp-hero-lead strong {
+  font-weight: 650;
+  color: color-mix(in srgb, var(--accent) 92%, #fff);
+}
+
+.lp-hero-prize {
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-sub--hero {
+  max-width: 40ch;
+  margin-bottom: 20px;
+}
+
+.lp-hero-pills {
+  list-style: none;
+  margin: 0 auto 20px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 14px;
+  max-width: 52rem;
+}
+
+.lp-hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 88%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--border) 90%, var(--text));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+.lp-hero-pill strong {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.lp-hero-pill svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.lp-leverage-tagline--tight {
+  margin-bottom: 20px;
+  font-size: 0.9375rem;
+  letter-spacing: 0.03em;
+}
+
+.lp-cta-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.lp-cta-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  line-height: 1.45;
+  max-width: 36ch;
+}
+
+.lp-cta-hint--footer {
+  margin-bottom: 16px;
+}
+
 .lp-title--prize-hero {
   display: flex;
   flex-wrap: wrap;
@@ -624,4 +709,197 @@ button.lp-text-link:hover {
   max-width: var(--lp-max);
   margin-left: auto;
   margin-right: auto;
+}
+
+/* Leaderboard preview (landing) */
+.lp-leader-preview {
+  padding-top: clamp(28px, 4vw, 40px);
+}
+
+.lp-section-lead--tight {
+  margin-bottom: 20px;
+}
+
+.lp-table-scroll {
+  overflow-x: auto;
+  border-radius: var(--lp-radius-sm);
+  border: 1px solid color-mix(in srgb, var(--border) 85%, var(--text));
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.lp-mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.lp-mini-table th,
+.lp-mini-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.lp-mini-table thead th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.lp-mini-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.lp-mini-table-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-mini-table-muted {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.875rem;
+  padding: 20px 16px;
+}
+
+.lp-leader-cta {
+  margin: 20px 0 0;
+  text-align: center;
+}
+
+.lp-leader-cta-btn {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* Example trade card */
+.lp-example {
+  padding-bottom: 0;
+}
+
+.lp-example-card {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 20px 20px 18px;
+  border-radius: var(--lp-radius-sm);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent),
+    0 8px 32px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.lp-example-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.lp-example-pair {
+  font-weight: 650;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.lp-example-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+.lp-example-dl {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.lp-example-dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.lp-example-dl dt {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.lp-example-dl dd {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.lp-example-profit dt,
+.lp-example-profit dd {
+  color: var(--ok);
+  font-weight: 650;
+}
+
+.lp-example-note {
+  margin: 16px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Activity strip + prize urgency */
+.lp-activity {
+  padding-top: clamp(24px, 4vw, 36px);
+}
+
+.lp-prize-urgency {
+  padding-top: clamp(24px, 4vw, 40px);
+}
+
+.lp-prize-urgency-inner {
+  max-width: 52ch;
+  margin: 0 auto;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 20px 22px;
+  border-radius: var(--lp-radius);
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  text-align: left;
+}
+
+.lp-prize-urgency-icon {
+  flex-shrink: 0;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.lp-prize-urgency-amount {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.lp-prize-urgency-copy {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+@media (max-width: 480px) {
+  .lp-prize-urgency-inner {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
 }

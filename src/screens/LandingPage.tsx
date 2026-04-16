@@ -54,20 +54,60 @@ function IconAutomation({ className }: { className?: string }) {
   );
 }
 
+type LeaderboardPreviewRow = {
+  rank: number;
+  label: string;
+  qusd: number;
+};
+
+type LandingStats = {
+  closes_24h: number | null;
+  accounts_with_email: number | null;
+};
+
 export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
   const [prizeAmount, setPrizeAmount] = useState<number | null | undefined>(undefined);
+  const [lbRows, setLbRows] = useState<LeaderboardPreviewRow[]>([]);
+  const [lbLoading, setLbLoading] = useState(true);
+  const [stats, setStats] = useState<LandingStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/qusd/sell/config", { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j: { prize_amount?: number } | null) => {
-        if (cancelled || !j) return;
-        const n = j.prize_amount;
-        setPrizeAmount(typeof n === "number" && Number.isFinite(n) ? n : null);
+    void Promise.all([
+      fetch("/api/qusd/sell/config", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/leaderboard?limit=3", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/landing-stats", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([cfg, lb, st]) => {
+        if (cancelled) return;
+        if (cfg && typeof cfg === "object" && "prize_amount" in cfg) {
+          const n = (cfg as { prize_amount?: number }).prize_amount;
+          setPrizeAmount(typeof n === "number" && Number.isFinite(n) ? n : null);
+        } else {
+          setPrizeAmount(null);
+        }
+        const rows =
+          lb && typeof lb === "object" && Array.isArray((lb as { rows?: unknown }).rows)
+            ? ((lb as { rows: LeaderboardPreviewRow[] }).rows ?? [])
+            : [];
+        setLbRows(rows.slice(0, 3));
+        setLbLoading(false);
+        if (st && typeof st === "object") {
+          setStats({
+            closes_24h: typeof (st as LandingStats).closes_24h === "number" ? (st as LandingStats).closes_24h : null,
+            accounts_with_email:
+              typeof (st as LandingStats).accounts_with_email === "number"
+                ? (st as LandingStats).accounts_with_email
+                : null,
+          });
+        }
       })
       .catch(() => {
-        if (!cancelled) setPrizeAmount(null);
+        if (!cancelled) {
+          setPrizeAmount(null);
+          setLbRows([]);
+          setLbLoading(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -86,66 +126,139 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
       <section className="lp-hero" aria-labelledby="lp-hero-heading">
         <div className="lp-hero-inner">
           <p className="lp-eyebrow">Solve Quest</p>
-          <h1 id="lp-hero-heading" className="lp-title lp-title--prize-hero">
-            <span className="lp-title-shine">Compete for</span>{" "}
-            <span
-              className="lp-title-prize-amount"
-              aria-label={
-                typeof prizeAmount === "number" ? `Prize pool about ${prizeAmount} USDC` : undefined
-              }
-            >
-              <img
-                src="/prize-usdc.png"
-                alt=""
-                className="lp-title-usdc-icon"
-                width={44}
-                height={44}
-                decoding="async"
-              />
-              <span className="lp-title-shine lp-title-usd">
-                ${usdPart} USDC
-              </span>
-            </span>{" "}
-            <span className="lp-title-shine">PRIZE</span>
+          <h1 id="lp-hero-heading" className="lp-title lp-title--game">
+            Compete in a Trading Game
           </h1>
-          <p className="lp-sub">Trade perpetual-style markets. Synced with Hyperliquid.</p>
-          <div className="lp-qusd-ribbon">
-            <img
-              src="/icon-qusd.png"
-              alt=""
-              className="lp-qusd-ribbon-icon"
-              width={52}
-              height={52}
-            />
-            <div className="lp-qusd-ribbon-copy">
-              <p className="lp-qusd-ribbon-lead">
-                You receive <strong>30,000 QUSD</strong> as a free <strong>BONUS</strong> when fully verified.
-              </p>
-            </div>
-          </div>
-          <p className="lp-leverage-tagline">
+          <p className="lp-hero-lead">
+            Start with <strong>30,000 free QUSD</strong>, climb the leaderboard, and compete for{" "}
+            <strong className="lp-hero-prize">${usdPart} USDC</strong>.
+          </p>
+          <p className="lp-sub lp-sub--hero">
+            Trade real market prices synced with Hyperliquid. No deposit required to start.
+          </p>
+          <ul className="lp-hero-pills" aria-label="What you get">
+            <li className="lp-hero-pill">
+              <img src="/icon-qusd.png" alt="" width={20} height={20} />
+              <span>
+                <strong>30,000 QUSD</strong> bonus when fully verified
+              </span>
+            </li>
+            <li className="lp-hero-pill">
+              <IconChart />
+              <span>Live leaderboard</span>
+            </li>
+            <li className="lp-hero-pill">
+              <img src="/prize-usdc.png" alt="" width={20} height={20} />
+              <span>Season prize pool</span>
+            </li>
+          </ul>
+          <p className="lp-leverage-tagline lp-leverage-tagline--tight">
             Multiple{" "}
             <img
               src="/icon-qusd.png"
               alt=""
               className="lp-leverage-tagline-qusd"
-              width={24}
-              height={24}
+              width={22}
+              height={22}
               decoding="async"
             />{" "}
             10,000 QUSD awarded to verified active users daily
           </p>
-          <div className="lp-cta-row">
+          <div className="lp-cta-stack">
             <button type="button" className="lp-btn-primary" onClick={onStartNow}>
               Start Now
             </button>
+            <p className="lp-cta-hint">Email verification takes ~10 seconds.</p>
           </div>
+        </div>
+      </section>
+
+      <section className="lp-section lp-leader-preview" aria-labelledby="lp-lb-heading">
+        <h2 id="lp-lb-heading" className="lp-section-title">
+          Top traders right now
+        </h2>
+        <p className="lp-section-lead lp-section-lead--tight">
+          Real QUSD balances from our server leaderboard (masked emails for privacy).
+        </p>
+        <div className="lp-table-scroll">
+          <table className="lp-mini-table">
+            <thead>
+              <tr>
+                <th scope="col">Rank</th>
+                <th scope="col">Trader</th>
+                <th scope="col" className="lp-mini-table-num">
+                  QUSD balance
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {lbLoading ? (
+                <tr>
+                  <td colSpan={3} className="lp-mini-table-muted">
+                    Loading…
+                  </td>
+                </tr>
+              ) : lbRows.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="lp-mini-table-muted">
+                    Be the first on the board — start trading to appear here.
+                  </td>
+                </tr>
+              ) : (
+                lbRows.map((r) => (
+                  <tr key={`${r.rank}-${r.label}`}>
+                    <td className="mono">#{r.rank}</td>
+                    <td>{r.label}</td>
+                    <td className="mono lp-mini-table-num">
+                      {r.qusd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <p className="lp-leader-cta">
+          <button type="button" className="lp-text-link lp-leader-cta-btn" onClick={onStartNow}>
+            Think you can beat them? Start trading.
+          </button>
+        </p>
+      </section>
+
+      <section className="lp-section lp-example" aria-labelledby="lp-ex-heading">
+        <h2 id="lp-ex-heading" className="lp-section-title">
+          Example trade
+        </h2>
+        <p className="lp-section-lead lp-section-lead--tight">Illustrative — not investment advice.</p>
+        <div className="lp-example-card">
+          <div className="lp-example-head">
+            <span className="lp-example-pair">BTC · Long</span>
+            <span className="lp-example-badge">Demo math</span>
+          </div>
+          <dl className="lp-example-dl">
+            <div>
+              <dt>Entry</dt>
+              <dd className="mono">63,200</dd>
+            </div>
+            <div>
+              <dt>Exit</dt>
+              <dd className="mono">65,000</dd>
+            </div>
+            <div className="lp-example-profit">
+              <dt>Profit (illustrative)</dt>
+              <dd className="mono">+1,320 QUSD</dd>
+            </div>
+          </dl>
+          <p className="lp-example-note">
+            Positions use fixed leverage; PnL depends on index movement and margin. See <strong>Trade</strong> for live
+            prices.
+          </p>
         </div>
       </section>
 
       <section className="lp-section" aria-labelledby="lp-how-heading">
         <h2 id="lp-how-heading" className="lp-section-title">
-          How It Works
+          How it works
         </h2>
         <p className="lp-section-lead">
           Three steps from sign-up to execution—without watching charts all day.
@@ -162,7 +275,7 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
             <span className="lp-step-num" aria-hidden>
               2
             </span>
-            <h3>Choose Direction</h3>
+            <h3>Choose direction</h3>
             <div className="lp-dir">
               <span>
                 <span className="lp-tag-long">Long</span> if you think price will rise
@@ -198,7 +311,7 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
 
       <section className="lp-section" aria-labelledby="lp-why-heading">
         <h2 id="lp-why-heading" className="lp-section-title">
-          Why Users Love Us
+          Why players choose us
         </h2>
         <div className="lp-grid-2">
           <div className="lp-feature">
@@ -219,7 +332,7 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
               <p>Beginner-friendly—no advanced trading knowledge required.</p>
             </div>
           </div>
-          <div className="lp-feature">
+          <div className="lp-feature lp-feature--wide">
             <span className="lp-feature-icon" aria-hidden>
               <IconAutomation />
             </span>
@@ -227,6 +340,54 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
               <h3>Automation proof</h3>
               <p>Designed to help keep the field level for everyone.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {stats && (stats.closes_24h != null || stats.accounts_with_email != null) ? (
+        <section className="lp-section lp-activity" aria-label="Recent activity">
+          <div className="lp-stats">
+            {stats.closes_24h != null ? (
+              <div className="lp-stat">
+                <div className="lp-stat-value">{stats.closes_24h.toLocaleString()}</div>
+                <div className="lp-stat-label">Closed trades (last 24h)</div>
+              </div>
+            ) : null}
+            {stats.accounts_with_email != null ? (
+              <div className="lp-stat">
+                <div className="lp-stat-value">{stats.accounts_with_email.toLocaleString()}</div>
+                <div className="lp-stat-label">Registered emails</div>
+              </div>
+            ) : null}
+            <div className="lp-stat">
+              <div className="lp-stat-value">HL</div>
+              <div className="lp-stat-label">Index marks from Hyperliquid</div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="lp-section lp-prize-urgency" aria-labelledby="lp-prize-urgency-heading">
+        <h2 id="lp-prize-urgency-heading" className="lp-section-title">
+          Season prize pool
+        </h2>
+        <div className="lp-prize-urgency-inner">
+          <img src="/prize-usdc.png" alt="" width={40} height={40} className="lp-prize-urgency-icon" />
+          <div>
+            <p className="lp-prize-urgency-amount">
+              <strong>${usdPart} USDC</strong> prize pool
+            </p>
+            <p className="lp-prize-urgency-copy">
+              Rules, QUEST requirements, and timing are on the{" "}
+              {onGoToPrize ? (
+                <button type="button" className="lp-text-link" onClick={onGoToPrize}>
+                  Prize
+                </button>
+              ) : (
+                "Prize"
+              )}{" "}
+              page. Promotional QUSD awards may run on a schedule — check there for the latest.
+            </p>
           </div>
         </div>
       </section>
@@ -248,20 +409,17 @@ export default function LandingPage({ onStartNow, onGoToPrize }: Props) {
       </section>
 
       <section className="lp-cta-block" aria-labelledby="lp-final-cta-heading">
-        <h2 id="lp-final-cta-heading">Start Trading in Minutes</h2>
-        <p className="lp-cta-steps">
-          Verify Account Info → Collect Bonus QUSD → Trade → Watch Your Balance Grow
-        </p>
+        <h2 id="lp-final-cta-heading">Start in minutes</h2>
+        <p className="lp-cta-steps">Verify email → Link Solana → Trade → Climb the board</p>
         <button type="button" className="lp-btn-primary" onClick={onStartNow}>
           Start Now
         </button>
+        <p className="lp-cta-hint lp-cta-hint--footer">Email verification takes ~10 seconds.</p>
         <p className="lp-urgency lp-urgency--prize">
           <span className="lp-urgency-lead">Get verified to compete —</span>{" "}
           <span className="lp-urgency-prize">
             <img src="/prize-usdc.png" alt="" className="lp-urgency-usdc" width={26} height={26} decoding="async" />
-            <span>
-              ${usdPart} USDC is waiting to be claimed.
-            </span>
+            <span>${usdPart} USDC in the seasonal pool.</span>
           </span>
         </p>
       </section>
