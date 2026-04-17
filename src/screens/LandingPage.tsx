@@ -128,7 +128,6 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
     <div className="lp">
       <section className="lp-hero" aria-labelledby="lp-hero-heading">
         <div className="lp-hero-inner">
-          <p className="lp-eyebrow">Solve Quest</p>
           <h1 id="lp-hero-heading" className="lp-title lp-title--game">
             Compete in a Trading Game
           </h1>
