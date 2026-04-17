@@ -113,6 +113,20 @@ const dep: Record<string, CSSProperties> = {
     color: "var(--text)",
   },
   stepLi: { marginBottom: 8 },
+  summaryDirection: {
+    margin: "0 0 8px",
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: "-0.01em",
+    color: "var(--text)",
+  },
+  summaryDirectionSpaced: {
+    margin: "18px 0 8px",
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: "-0.01em",
+    color: "var(--text)",
+  },
   monitorNote: {
     margin: "0 0 0",
     padding: "12px 14px",
@@ -527,38 +541,6 @@ export default function SwapScreen({
             <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong>) to your account after
             on-chain confirmation.
           </p>
-          <ol style={dep.stepsList}>
-            <li style={dep.stepLi}>
-              <strong>Send USDC</strong> on the Solana network to the address below (only USDC — wrong tokens can be
-              lost).
-            </li>
-            <li style={dep.stepLi}>
-              <strong>Wait for confirmation</strong> — your wallet or explorer will show when the transaction settles.
-            </li>
-            <li style={dep.stepLi}>
-              <strong>QUSD credit</strong> — we add QUSD to your Solve Quest balance when our system sees the deposit on
-              chain.
-            </li>
-          </ol>
-          <p style={dep.monitorNote}>
-            {autoCreditUsdcEnabled === true ? (
-              <>
-                <strong style={{ color: "var(--text)" }}>Automatic processing is on:</strong> the server checks the
-                blockchain on a timer (not when you press a button). After Solana confirms your transfer, QUSD usually
-                appears within a few minutes — refresh your balance or revisit this page.
-              </>
-            ) : autoCreditUsdcEnabled === false ? (
-              <>
-                <strong style={{ color: "var(--warn)" }}>Automatic chain monitoring may be off</strong> on this
-                deployment. If QUSD doesn’t show up, contact support with your transaction signature from your wallet.
-              </>
-            ) : (
-              <>
-                After your transfer confirms, QUSD is credited when our backend processes your deposit — often within a
-                few minutes.
-              </>
-            )}
-          </p>
           <div style={dep.addressBlock}>
             <Suspense fallback={<p style={dep.suspenseFallback}>Loading…</p>}>
               <TestReceiveAddresses
@@ -762,7 +744,43 @@ export default function SwapScreen({
       </section>
 
       <div style={card}>
-        <p style={{ margin: "0 0 10px", fontWeight: 650, fontSize: "0.95rem" }}>Swap rules (summary)</p>
+        <p style={{ margin: "0 0 14px", fontWeight: 650, fontSize: "0.95rem" }}>How it works (summary)</p>
+
+        <p style={dep.summaryDirection}>USDC → QUSD (you send USDC)</p>
+        <ul style={{ ...dep.stepsList, marginBottom: 12 }}>
+          <li style={dep.stepLi}>
+            <strong>Send USDC</strong> on the Solana network to the address in the panel above (only USDC — wrong tokens
+            can be lost).
+          </li>
+          <li style={dep.stepLi}>
+            <strong>Wait for confirmation</strong> — your wallet or explorer will show when the transaction settles.
+          </li>
+          <li style={dep.stepLi}>
+            <strong>QUSD credit</strong> — we add QUSD to your Solve Quest balance when our system sees the deposit on
+            chain.
+          </li>
+        </ul>
+        <p style={{ ...dep.monitorNote, marginTop: 0 }}>
+          {autoCreditUsdcEnabled === true ? (
+            <>
+              <strong style={{ color: "var(--text)" }}>Automatic processing is on:</strong> the server checks the
+              blockchain on a timer (not when you press a button). After Solana confirms your transfer, QUSD usually
+              appears within a few minutes — refresh your balance or revisit this page.
+            </>
+          ) : autoCreditUsdcEnabled === false ? (
+            <>
+              <strong style={{ color: "var(--warn)" }}>Automatic chain monitoring may be off</strong> on this
+              deployment. If QUSD doesn’t show up, contact support with your transaction signature from your wallet.
+            </>
+          ) : (
+            <>
+              After your transfer confirms, QUSD is credited when our backend processes your deposit — often within a
+              few minutes.
+            </>
+          )}
+        </p>
+
+        <p style={dep.summaryDirectionSpaced}>QUSD → USDC (in-app swap)</p>
         <ul
           style={{
             margin: 0,
@@ -773,7 +791,7 @@ export default function SwapScreen({
             maxWidth: 520,
           }}
         >
-          <li>You need a verified Solana address on Account — USDC is sent there.</li>
+          <li>You need a verified Solana address on Account — USDC is sent to that wallet.</li>
           <li>
             Each swap amount must be <strong>greater than</strong> the minimum QUSD (see Exchange rate in the panel
             above).
