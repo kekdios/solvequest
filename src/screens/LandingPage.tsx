@@ -138,7 +138,9 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
               and compete for{" "}
               <span className="lp-hero-prize-line">
                 <img src="/icon-qusd.png" alt="" width={26} height={26} className="lp-hero-prize-icon" />
-                <strong className="lp-hero-prize">{prizePart} QUSD</strong>
+                <strong className="lp-hero-prize">
+                  {prizePart} QUSD <span className="lp-hero-prize-daily">daily</span>
+                </strong>
               </span>
               .
             </span>

@@ -139,6 +139,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.lp-hero-prize-daily {
+  color: color-mix(in srgb, var(--accent) 88%, #fff);
+  font-weight: 700;
+}
+
 .lp-sub--hero {
   max-width: 40ch;
   margin-top: clamp(16px, 3vw, 26px);
