@@ -9,6 +9,7 @@ const TestReceiveAddresses = lazy(() => import("../components/TestReceiveAddress
 
 const CHANGENOW_URL = "https://changenow.io/";
 const USDC_ICON = "/prize-usdc.png";
+const DEPOSIT_CHECK_COOLDOWN_MS = 30_000;
 
 type SwapConfig = {
   swap_above_amount: number;
@@ -105,6 +106,20 @@ const dep: Record<string, CSSProperties> = {
     color: "var(--text)",
   },
   changeNowLink: { color: "var(--accent)", fontWeight: 600 },
+  depositCheckRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+    marginTop: 14,
+  },
+  depositCheckHint: {
+    margin: 0,
+    fontSize: 12,
+    lineHeight: 1.45,
+    color: "var(--muted)",
+    flex: "1 1 200px",
+  },
   /** Matches QUSD→USDC summary bullets: muted body copy. */
   summaryList: {
     margin: 0,
@@ -268,7 +283,27 @@ export default function SwapScreen({
   const [healthAgeTick, setHealthAgeTick] = useState(0);
   /** 0 idle; 1–3 which sub-step is highlighted during QUSD→USDC POST. */
   const [swapProgressPhase, setSwapProgressPhase] = useState(0);
+  /** USDC→QUSD “Check” button: next allowed click time (ms). */
+  const [depositCheckCooldownUntil, setDepositCheckCooldownUntil] = useState<number | null>(null);
+  const [depositCheckClock, setDepositCheckClock] = useState(0);
   const displayAddr = serverDepositAddress?.trim() ?? "";
+
+  useEffect(() => {
+    if (!depositCheckCooldownUntil) return;
+    const id = window.setInterval(() => {
+      setDepositCheckClock((c) => c + 1);
+      if (Date.now() >= depositCheckCooldownUntil) {
+        setDepositCheckCooldownUntil(null);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [depositCheckCooldownUntil]);
+
+  const depositCheckSecondsLeft = useMemo(() => {
+    void depositCheckClock;
+    if (!depositCheckCooldownUntil) return 0;
+    return Math.max(0, Math.ceil((depositCheckCooldownUntil - Date.now()) / 1000));
+  }, [depositCheckCooldownUntil, depositCheckClock]);
 
   useEffect(() => {
     if (isDemo) return;
@@ -367,6 +402,20 @@ export default function SwapScreen({
   useEffect(() => {
     loadPreflight();
   }, [loadPreflight, qusdUnlocked, solReceiveVerified]);
+
+  const runDepositCreditCheck = useCallback(() => {
+    if (depositCheckSecondsLeft > 0) return;
+    setDepositCheckCooldownUntil(Date.now() + DEPOSIT_CHECK_COOLDOWN_MS);
+    void (async () => {
+      try {
+        await onRefreshAccount?.();
+        await loadDepositScanHealth();
+        loadPreflight();
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [depositCheckSecondsLeft, onRefreshAccount, loadDepositScanHealth, loadPreflight]);
 
   const qIn = Number.parseFloat(draft.replace(/,/g, ""));
   const rate = cfg?.swap_qusd_usdc_rate ?? 0;
@@ -572,6 +621,23 @@ export default function SwapScreen({
                 }
               />
             </Suspense>
+          </div>
+          <div style={dep.depositCheckRow}>
+            <button
+              type="button"
+              style={{
+                ...uiBtnPrimary,
+                minWidth: 152,
+                opacity: depositCheckSecondsLeft > 0 || !onRefreshAccount ? 0.55 : 1,
+              }}
+              disabled={depositCheckSecondsLeft > 0 || !onRefreshAccount}
+              onClick={runDepositCreditCheck}
+            >
+              {depositCheckSecondsLeft > 0 ? `Check again in ${depositCheckSecondsLeft}s` : "Check"}
+            </button>
+            <p style={dep.depositCheckHint}>
+              See if your USDC arrived — refreshes your QUSD balance and deposit scanner status from the server.
+            </p>
           </div>
           <p style={dep.changeNow}>
             <a href={CHANGENOW_URL} target="_blank" rel="noopener noreferrer" style={dep.changeNowLink}>
