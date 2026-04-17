@@ -57,4 +57,12 @@ export function ensureAccountsSchema(database: SqliteDb): void {
   `);
 
   ensureDailyPrizeWinnersSchema(database);
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS deposit_treasury_scan (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      watermark_signature TEXT
+    );
+  `);
+  database.prepare(`INSERT OR IGNORE INTO deposit_treasury_scan (id, watermark_signature) VALUES (1, NULL)`).run();
 }

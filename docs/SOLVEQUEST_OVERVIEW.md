@@ -194,26 +194,23 @@ After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10
 
 - **Browser RPC**: defaults to **same-origin** `/solana-rpc` so providers that reject browser `Origin` on public mainnet are avoided; Express proxies to **`SOLANA_RPC_PROXY_TARGET`** (default mainnet-beta) and strips Origin on the upstream request.
 - **Treasury**: **`SOLANA_TREASURY_ADDRESS`** on the server; **`GET /api/config/treasury`** exposes it to the client (no Vite env for treasury address). **`SOLANA_TREASURY_KEY_B64`** is **base64 of the 64-byte secret** for Node only. Wallets expect **Base58** or a **JSON byte array** (`npm run treasury:gen` / `npm run treasury:b64-to-wallet` print both).
-- **Buy QUSD (worker)**: USDC SPL to the account’s receive ATA is detected by **`server/qusdBuyScanWorker.ts`** + **`server/solanaUsdcScan.ts`** (optional background polling via **`SOLVEQUEST_DEPOSIT_SCAN`**). Parsed txs credit **`deposit_credits`** and **`qusd_ledger`** (via **`server/qusdLedger.ts`**). Implementation notes:
-  - **First scan** (no row in **`deposit_scan_state`** or null watermark): the worker **paginates** signatures on the USDC ATA and credits inbound USDC **oldest → newest** (so a fresh DB or reset still picks up existing on-chain history).
-  - **Stuck watermark**: if **`deposit_credits`** sum is ~0 but the user’s USDC ATA still holds USDC, the worker **clears** **`deposit_scan_state`** for that account and rescans (fixes the legacy case where a watermark advanced without credits).
-  - **Parsing**: inbound USDC is detected from meta **pre/post token balances**, matching the wallet’s USDC **ATA** by **`accountIndex`** when possible, else by **`owner`** (see **`usdcNetChangeForWallet`** in **`server/solanaUsdcScan.ts`**).
+- **Buy QUSD (worker)**: USDC SPL **inbound to the shared treasury USDC ATA** is detected by **`server/qusdBuyScanWorker.ts`** + **`server/treasuryUsdcDepositScan.ts`** (optional background polling via **`SOLVEQUEST_DEPOSIT_SCAN`**). The treasury wallet is **`SWAP_USDC_RECEIVE_ADDRESS`** if set, else **`SOLANA_TREASURY_ADDRESS`**. For each new inbound USDC transfer, the worker resolves the **sender** wallet from token balance metadata, matches **`accounts.sol_receive_address`**, then credits **`deposit_credits`** and **`qusd_ledger`** (via **`server/qusdLedger.ts`**). **`UNIQUE (chain, signature)`** on **`deposit_credits`** prevents double credits. Implementation notes:
+  - **First scan** (null watermark in **`deposit_treasury_scan`**): the worker **paginates** signatures on the treasury **USDC ATA** and processes txs **oldest → newest**, then sets the watermark to the newest signature.
+  - **Parsing**: treasury inbound amount uses **`usdcNetChangeForWallet`**; the **sender** is inferred from USDC balance deltas by **`owner`** (see **`parseInboundTreasuryUsdcWithSender`** in **`server/treasuryUsdcDepositScan.ts`**).
 
 #### USDC deposit scan — Solana JSON-RPC calls (and 429 errors)
 
-The worker and **`runQusdBuyScanOnce`** use **`@solana/web3.js`** `Connection` against **`SOLANA_RPC_URL`** or **`SOLANA_RPC_PROXY_TARGET`** (else public mainnet). Each **account** with a **`sol_receive_address`** runs **`processAccount`** (`server/qusdBuyScanWorker.ts`), which calls into **`scanNewUsdcDeposits`** (`server/solanaUsdcScan.ts`). Typical JSON-RPC methods involved:
+The worker and **`runQusdBuyScanOnce`** use **`@solana/web3.js`** `Connection` against **`SOLANA_RPC_URL`** or **`SOLANA_RPC_PROXY_TARGET`** (else public mainnet). **One** sweep pass scans the **treasury** wallet’s USDC ATA (`server/treasuryUsdcDepositScan.ts`). Typical JSON-RPC methods involved:
 
 | Call (logical) | What it does in this flow |
 |----------------|---------------------------|
-| **`getTokenAccountBalance`** | Reads the user’s **canonical USDC ATA** balance (human USDC) to compare with **`deposit_credits`** and optionally **clear a stale watermark** when there is on-chain USDC but no credited deposits. |
-| **`getSignaturesForAddress`** | Lists transaction signatures that touched the **USDC ATA** (not the owner wallet). **Incremental scans** (watermark set): one request, up to **40** newest signatures. **First / full-history scans** (no watermark): **paginated** in batches of **40** (up to **1000** pages = up to **40k** signatures) until history is exhausted. |
-| **`getTransaction`** (used via **`getParsedTransaction`**) | For **each** signature the scanner needs to evaluate, fetches the **parsed** transaction (version 0) to read **pre/post token balances** and compute net USDC inbound to the user’s ATA (**`usdcNetChangeForWallet`**). |
+| **`getSignaturesForAddress`** | Lists transaction signatures that touched the **treasury USDC ATA**. **Incremental scans** (watermark set): one request, up to **40** newest signatures. **First / full-history scans** (no watermark): **paginated** in batches of **40** (up to **1000** pages = up to **40k** signatures) until history is exhausted. |
+| **`getTransaction`** (used via **`getParsedTransaction`**) | For **each** signature in the batch, fetches the **parsed** transaction (version 0) to read **pre/post token balances**, compute net USDC inbound to the treasury ATA, and resolve the **sender** wallet for attribution. |
 
 **Call pattern summary**
 
-- **Always**: at least **one** `getTokenAccountBalance` per account per pass.
-- **Then**: at least **one** `getSignaturesForAddress` on the USDC ATA (often more on a cold / full-history scan).
-- **Then**: **one `getParsedTransaction` per signature** processed in order (oldest→newest on first scan; only “new” sigs after the watermark on incremental runs). A wallet with a long ATA history can therefore trigger **hundreds or thousands** of `getParsedTransaction` calls in a single pass.
+- **Per pass**: at least **one** `getSignaturesForAddress` on the treasury USDC ATA (often more on a cold / full-history scan).
+- **Then**: **one `getParsedTransaction` per signature** in the batch (oldest→newest on first scan; only new sigs after the watermark on incremental runs). A busy treasury address can therefore trigger **many** `getParsedTransaction` calls in a single pass.
 
 **Why you see `429 Too Many Requests`**
 

@@ -9,7 +9,7 @@ type TokenBalanceRow = NonNullable<
   NonNullable<ParsedTransactionWithMeta["meta"]>["preTokenBalances"]
 >[number];
 
-function accountKeyAtParsed(parsed: ParsedTransactionWithMeta, index: number): PublicKey | undefined {
+export function accountKeyAtParsed(parsed: ParsedTransactionWithMeta, index: number): PublicKey | undefined {
   const msg = parsed.transaction.message as {
     getAccountKeys?: () => { get: (i: number) => PublicKey | undefined };
     accountKeys?: Array<PublicKey | { pubkey: PublicKey }>;
@@ -95,7 +95,8 @@ const SIG_PAGE_LIMIT = 40;
 /** Cap RPC pagination so pathological ATAs do not loop forever (40k txs ≈ 1000 pages). */
 const MAX_SIG_PAGES = 1000;
 
-async function getSignaturesForAtaPaginated(
+/** Exported for treasury USDC sweep (same pagination as per-user deposit scan). */
+export async function getSignaturesForAtaPaginated(
   connection: Connection,
   ata: PublicKey,
 ): Promise<Array<{ signature: string }>> {

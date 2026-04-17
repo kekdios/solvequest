@@ -131,6 +131,14 @@ async function main(): Promise<void> {
     }[];
 
     console.log("=== SQLite:", dbPath, "===");
+    try {
+      const twm = db
+        .prepare(`SELECT watermark_signature FROM deposit_treasury_scan WHERE id = 1`)
+        .get() as { watermark_signature: string | null } | undefined;
+      console.log("deposit_treasury_scan watermark:", twm?.watermark_signature ?? "(none)");
+    } catch {
+      console.log("deposit_treasury_scan: (table missing — run server once to migrate)");
+    }
     if (rows.length === 0) {
       console.log("No account row with sol_receive_address matching this pubkey.");
       console.log("The wallet must be saved on Account (verify flow) for the worker to scan it.");
@@ -164,10 +172,12 @@ async function main(): Promise<void> {
     "- For reliable RPC (avoid 429 on this script), set SOLANA_RPC_URL in .env to a paid or dedicated endpoint.",
   );
   console.log(
-    "- QUSD credit requires SOLVEQUEST_DEPOSIT_SCAN=1 on the server and a matching accounts.sol_receive_address.",
+    "- QUSD credit requires SOLVEQUEST_DEPOSIT_SCAN=1 and accounts.sol_receive_address equal to the **sender** wallet of USDC sent to the treasury USDC ATA.",
   );
-  console.log("- Stale watermark: worker clears if on-chain USDC > 0 but deposit_credits sum ~ 0.");
-  console.log("- Inbound must parse as positive usdcNetChangeForWallet (SPL transfer into your USDC ATA).");
+  console.log(
+    "- Treasury = SWAP_USDC_RECEIVE_ADDRESS if set, else SOLANA_TREASURY_ADDRESS (see server/treasuryUsdcDepositScan.ts).",
+  );
+  console.log("- This script still lists your wallet USDC ATA activity; credits are attributed from treasury inbound txs, not from your ATA balance alone.");
 }
 
 void main().catch((e: unknown) => {

@@ -79,6 +79,13 @@ CREATE TABLE IF NOT EXISTS deposit_scan_state (
   watermark_signature TEXT
 );
 
+-- Single-row watermark for USDC deposits to the shared treasury USDC ATA (see server/treasuryUsdcDepositScan.ts).
+CREATE TABLE IF NOT EXISTS deposit_treasury_scan (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  watermark_signature TEXT
+);
+INSERT OR IGNORE INTO deposit_treasury_scan (id, watermark_signature) VALUES (1, NULL);
+
 CREATE TABLE IF NOT EXISTS perp_transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
