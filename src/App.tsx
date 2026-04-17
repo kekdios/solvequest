@@ -773,6 +773,7 @@ function AppInner() {
 
           {screen === "account" && (
             <AccountScreen
+              coolUsername={ledgerAccountRow?.username?.trim() || null}
               isDemo={demo}
               serverDepositAddress={ledgerAccountRow?.sol_receive_address?.trim() || null}
               solReceiveVerified={ledgerAccountRow?.sol_receive_verified_at != null}

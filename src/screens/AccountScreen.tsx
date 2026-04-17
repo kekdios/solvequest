@@ -14,6 +14,8 @@ const statAmountStyle = {
 } as const;
 
 type Props = {
+  /** Server-assigned leaderboard handle; null until assigned after email verification. */
+  coolUsername?: string | null;
   /** Anonymous demo: no Solana deposit UI; balances stay in-browser only. */
   isDemo?: boolean;
   /** After verification, the user’s Solana address used for USDC deposit scan. */
@@ -27,6 +29,7 @@ type Props = {
 };
 
 export default function AccountScreen({
+  coolUsername = null,
   isDemo = false,
   serverDepositAddress = null,
   solReceiveVerified = false,
@@ -75,9 +78,25 @@ export default function AccountScreen({
     }
   }, [draftAddress, verifyBusy, verified, onRefreshAccount]);
 
+  const displayName = coolUsername?.trim() || "";
+
   return (
     <div className="app-page" style={s.wrap}>
       <div style={s.metricsStack}>
+        {!isDemo ? (
+          <section style={s.namePanel} aria-label="Leaderboard display name">
+            <p style={s.statLabel}>Your leaderboard name</p>
+            <p style={s.usernameMono} className="mono">
+              {displayName || "—"}
+            </p>
+            <p style={{ ...s.statSub, marginTop: 8 }}>
+              {displayName
+                ? "This is how you appear on the leaderboard."
+                : "You’ll get a unique name after email verification (refresh if you just signed in)."}
+            </p>
+          </section>
+        ) : null}
+
         <div className="account-balance-grid">
           <section style={s.statHero} aria-label="QUSD balance">
             <p style={s.statLabel}>QUSD balance</p>
@@ -176,6 +195,21 @@ export default function AccountScreen({
 const s: Record<string, CSSProperties> = {
   wrap: { display: "flex", flexDirection: "column", gap: 16 },
   metricsStack: { display: "flex", flexDirection: "column", gap: 16 },
+  namePanel: {
+    width: "100%",
+    padding: "14px 16px",
+    borderRadius: 12,
+    border: "1px solid color-mix(in srgb, var(--border) 90%, var(--text))",
+    background: "var(--panel)",
+  },
+  usernameMono: {
+    margin: "6px 0 0",
+    fontSize: "1.05rem",
+    fontWeight: 650,
+    letterSpacing: "-0.02em",
+    color: "color-mix(in srgb, var(--accent) 85%, var(--text))",
+    wordBreak: "break-word",
+  },
   err: { margin: "8px 0 0", fontSize: 13, color: "var(--danger)" },
   buyMoreHeader: {
     display: "flex",

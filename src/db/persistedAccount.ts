@@ -8,6 +8,8 @@ export type PersistedAccountRow = {
   updated_at: number;
   /** Set when row is tied to email login — matches JWT `email` */
   email: string | null;
+  /** Public leaderboard handle (adjective-animal-color-number); set after email verification. */
+  username?: string | null;
   usdc_balance: number;
   coverage_limit_qusd: number;
   premium_accrued_usdc: number;
