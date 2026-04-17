@@ -71,7 +71,8 @@ function fmtSol(lamports: number | null): string {
 function scanStatusColor(status: DepositScanAccountReport["status"]): string {
   if (status === "ok") return "var(--ok)";
   if (status === "error") return "var(--danger)";
-  return "var(--warn)";
+  /** Skipped: softer green so it stays readable on black like success text */
+  return "color-mix(in srgb, var(--ok) 72%, var(--muted))";
 }
 
 export default function AdminScreen() {
@@ -195,7 +196,7 @@ export default function AdminScreen() {
   const errTotalPages = errs ? Math.max(1, Math.ceil(errs.total / errPageSize)) : 1;
 
   return (
-    <div className="app-page" style={s.wrap}>
+    <div className="app-page admin-page" style={s.wrap}>
       {error ? (
         <p role="alert" style={{ color: "var(--danger)", marginBottom: 12 }}>
           {error}
@@ -207,7 +208,7 @@ export default function AdminScreen() {
       {data ? (
         <>
           <section style={s.section}>
-            <h2 className="app-section-title" style={s.h2}>
+            <h2 className="app-section-title" style={s.sectionTitle}>
               USDC deposit scanner
             </h2>
             <p style={{ ...s.mutedP, marginBottom: 12 }}>
@@ -244,8 +245,8 @@ export default function AdminScreen() {
                 {depositScanReports.map((rep) => (
                   <div key={rep.account_id} style={s.scanReportCard}>
                     <div style={s.scanReportHead}>
-                      <span className="mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
-                        {rep.account_id}
+                      <span className="mono" style={s.scanAccountId}>
+                        Account ID: {rep.account_id}
                       </span>
                       <span
                         style={{
@@ -257,12 +258,13 @@ export default function AdminScreen() {
                         {rep.status === "ok" ? "OK" : rep.status === "skipped" ? "Skipped" : "Error"}
                       </span>
                     </div>
+                    <p style={s.scanUserAddrLabel}>User&apos;s verified receive address (same as on their Account page)</p>
                     <a
                       href={solscanAccountUrl(rep.sol_receive_address)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="mono"
-                      style={{ fontSize: 11, display: "block", marginBottom: 8, wordBreak: "break-all" }}
+                      style={s.adminLink}
                     >
                       {rep.sol_receive_address}
                     </a>
@@ -283,7 +285,7 @@ export default function AdminScreen() {
           </section>
 
           <section style={s.section}>
-            <h2 className="app-section-title" style={s.h2}>
+            <h2 className="app-section-title" style={s.sectionTitle}>
               Solana balances
             </h2>
             <div style={s.addrGrid}>
@@ -293,7 +295,7 @@ export default function AdminScreen() {
           </section>
 
           <section style={s.section}>
-            <h2 className="app-section-title" style={s.h2}>
+            <h2 className="app-section-title" style={s.sectionTitle}>
               QUSD → USDC swaps (ledger)
             </h2>
             <div className="app-table-scroll">
@@ -346,7 +348,7 @@ export default function AdminScreen() {
           </section>
 
           <section style={s.section}>
-            <h2 className="app-section-title" style={s.h2}>
+            <h2 className="app-section-title" style={s.sectionTitle}>
               Swap errors (refunds after failed USDC send)
             </h2>
             <div className="app-table-scroll">
@@ -395,7 +397,7 @@ export default function AdminScreen() {
           </section>
 
           <section style={s.section}>
-            <h2 className="app-section-title" style={s.h2}>
+            <h2 className="app-section-title" style={s.sectionTitle}>
               Environment (server)
             </h2>
             <div className="app-table-scroll">
@@ -441,7 +443,7 @@ function AddressCard({ title, b }: { title: string; b: AddrBalance }) {
             target="_blank"
             rel="noopener noreferrer"
             className="mono"
-            style={{ fontSize: 13, wordBreak: "break-all", display: "inline-block", marginBottom: 8 }}
+            style={{ ...s.adminLink, fontSize: 13, display: "inline-block", marginBottom: 8 }}
           >
             {addr}
           </a>
@@ -510,6 +512,23 @@ const s: Record<string, CSSProperties> = {
   wrap: { maxWidth: 960, margin: "0 auto" },
   section: { marginBottom: 28 },
   h2: { fontSize: 16, marginBottom: 12 },
+  /** Match success copy (`var(--ok)`) — avoids default heading/link blue–purple on black */
+  sectionTitle: { fontSize: 16, marginBottom: 12, color: "var(--ok)", fontWeight: 650 },
+  adminLink: {
+    fontSize: 12,
+    display: "block",
+    marginBottom: 8,
+    wordBreak: "break-all",
+    color: "var(--ok)",
+    textDecorationColor: "color-mix(in srgb, var(--ok) 45%, transparent)",
+  },
+  scanAccountId: { fontSize: 12, wordBreak: "break-all", color: "var(--ok)" },
+  scanUserAddrLabel: {
+    margin: "0 0 4px",
+    fontSize: 11,
+    fontWeight: 600,
+    color: "color-mix(in srgb, var(--ok) 80%, var(--muted))",
+  },
   mutedP: { margin: 0, fontSize: 13, lineHeight: 1.55, color: "var(--muted)", maxWidth: 560 },
   scanReportWrap: {
     marginTop: 16,
@@ -548,7 +567,7 @@ const s: Record<string, CSSProperties> = {
     paddingLeft: 18,
     fontSize: 12,
     lineHeight: 1.5,
-    color: "var(--muted)",
+    color: "color-mix(in srgb, var(--ok) 70%, var(--muted))",
   },
   scanReportLi: { marginBottom: 4 },
   addrGrid: {

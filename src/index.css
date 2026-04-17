@@ -133,6 +133,14 @@ select {
   font-size: 13px;
 }
 
+/* Admin screen: avoid default blue/purple links on black */
+.admin-page a {
+  color: var(--ok);
+}
+.admin-page a:visited {
+  color: color-mix(in srgb, var(--ok) 82%, var(--muted));
+}
+
 .perps-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

@@ -227,7 +227,9 @@ export async function processAccount(
     return "skipped";
   }
 
-  reporter?.log(`Receive address: ${owner.toBase58()}`);
+  reporter?.log(
+    `User's verified Solana receive address (from their Account; USDC deposits go here): ${owner.toBase58()}`,
+  );
   reporter?.log(`QUSD per 1 USDC (multiplier): ${qusdPerUsdc}`);
 
   const wmRow = database
