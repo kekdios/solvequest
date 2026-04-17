@@ -587,19 +587,31 @@ export default function SwapScreen({
         </div>
       ) : null}
 
-      {pf && !pf.treasury_ready ? (
-        <p style={{ color: "var(--warn)", margin: "12px 0", maxWidth: 520 }}>
-          Swaps are paused: treasury needs USDC, at least {(pf.min_treasury_sol_lamports / 1e9).toFixed(3)} SOL for
-          fees, and swap env limits must be set.
-        </p>
-      ) : null}
-
       <section style={dep.panel} aria-labelledby="swap-qusd-to-usdc-heading">
         <div style={dep.header}>
           <h2 style={dep.title} id="swap-qusd-to-usdc-heading">
             Swap QUSD to USDC
           </h2>
         </div>
+        {pf && !pf.treasury_ready ? (
+          <p
+            role="alert"
+            style={{
+              color: "var(--warn)",
+              margin: "0 0 14px",
+              padding: "12px 14px",
+              fontSize: 13,
+              lineHeight: 1.55,
+              borderRadius: 8,
+              border: "1px solid color-mix(in srgb, var(--warn) 35%, var(--border))",
+              background: "color-mix(in srgb, var(--warn) 8%, var(--bg))",
+              maxWidth: 520,
+            }}
+          >
+            Swaps are paused: treasury needs USDC, at least {(pf.min_treasury_sol_lamports / 1e9).toFixed(3)} SOL for
+            fees, and swap env limits must be set.
+          </p>
+        ) : null}
         {cfg ? (
           <div
             style={{
