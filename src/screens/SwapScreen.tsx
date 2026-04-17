@@ -229,17 +229,14 @@ export default function SwapScreen({
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <img src={USDC_ICON} alt="" width={28} height={28} />
-              <div>
-                <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>If you could swap that full amount</p>
-                <p style={{ margin: "4px 0 0", fontSize: "1.2rem", fontWeight: 700 }} className="mono">
-                  {hypotheticalFullBalanceUsdc != null
-                    ? `${hypotheticalFullBalanceUsdc.toLocaleString(undefined, {
-                        maximumFractionDigits: 2,
-                        minimumFractionDigits: 2,
-                      })} USDC`
-                    : "—"}
-                </p>
-              </div>
+              <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700 }} className="mono">
+                {hypotheticalFullBalanceUsdc != null
+                  ? `${hypotheticalFullBalanceUsdc.toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                      minimumFractionDigits: 2,
+                    })} USDC available`
+                  : "—"}
+              </p>
             </div>
             <p
               style={{
