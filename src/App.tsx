@@ -234,11 +234,11 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   },
   sellQusd: {
     title: "Prize",
-    lead: "Seasonal USDC prize pool and how to get in touch.",
+    lead: "Swap QUSD trading profits for USDC — plus daily QUSD prizes and the leaderboard.",
   },
   leaderboard: {
     title: "Leaderboard",
-    lead: "Top QUSD balances and prize pool details.",
+    lead: "Top QUSD balances and the daily prize competition.",
   },
   account: {
     title: "Account",

@@ -93,13 +93,84 @@
   color: var(--text);
 }
 
-.lp-hero-swap-line {
-  margin: clamp(8px, 1.5vw, 14px) auto 0;
-  max-width: 44ch;
-  font-size: clamp(0.92rem, 2.1vw, 1.02rem);
+/* Primary incentive: cash out trading edge as real USDC */
+.lp-hero-swap-highlight {
+  margin: clamp(12px, 2.2vw, 22px) auto 0;
+  max-width: min(40rem, 100%);
+  padding: clamp(14px, 2.4vw, 20px) clamp(16px, 3vw, 26px);
+  border-radius: var(--lp-radius-sm);
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border));
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%),
+    linear-gradient(165deg, color-mix(in srgb, var(--accent) 10%, var(--panel)) 0%, var(--panel) 65%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
+    0 14px 44px color-mix(in srgb, var(--accent) 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.lp-hero-swap-highlight-main {
+  margin: 0;
+  font-size: clamp(1.14rem, 3.2vw, 1.55rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.lp-hero-swap-highlight-main strong {
+  font-weight: inherit;
+}
+
+.lp-hero-swap-highlight-tokens {
+  white-space: nowrap;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--accent) 92%, #fff);
+}
+
+.lp-hero-swap-highlight-tokens--usdc {
+  color: #e2e8f0;
+}
+
+.lp-hero-swap-asterisk {
+  font-weight: 600;
+  font-size: 0.85em;
+  color: color-mix(in srgb, var(--muted) 85%, var(--text));
+  vertical-align: super;
+}
+
+.lp-hero-swap-highlight-qusd {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  max-width: 28px;
+  max-height: 28px;
+  margin-right: 0.22em;
+  object-fit: contain;
+  vertical-align: -0.22em;
+}
+
+.lp-hero-swap-highlight-sub {
+  margin: 10px 0 0;
+  font-size: clamp(0.8125rem, 1.85vw, 0.9375rem);
   font-weight: 500;
-  color: var(--muted);
   line-height: 1.45;
+  color: var(--muted);
+  max-width: 38ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.lp-hero-swap-usdc-icon {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  max-width: 24px;
+  max-height: 24px;
+  margin-right: 0.22em;
+  object-fit: contain;
+  vertical-align: -0.18em;
 }
 
 .lp-hero-nodeposit {
@@ -179,15 +250,19 @@
   font-weight: 650;
 }
 
+.lp-hero-pill--swap {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+  color: var(--text);
+}
+
+.lp-hero-pill--swap strong {
+  color: color-mix(in srgb, var(--accent) 88%, #fff);
+}
+
 .lp-hero-pill svg {
   flex-shrink: 0;
   color: var(--accent);
-}
-
-.lp-leverage-tagline--tight {
-  margin-bottom: 20px;
-  font-size: 0.9375rem;
-  letter-spacing: 0.03em;
 }
 
 .lp-cta-stack {
@@ -474,28 +549,6 @@
   .lp-qusd-ribbon-copy {
     text-align: center;
   }
-}
-
-.lp-leverage-tagline {
-  margin: 0 auto 24px;
-  max-width: min(100%, 52ch);
-  font-size: 1rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  line-height: 1.45;
-  text-align: center;
-  color: color-mix(in srgb, var(--accent) 88%, var(--text));
-}
-
-.lp-leverage-tagline-qusd {
-  display: inline-block;
-  vertical-align: -0.22em;
-  width: 1.35em;
-  height: 1.35em;
-  border-radius: 6px;
-  object-fit: contain;
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .lp-cta-row {

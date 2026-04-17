@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-const USDC_ICON = "/prize-usdc.png";
+const QUSD_ICON = "/icon-qusd.png";
 
 type PrizeConfig = {
   prize_amount: number;
@@ -55,16 +55,17 @@ export default function LeaderboardScreen() {
       ) : null}
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-        <img src={USDC_ICON} alt="" width={40} height={40} style={{ objectFit: "contain" }} />
+        <img src={QUSD_ICON} alt="" width={40} height={40} style={{ objectFit: "contain" }} />
         <span style={{ fontSize: "1.75rem", fontWeight: 700, letterSpacing: "-0.03em" }}>
-          ${prizeAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          {prizeAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} QUSD
         </span>
-        <span style={{ color: "var(--muted)", fontSize: 14 }}>prize pool (USDC)</span>
+        <span style={{ color: "var(--muted)", fontSize: 14 }}>daily prize pool</span>
       </div>
 
       <p style={{ marginTop: 18, lineHeight: 1.6, maxWidth: 640 }}>
-        Eligibility and prize rules are on the <strong>Prize</strong> page. You compete using QUSD on the leaderboard
-        below.
+        You compete for this QUSD amount <strong>daily</strong> per the <strong>Prize</strong> page. Rankings below are
+        total QUSD (ledger). To convert trading profits to real <strong>USDC</strong>, use <strong>Swap</strong> after
+        you verify your Solana address.
       </p>
 
       <h2 style={s.h2}>Top players by QUSD</h2>

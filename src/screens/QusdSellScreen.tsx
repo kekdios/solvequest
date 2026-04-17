@@ -58,7 +58,8 @@ export default function QusdSellScreen({
       <div>
         <div style={card}>
           <p style={{ margin: 0, color: "var(--muted)" }}>
-            Prize pool details run on the live app with a signed-in account. Demo mode uses local balances only.
+            Daily QUSD prize and prize rules run in the live app with a signed-in account. Demo mode uses local balances
+            only.
           </p>
           <PrizeContactLine style={{ marginTop: 16 }} />
         </div>
@@ -82,13 +83,44 @@ export default function QusdSellScreen({
         <span style={{ fontSize: "1.75rem", fontWeight: 700, letterSpacing: "-0.03em" }}>
           {prizeAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} QUSD
         </span>
-        <span style={{ color: "var(--muted)", fontSize: 14 }}>prize pool</span>
+        <span style={{ color: "var(--muted)", fontSize: 14 }}>daily prize pool</span>
       </div>
 
       <p style={{ marginTop: 18, lineHeight: 1.6, maxWidth: 640 }}>
-        Seasonal rules, eligibility, and how the QUSD prize pool is awarded are described here and may change between
-        seasons.
-        Use the contact below for prize questions.
+        <strong>Competition:</strong> you&apos;re racing for this <strong>QUSD</strong> amount on the leaderboard each
+        day (rules and eligibility below — they can change). That&apos;s separate from{" "}
+        <strong>trading profits</strong>: when you close trades in the green, your balance grows in QUSD too.
+      </p>
+
+      <div
+        style={{
+          ...card,
+          marginTop: 18,
+          borderColor: "color-mix(in srgb, var(--accent) 38%, var(--border))",
+          background:
+            "linear-gradient(165deg, color-mix(in srgb, var(--accent) 10%, var(--panel)) 0%, var(--panel) 100%)",
+          boxShadow:
+            "0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent), 0 12px 36px color-mix(in srgb, var(--accent) 12%, transparent)",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: "clamp(1.05rem, 2.5vw, 1.25rem)",
+            fontWeight: 750,
+            letterSpacing: "-0.02em",
+            lineHeight: 1.35,
+            color: "var(--text)",
+          }}
+        >
+          Swap QUSD trading profits for USDC *
+        </p>
+      </div>
+
+      <p style={{ marginTop: 14, lineHeight: 1.6, maxWidth: 640 }}>
+        Open <strong>Swap</strong> in the sidebar to convert QUSD (including trading profits) to <strong>USDC</strong> on
+        Solana at the app&apos;s rate, sent to your verified receive address. Limits, treasury balance, and verification
+        rules apply — see Swap for details.
       </p>
 
       <PrizeContactLine />
@@ -101,7 +133,8 @@ export default function QusdSellScreen({
         </div>
         {!solReceiveVerified ? (
           <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--muted)" }}>
-            Verify your Solana address on the <strong>Account</strong> page for deposits and payouts.{" "}
+            Verify your Solana address on the <strong>Account</strong> page for deposits, prize-related notices, and
+            USDC from Swap.{" "}
             {serverDepositAddress ? `Current address: ${serverDepositAddress.slice(0, 8)}…` : null}
           </p>
         ) : null}
@@ -110,7 +143,8 @@ export default function QusdSellScreen({
       <div style={card}>
         <label style={uiFieldLabel}>Leaderboard</label>
         <p style={{ margin: "6px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--muted)" }}>
-          Rankings use total QUSD (ledger). Open <strong>Leaderboard</strong> in the sidebar for the live table.
+          Daily prize competition uses total QUSD (ledger) — open <strong>Leaderboard</strong> in the sidebar for live
+          rankings.
         </p>
       </div>
 
@@ -131,7 +165,7 @@ function PrizeContactLine({ style }: { style?: CSSProperties }) {
         ...style,
       }}
     >
-      To claim prize contact{" "}
+      Questions about the daily prize or eligibility? Contact{" "}
       <a href={`mailto:${PRIZE_CONTACT_EMAIL}`} style={{ color: "var(--accent)", wordBreak: "break-all" }}>
         {PRIZE_CONTACT_EMAIL}
       </a>
@@ -153,7 +187,8 @@ function SybilProofNote() {
       </h2>
       <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--muted)" }}>
         <strong style={{ color: "var(--text)" }}>QUSD cannot be transferred between users.</strong> Balances come from
-        trading, promotions, and configured on-chain flows only.
+        trading, promotions, and configured on-chain flows only. Daily prize awards and Swap conversion are separate
+        systems with their own rules.
       </p>
     </div>
   );
