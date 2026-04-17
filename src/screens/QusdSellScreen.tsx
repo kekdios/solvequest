@@ -3,7 +3,6 @@ import { uiFieldLabel } from "../ui/appSurface";
 import { QusdIcon } from "../Qusd";
 import { isDemoMode, useAuthMode } from "../auth/sessionAuth";
 
-const USDC_ICON = "/prize-usdc.png";
 const PRIZE_CONTACT_EMAIL = "privacyemail369@gmail.com";
 
 const card: CSSProperties = {
@@ -79,15 +78,16 @@ export default function QusdSellScreen({
       ) : null}
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-        <img src={USDC_ICON} alt="" width={40} height={40} style={{ objectFit: "contain" }} />
+        <QusdIcon size={40} />
         <span style={{ fontSize: "1.75rem", fontWeight: 700, letterSpacing: "-0.03em" }}>
-          ${prizeAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          {prizeAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} QUSD
         </span>
-        <span style={{ color: "var(--muted)", fontSize: 14 }}>prize pool (USDC)</span>
+        <span style={{ color: "var(--muted)", fontSize: 14 }}>prize pool</span>
       </div>
 
       <p style={{ marginTop: 18, lineHeight: 1.6, maxWidth: 640 }}>
-        Seasonal rules, eligibility, and how the USDC pool is awarded are described here and may change between seasons.
+        Seasonal rules, eligibility, and how the QUSD prize pool is awarded are described here and may change between
+        seasons.
         Use the contact below for prize questions.
       </p>
 

@@ -107,14 +107,14 @@
   white-space: nowrap;
 }
 
-.lp-hero-compete .lp-hero-usdc-icon {
+.lp-hero-compete .lp-hero-prize-icon {
   max-width: 30px;
   max-height: 30px;
   width: 1.15em;
   height: 1.15em;
 }
 
-.lp-hero-usdc-icon {
+.lp-hero-prize-icon {
   display: inline-block;
   width: 1.05em;
   height: 1.05em;
@@ -882,7 +882,7 @@ button.lp-text-link:hover {
   font-weight: 600;
 }
 
-.lp-urgency-usdc {
+.lp-urgency-prize-icon {
   flex-shrink: 0;
   object-fit: contain;
   vertical-align: middle;

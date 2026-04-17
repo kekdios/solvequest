@@ -117,7 +117,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
     };
   }, []);
 
-  const usdPart =
+  const prizePart =
     prizeAmount === undefined
       ? "…"
       : prizeAmount === null
@@ -137,8 +137,8 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             <span className="lp-hero-compete">
               and compete for{" "}
               <span className="lp-hero-prize-line">
-                <img src="/prize-usdc.png" alt="" width={26} height={26} className="lp-hero-usdc-icon" />
-                <strong className="lp-hero-prize">${usdPart} USDC</strong>
+                <img src="/icon-qusd.png" alt="" width={26} height={26} className="lp-hero-prize-icon" />
+                <strong className="lp-hero-prize">{prizePart} QUSD</strong>
               </span>
               .
             </span>
@@ -189,7 +189,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
               <span>Live leaderboard</span>
             </li>
             <li className="lp-hero-pill">
-              <img src="/prize-usdc.png" alt="" width={20} height={20} />
+              <img src="/icon-qusd.png" alt="" width={20} height={20} />
               <span>Season prize pool</span>
             </li>
           </ul>
@@ -477,10 +477,10 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           Season prize pool
         </h2>
         <div className="lp-prize-urgency-inner">
-          <img src="/prize-usdc.png" alt="" width={40} height={40} className="lp-prize-urgency-icon" />
+          <img src="/icon-qusd.png" alt="" width={40} height={40} className="lp-prize-urgency-icon" />
           <div>
             <p className="lp-prize-urgency-amount">
-              <strong>${usdPart} USDC</strong> prize pool
+              <strong>{prizePart} QUSD</strong> prize pool
             </p>
             <p className="lp-prize-urgency-copy">
               Rules and timing are on the{" "}
@@ -523,8 +523,8 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
         <p className="lp-urgency lp-urgency--prize">
           <span className="lp-urgency-lead">Get verified to compete —</span>{" "}
           <span className="lp-urgency-prize">
-            <img src="/prize-usdc.png" alt="" className="lp-urgency-usdc" width={26} height={26} decoding="async" />
-            <span>${usdPart} USDC in the seasonal pool.</span>
+            <img src="/icon-qusd.png" alt="" className="lp-urgency-prize-icon" width={26} height={26} decoding="async" />
+            <span>{prizePart} QUSD in the seasonal pool.</span>
           </span>
         </p>
       </section>
