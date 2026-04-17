@@ -15,6 +15,7 @@ import { createVisitorsApiMiddleware } from "../plugins/visitorsApiPlugin";
 import { createLeaderboardApiMiddleware } from "../plugins/leaderboardApiPlugin";
 import { createLandingStatsApiMiddleware } from "../plugins/landingStatsApiPlugin";
 import { createSwapApiMiddleware } from "../plugins/swapApiPlugin";
+import { getDepositScanHealth } from "./depositScanHealth";
 import { startQusdBuyScanWorker } from "./qusdBuyScanWorker";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,6 +55,12 @@ app.get("/version", (_req, res) => {
 });
 
 /** Public: treasury base58 for deposit UI without a Vite rebuild. */
+/** Public: deposit worker heartbeat for Swap page (same process as `startQusdBuyScanWorker`). */
+app.get("/api/config/deposit-scan-health", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json(getDepositScanHealth(process.env));
+});
+
 app.get("/api/config/treasury", (_req, res) => {
   const raw = process.env.SOLANA_TREASURY_ADDRESS?.trim();
   res.setHeader("Cache-Control", "no-store");

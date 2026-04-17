@@ -150,7 +150,9 @@ export function createSwapApiMiddleware(env: Record<string, string>, root: strin
           addr = null;
         }
       }
-      sendJson(res, 200, { address: addr });
+      const autoCreditUsdc =
+        env.SOLVEQUEST_DEPOSIT_SCAN === "1" || env.SOLVEQUEST_DEPOSIT_SCAN === "true";
+      sendJson(res, 200, { address: addr, auto_credit_usdc_enabled: autoCreditUsdc });
       return;
     }
 

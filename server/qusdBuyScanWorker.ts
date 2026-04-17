@@ -10,6 +10,7 @@ import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
 import { insertSolanaUsdcCredit } from "./qusdLedger";
 import { getUsdcAtaBalanceUi, scanNewUsdcDeposits, type ScanLedger } from "./solanaUsdcScan";
 import { ensureAccountsSchema } from "./ensureAccountsSchema";
+import { getDepositScanIntervalMs, recordDepositScanTickComplete } from "./depositScanHealth";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -104,10 +105,7 @@ export function startQusdBuyScanWorker(root: string, env: NodeJS.ProcessEnv): vo
   const qusdPerUsdc = parseQusdMultiplier(env.QUSD_MULTIPLIER ?? env.VITE_QUSD_MULTIPLIER);
 
   const dbPath = resolveDbPath(root, env);
-  const intervalMs = Math.max(
-    10_000,
-    Number.parseInt(env.SOLVEQUEST_DEPOSIT_SCAN_INTERVAL_MS ?? "45000", 10) || 45_000,
-  );
+  const intervalMs = getDepositScanIntervalMs(env);
 
   let db: SqliteDb | null = null;
   const getDb = (): SqliteDb | null => {
@@ -151,6 +149,7 @@ export function startQusdBuyScanWorker(root: string, env: NodeJS.ProcessEnv): vo
         console.error(`[qusd-buy] account ${accountId}:`, e);
       }
     }
+    recordDepositScanTickComplete();
   };
 
   void tick();

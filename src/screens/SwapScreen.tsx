@@ -3,6 +3,7 @@ import { uiBtnPrimary, uiInput } from "../ui/appSurface";
 import { QUSD_PER_USD } from "../engine/qusdVault";
 import { QusdIcon } from "../Qusd";
 import { computeSwapAmounts } from "../lib/swapAmounts";
+import { friendlyQusdToUsdcSwapError } from "../lib/swapFriendlyMessages";
 
 const TestReceiveAddresses = lazy(() => import("../components/TestReceiveAddresses"));
 
@@ -14,6 +15,13 @@ type SwapConfig = {
   swap_qusd_usdc_rate: number;
   swap_maximum_usdc_amount: number;
   swap_enabled: boolean;
+};
+
+type DepositScanHealth = {
+  worker_enabled: boolean;
+  interval_ms: number;
+  last_tick_at: number | null;
+  status: "disabled" | "starting" | "ok" | "stale";
 };
 
 type Preflight = {
@@ -97,7 +105,123 @@ const dep: Record<string, CSSProperties> = {
     color: "var(--text)",
   },
   changeNowLink: { color: "var(--accent)", fontWeight: 600 },
+  stepsList: {
+    margin: "0 0 14px",
+    paddingLeft: 20,
+    fontSize: 13,
+    lineHeight: 1.65,
+    color: "var(--text)",
+  },
+  stepLi: { marginBottom: 8 },
+  monitorNote: {
+    margin: "0 0 0",
+    padding: "12px 14px",
+    fontSize: 12,
+    lineHeight: 1.55,
+    color: "var(--muted)",
+    borderRadius: 8,
+    border: "1px solid color-mix(in srgb, var(--border) 90%, transparent)",
+    background: "color-mix(in srgb, var(--muted) 6%, var(--bg))",
+  },
+  swapProgress: {
+    marginTop: 16,
+    padding: "14px 16px",
+    borderRadius: 10,
+    border: "1px solid color-mix(in srgb, var(--accent) 22%, var(--border))",
+    background: "color-mix(in srgb, var(--accent) 5%, var(--panel))",
+  },
+  swapProgressTitle: {
+    margin: "0 0 10px",
+    fontSize: 12,
+    fontWeight: 650,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase" as const,
+    color: "var(--muted)",
+  },
+  swapProgressRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 10,
+    fontSize: 13,
+    lineHeight: 1.45,
+  },
+  swapProgressRowLast: { marginBottom: 0 },
+  swapDot: {
+    flexShrink: 0,
+    width: 22,
+    height: 22,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 11,
+    fontWeight: 700,
+  },
+  healthLine: {
+    margin: "12px 0 0",
+    padding: "10px 12px",
+    fontSize: 12,
+    lineHeight: 1.45,
+    borderRadius: 8,
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  healthDot: {
+    flexShrink: 0,
+    marginTop: 3,
+    width: 8,
+    height: 8,
+    borderRadius: "50%",
+  },
 };
+
+function formatShortAgo(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ago`;
+}
+
+function SwapProgressRow({
+  phase,
+  step,
+  label,
+  isLast,
+}: {
+  phase: number;
+  step: number;
+  label: string;
+  isLast: boolean;
+}) {
+  const done = phase > step;
+  const active = phase === step;
+  return (
+    <div style={{ ...dep.swapProgressRow, ...(isLast ? dep.swapProgressRowLast : {}) }}>
+      <span
+        style={{
+          ...dep.swapDot,
+          background: done
+            ? "color-mix(in srgb, var(--ok) 28%, transparent)"
+            : active
+              ? "color-mix(in srgb, var(--accent) 30%, transparent)"
+              : "color-mix(in srgb, var(--muted) 10%, transparent)",
+          color: done ? "var(--ok)" : active ? "var(--accent)" : "var(--muted)",
+          border: `1px solid ${
+            done ? "color-mix(in srgb, var(--ok) 65%, transparent)" : active ? "var(--accent)" : "var(--border)"
+          }`,
+        }}
+        aria-hidden
+      >
+        {done ? "✓" : step}
+      </span>
+      <span style={{ color: active ? "var(--text)" : "var(--muted)", fontWeight: active ? 600 : 400 }}>{label}</span>
+    </div>
+  );
+}
 
 export default function SwapScreen({
   isDemo,
@@ -115,6 +239,13 @@ export default function SwapScreen({
   const [okMsg, setOkMsg] = useState<string | null>(null);
   /** When set (`SWAP_USDC_RECEIVE_ADDRESS`), deposit UI shows this address instead of the user wallet. */
   const [buyDepositOverride, setBuyDepositOverride] = useState<string | null>(null);
+  /** Server polls chain for USDC→QUSD only when `SOLVEQUEST_DEPOSIT_SCAN` is enabled. */
+  const [autoCreditUsdcEnabled, setAutoCreditUsdcEnabled] = useState<boolean | null>(null);
+  const [depositScanHealth, setDepositScanHealth] = useState<DepositScanHealth | null>(null);
+  /** Bumps every 10s so “Xs ago” stays fresh without polling every second. */
+  const [healthAgeTick, setHealthAgeTick] = useState(0);
+  /** 0 idle; 1–3 which sub-step is highlighted during QUSD→USDC POST. */
+  const [swapProgressPhase, setSwapProgressPhase] = useState(0);
   const displayAddr = serverDepositAddress?.trim() ?? "";
 
   useEffect(() => {
@@ -126,8 +257,66 @@ export default function SwapScreen({
           ? (j as { address: string }).address.trim()
           : "";
         setBuyDepositOverride(a || null);
+        const acRaw =
+          j && typeof j === "object" ? (j as Record<string, unknown>).auto_credit_usdc_enabled : undefined;
+        setAutoCreditUsdcEnabled(typeof acRaw === "boolean" ? acRaw : null);
       })
-      .catch(() => setBuyDepositOverride(null));
+      .catch(() => {
+        setBuyDepositOverride(null);
+        setAutoCreditUsdcEnabled(null);
+      });
+  }, [isDemo]);
+
+  const loadDepositScanHealth = useCallback(async () => {
+    if (isDemo) return;
+    try {
+      const r = await fetch("/api/config/deposit-scan-health", { credentials: "same-origin" });
+      if (!r.ok) {
+        setDepositScanHealth(null);
+        return;
+      }
+      const j = (await r.json()) as unknown;
+      if (!j || typeof j !== "object") {
+        setDepositScanHealth(null);
+        return;
+      }
+      const o = j as Record<string, unknown>;
+      if (
+        typeof o.worker_enabled !== "boolean" ||
+        typeof o.interval_ms !== "number" ||
+        (o.last_tick_at != null && typeof o.last_tick_at !== "number") ||
+        typeof o.status !== "string"
+      ) {
+        setDepositScanHealth(null);
+        return;
+      }
+      const st = o.status;
+      if (st !== "disabled" && st !== "starting" && st !== "ok" && st !== "stale") {
+        setDepositScanHealth(null);
+        return;
+      }
+      setDepositScanHealth({
+        worker_enabled: o.worker_enabled,
+        interval_ms: o.interval_ms,
+        last_tick_at: o.last_tick_at == null ? null : Number(o.last_tick_at),
+        status: st,
+      });
+    } catch {
+      setDepositScanHealth(null);
+    }
+  }, [isDemo]);
+
+  useEffect(() => {
+    if (isDemo) return;
+    void loadDepositScanHealth();
+    const id = window.setInterval(() => void loadDepositScanHealth(), 20_000);
+    return () => clearInterval(id);
+  }, [isDemo, loadDepositScanHealth]);
+
+  useEffect(() => {
+    if (isDemo) return;
+    const id = window.setInterval(() => setHealthAgeTick((x) => x + 1), 10_000);
+    return () => clearInterval(id);
   }, [isDemo]);
 
   useEffect(() => {
@@ -191,6 +380,20 @@ export default function SwapScreen({
     qusdDebit > 0 &&
     qusdDebit <= qusdUnlocked + 1e-9;
 
+  useEffect(() => {
+    if (!busy) {
+      setSwapProgressPhase(0);
+      return;
+    }
+    setSwapProgressPhase(1);
+    const t2 = window.setTimeout(() => setSwapProgressPhase(2), 450);
+    const t3 = window.setTimeout(() => setSwapProgressPhase(3), 950);
+    return () => {
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [busy]);
+
   const submit = useCallback(async () => {
     if (!canSubmit || !Number.isFinite(qIn)) return;
     setBusy(true);
@@ -211,21 +414,65 @@ export default function SwapScreen({
         usdc_sent?: number;
       };
       if (!r.ok) {
-        setErr(j.message || j.error || `Swap failed (${r.status}).`);
+        setErr(friendlyQusdToUsdcSwapError(j, r.status));
         return;
       }
+      const usdc = j.usdc_sent != null ? j.usdc_sent.toFixed(2) : "";
+      const sigShort = j.signature ? `${j.signature.slice(0, 8)}…` : "";
       setOkMsg(
-        `Sent ${j.usdc_sent != null ? j.usdc_sent.toFixed(6) : ""} USDC. Deducted ${j.qusd_debited != null ? j.qusd_debited.toFixed(2) : ""} QUSD. Tx: ${j.signature?.slice(0, 12)}…`,
+        `Success — about ${usdc} USDC is on its way to your wallet. Your QUSD balance was updated.${sigShort ? ` Reference: ${sigShort}` : ""}`,
       );
       setDraft("");
       await onRefreshAccount?.();
       loadPreflight();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Network error");
+    } catch {
+      setErr("We couldn’t reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
   }, [canSubmit, qIn, onRefreshAccount, loadPreflight]);
+
+  const depositHealthLabel = useMemo(() => {
+    void healthAgeTick;
+    const h = depositScanHealth;
+    if (!h) return null;
+    const borderMix = "color-mix(in srgb, var(--border) 85%, transparent)";
+    const base = { border: borderMix, bg: "color-mix(in srgb, var(--muted) 5%, var(--panel))" };
+    switch (h.status) {
+      case "disabled":
+        return {
+          ...base,
+          dot: "var(--muted)",
+          text: "USDC deposit scanner is off on this server (deposits won’t credit automatically).",
+        };
+      case "starting":
+        return {
+          ...base,
+          dot: "var(--warn)",
+          bg: "color-mix(in srgb, var(--warn) 8%, var(--panel))",
+          text: "USDC deposit scanner is starting — waiting for the first full blockchain check…",
+        };
+      case "ok": {
+        const ago =
+          h.last_tick_at != null ? formatShortAgo(Date.now() - h.last_tick_at) : "recently";
+        return {
+          ...base,
+          dot: "var(--ok)",
+          bg: "color-mix(in srgb, var(--ok) 7%, var(--panel))",
+          text: `USDC deposit scanner is running. Last full pass ${ago}.`,
+        };
+      }
+      case "stale":
+        return {
+          ...base,
+          dot: "var(--danger)",
+          bg: "color-mix(in srgb, var(--danger) 8%, var(--panel))",
+          text: "USDC deposit scanner hasn’t completed a full pass recently. If credits are stuck, check server logs or support.",
+        };
+      default:
+        return null;
+    }
+  }, [depositScanHealth, healthAgeTick]);
 
   if (isDemo) {
     return (
@@ -249,6 +496,23 @@ export default function SwapScreen({
         </p>
       </div>
 
+      {depositHealthLabel ? (
+        <p
+          style={{
+            ...dep.healthLine,
+            maxWidth: 520,
+            border: `1px solid ${depositHealthLabel.border}`,
+            background: depositHealthLabel.bg,
+            color: "var(--text)",
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <span style={{ ...dep.healthDot, background: depositHealthLabel.dot }} aria-hidden />
+          <span>{depositHealthLabel.text}</span>
+        </p>
+      ) : null}
+
       {!isDemo && (buyDepositOverride || (solReceiveVerified && displayAddr)) ? (
         <section style={dep.panel} aria-label="Swap USDC to QUSD">
           <div style={dep.header}>
@@ -262,6 +526,38 @@ export default function SwapScreen({
             below. We add the QUSD (at{" "}
             <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong>) to your account after
             on-chain confirmation.
+          </p>
+          <ol style={dep.stepsList}>
+            <li style={dep.stepLi}>
+              <strong>Send USDC</strong> on the Solana network to the address below (only USDC — wrong tokens can be
+              lost).
+            </li>
+            <li style={dep.stepLi}>
+              <strong>Wait for confirmation</strong> — your wallet or explorer will show when the transaction settles.
+            </li>
+            <li style={dep.stepLi}>
+              <strong>QUSD credit</strong> — we add QUSD to your Solve Quest balance when our system sees the deposit on
+              chain.
+            </li>
+          </ol>
+          <p style={dep.monitorNote}>
+            {autoCreditUsdcEnabled === true ? (
+              <>
+                <strong style={{ color: "var(--text)" }}>Automatic processing is on:</strong> the server checks the
+                blockchain on a timer (not when you press a button). After Solana confirms your transfer, QUSD usually
+                appears within a few minutes — refresh your balance or revisit this page.
+              </>
+            ) : autoCreditUsdcEnabled === false ? (
+              <>
+                <strong style={{ color: "var(--warn)" }}>Automatic chain monitoring may be off</strong> on this
+                deployment. If QUSD doesn’t show up, contact support with your transaction signature from your wallet.
+              </>
+            ) : (
+              <>
+                After your transfer confirms, QUSD is credited when our backend processes your deposit — often within a
+                few minutes.
+              </>
+            )}
           </p>
           <div style={dep.addressBlock}>
             <Suspense fallback={<p style={dep.suspenseFallback}>Loading…</p>}>
@@ -426,8 +722,32 @@ export default function SwapScreen({
           disabled={!canSubmit}
           onClick={() => void submit()}
         >
-          {busy ? "Swapping…" : "Swap"}
+          {busy ? "Working…" : "Swap"}
         </button>
+
+        {busy ? (
+          <div style={dep.swapProgress} role="status" aria-live="polite" aria-busy="true">
+            <p style={dep.swapProgressTitle}>Progress</p>
+            <SwapProgressRow
+              phase={swapProgressPhase}
+              step={1}
+              label="Checking your amount and limits"
+              isLast={false}
+            />
+            <SwapProgressRow
+              phase={swapProgressPhase}
+              step={2}
+              label="Updating your QUSD balance"
+              isLast={false}
+            />
+            <SwapProgressRow
+              phase={swapProgressPhase}
+              step={3}
+              label="Sending USDC to your Solana wallet"
+              isLast
+            />
+          </div>
+        ) : null}
 
         {err ? (
           <p role="alert" style={{ marginTop: 12, color: "var(--danger)", fontSize: 14 }}>
