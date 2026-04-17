@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
-import { uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
+import { uiBtnPrimary, uiInput } from "../ui/appSurface";
 import { QUSD_PER_USD } from "../engine/qusdVault";
 import { QusdIcon } from "../Qusd";
 import { computeSwapAmounts } from "../lib/swapAmounts";
@@ -336,8 +336,8 @@ export default function SwapScreen({
       ) : null}
 
       <div style={card}>
-        <label style={uiFieldLabel} htmlFor="swap-qusd-in">
-          QUSD to swap
+        <label style={{ ...dep.title, display: "block", marginBottom: 10 }} htmlFor="swap-qusd-in">
+          Swap QUSD to USDC
         </label>
         {cfg && rate > 0 ? (
           <div
