@@ -155,14 +155,9 @@ export default function SwapScreen({
 
   return (
     <div className="app-page">
-      <p style={{ margin: "0 0 12px", color: "var(--muted)", maxWidth: 560, lineHeight: 1.55 }}>
-        Exchange QUSD from your balance for USDC sent to your <strong>verified</strong> Solana receive address (same as
-        Account). Rate and limits come from the server.
-      </p>
-
       {cfg ? (
         <div style={card}>
-          <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--muted)" }}>Reference rate</p>
+          <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--muted)" }}>Exchange rate</p>
           <p style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>
             1 USDC = {rate > 0 ? rate.toLocaleString(undefined, { maximumFractionDigits: 8 }) : "—"} QUSD
           </p>
@@ -279,7 +274,7 @@ export default function SwapScreen({
             above).
           </li>
           <li>
-            USDC out = QUSD ÷ reference rate (QUSD per 1 USDC), rounded to 2 decimals, then capped by the max USDC per
+            USDC out = QUSD ÷ exchange rate (QUSD per 1 USDC), rounded to 2 decimals, then capped by the max USDC per
             transaction and by treasury USDC on hand (if capped, QUSD debited matches the USDC actually sent).
           </li>
           <li>Swaps only run when the treasury holds USDC and enough SOL for fees (≥ 0.001 SOL).</li>
