@@ -161,13 +161,14 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
                 <img src="/prize-usdc.png" alt="" width={24} height={24} className="lp-hero-swap-usdc-icon" />
                 USDC
               </span>
-              <span className="lp-hero-swap-asterisk" aria-hidden>
+              <a
+                href="#lp-swap-footnote"
+                className="lp-hero-swap-asterisk"
+                aria-label="See footnote: in-app Swap, profits only, verified Solana address"
+              >
                 {" "}
                 *
-              </span>
-            </p>
-            <p className="lp-hero-swap-highlight-sub">
-              In-app <strong>Swap</strong> — profits only; a verified Solana receive address is required.
+              </a>
             </p>
           </div>
           <p className="lp-hero-nodeposit">No deposit required to start.</p>
@@ -555,6 +556,11 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           </span>
         </p>
       </section>
+
+      <p id="lp-swap-footnote" className="lp-page-footnote" tabIndex={-1}>
+        <span className="lp-page-footnote-mark">*</span> In-app <strong>Swap</strong> — profits only; a verified Solana
+        receive address is required.
+      </p>
 
       {onTerms && onPrivacy ? (
         <footer className="lp-legal-footer">

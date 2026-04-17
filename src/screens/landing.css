@@ -133,11 +133,17 @@
   color: #e2e8f0;
 }
 
-.lp-hero-swap-asterisk {
+a.lp-hero-swap-asterisk {
   font-weight: 600;
   font-size: 0.85em;
-  color: color-mix(in srgb, var(--muted) 85%, var(--text));
+  color: color-mix(in srgb, var(--accent) 72%, var(--muted));
   vertical-align: super;
+  text-decoration: none;
+}
+
+a.lp-hero-swap-asterisk:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .lp-hero-swap-highlight-qusd {
@@ -149,17 +155,6 @@
   margin-right: 0.22em;
   object-fit: contain;
   vertical-align: -0.22em;
-}
-
-.lp-hero-swap-highlight-sub {
-  margin: 10px 0 0;
-  font-size: clamp(0.8125rem, 1.85vw, 0.9375rem);
-  font-weight: 500;
-  line-height: 1.45;
-  color: var(--muted);
-  max-width: 38ch;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .lp-hero-swap-usdc-icon {
@@ -1155,6 +1150,24 @@ button.lp-text-link:hover {
     align-items: center;
     text-align: center;
   }
+}
+
+.lp-page-footnote {
+  scroll-margin-top: 1rem;
+  max-width: var(--lp-max);
+  margin: 0 auto;
+  padding: 0 var(--lp-gutter) clamp(20px, 3vw, 28px);
+  font-size: clamp(0.8125rem, 1.85vw, 0.875rem);
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}
+
+.lp-page-footnote-mark {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--accent) 55%, var(--muted));
+  margin-right: 0.15em;
 }
 
 .lp-legal-footer {
