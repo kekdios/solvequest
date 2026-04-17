@@ -240,6 +240,54 @@ export default function SwapScreen({
 
   return (
     <div className="app-page">
+      {!isDemo && (buyDepositOverride || (solReceiveVerified && displayAddr)) ? (
+        <section style={dep.panel} aria-label="Swap USDC to QUSD">
+          <div style={dep.header}>
+            <QusdIcon size={28} style={dep.icon} />
+            <h2 style={dep.title}>Swap USDC to QUSD</h2>
+          </div>
+          <p style={dep.lead}>
+            Send <strong style={{ color: "var(--text)" }}>USDC</strong> on Solana to{" "}
+            <strong style={{ color: "var(--text)" }}>
+              {buyDepositOverride ? "the deposit address" : "your verified address"}
+            </strong>{" "}
+            below. We add the QUSD (at{" "}
+            <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong>) to your account after
+            on-chain confirmation.
+          </p>
+          <div style={dep.addressBlock}>
+            <Suspense fallback={<p style={dep.suspenseFallback}>Loading…</p>}>
+              <TestReceiveAddresses
+                serverDepositAddress={buyDepositOverride ?? displayAddr}
+                depositAddressError={null}
+                addressReady
+                variant="user_deposit"
+                depositHintOverride={
+                  buyDepositOverride ? (
+                    <>
+                      Only send <strong style={dep.hintStrong}>USDC</strong> on the{" "}
+                      <strong style={dep.hintStrong}>Solana Network</strong> to the deposit address.
+                    </>
+                  ) : (
+                    <>
+                      Only send <strong style={dep.hintStrong}>USDC</strong> on the{" "}
+                      <strong style={dep.hintStrong}>Solana Network</strong> to this <strong>verified</strong> wallet —
+                      your linked receive address for QUSD credits.
+                    </>
+                  )
+                }
+              />
+            </Suspense>
+          </div>
+          <p style={dep.changeNow}>
+            <a href={CHANGENOW_URL} target="_blank" rel="noopener noreferrer" style={dep.changeNowLink}>
+              Buy/Sell cryptocurrencies
+            </a>{" "}
+            <span style={{ color: "var(--muted)" }}>— instant swaps via ChangeNOW.</span>
+          </p>
+        </section>
+      ) : null}
+
       {cfg ? (
         <div style={card}>
           <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--muted)" }}>Exchange rate</p>
@@ -384,55 +432,6 @@ export default function SwapScreen({
           </p>
         ) : null}
       </div>
-
-      {!isDemo && (buyDepositOverride || (solReceiveVerified && displayAddr)) ? (
-        <section style={dep.panel} aria-label="Swap USDC to QUSD">
-          <div style={dep.header}>
-            <QusdIcon size={28} style={dep.icon} />
-            <h2 style={dep.title}>Swap USDC to QUSD</h2>
-          </div>
-          <p style={dep.lead}>
-            Send <strong style={{ color: "var(--text)" }}>USDC (SPL)</strong> on Solana to{" "}
-            <strong style={{ color: "var(--text)" }}>
-              {buyDepositOverride ? "the deposit address" : "your verified address"}
-            </strong>{" "}
-            below. The server credits QUSD at{" "}
-            <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong> after on-chain
-            confirmation.
-          </p>
-          <div style={dep.addressBlock}>
-            <Suspense fallback={<p style={dep.suspenseFallback}>Loading…</p>}>
-              <TestReceiveAddresses
-                serverDepositAddress={buyDepositOverride ?? displayAddr}
-                depositAddressError={null}
-                addressReady
-                variant="user_deposit"
-                depositHintOverride={
-                  buyDepositOverride ? (
-                    <>
-                      Only send <strong style={dep.hintStrong}>USDC</strong> on the{" "}
-                      <strong style={dep.hintStrong}>Solana Network</strong> to this deposit address (configured on the
-                      server for QUSD credits).
-                    </>
-                  ) : (
-                    <>
-                      Only send <strong style={dep.hintStrong}>USDC</strong> on the{" "}
-                      <strong style={dep.hintStrong}>Solana Network</strong> to this <strong>verified</strong> wallet —
-                      your linked receive address for QUSD credits.
-                    </>
-                  )
-                }
-              />
-            </Suspense>
-          </div>
-          <p style={dep.changeNow}>
-            <a href={CHANGENOW_URL} target="_blank" rel="noopener noreferrer" style={dep.changeNowLink}>
-              Buy/Sell cryptocurrencies
-            </a>{" "}
-            <span style={{ color: "var(--muted)" }}>— instant swaps via ChangeNOW.</span>
-          </p>
-        </section>
-      ) : null}
 
       <div style={card}>
         <p style={{ margin: "0 0 10px", fontWeight: 650, fontSize: "0.95rem" }}>Swap rules (summary)</p>
