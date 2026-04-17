@@ -5,7 +5,7 @@ const SUPPORT_EMAIL = "privacyemail369@gmail.com";
 export default function TermsScreen() {
   return (
     <article className="legal-doc">
-      <p className="legal-meta">Last updated: April 14, 2026</p>
+      <p className="legal-meta">Last updated: April 17, 2026</p>
       <p>
         These Terms of Service (“Terms”) govern your access to and use of the Solve Quest website and application
         (“Service”) operated by us (“we,” “us,” or “our”). By accessing or using the Service, you agree to these Terms.

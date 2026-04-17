@@ -5,7 +5,7 @@ const SUPPORT_EMAIL = "privacyemail369@gmail.com";
 export default function PrivacyScreen() {
   return (
     <article className="legal-doc">
-      <p className="legal-meta">Last updated: April 14, 2026</p>
+      <p className="legal-meta">Last updated: April 17, 2026</p>
       <p>
         This Privacy Policy describes how Solve Quest (“we,” “us,” or “our”) collects, uses, and shares information when
         you use our website and application (the “Service”).
