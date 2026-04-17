@@ -1,11 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
-import { QUSD_PER_USD } from "../engine/qusdVault";
-import { QusdAmount, QusdIcon } from "../Qusd";
-
-const TestReceiveAddresses = lazy(() => import("../components/TestReceiveAddresses"));
-
-const CHANGENOW_URL = "https://changenow.io/";
+import { QusdAmount } from "../Qusd";
 
 const LINK_VERIFY_BONUS_QUSD = 10_000;
 
@@ -42,23 +37,8 @@ export default function AccountScreen({
   const [draftAddress, setDraftAddress] = useState("");
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
-  /** When set (SWAP_USDC_RECEIVE_ADDRESS), Buy QUSD shows this deposit address instead of the user wallet. */
-  const [buyDepositOverride, setBuyDepositOverride] = useState<string | null>(null);
   const verified = Boolean(solReceiveVerified);
   const displayAddr = serverDepositAddress?.trim() ?? "";
-
-  useEffect(() => {
-    if (isDemo) return;
-    void fetch("/api/config/buy-qusd-deposit", { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        const a = j && typeof j === "object" && typeof (j as { address?: string }).address === "string"
-          ? (j as { address: string }).address.trim()
-          : "";
-        setBuyDepositOverride(a || null);
-      })
-      .catch(() => setBuyDepositOverride(null));
-  }, [isDemo]);
 
   useEffect(() => {
     if (verified && displayAddr) setDraftAddress(displayAddr);
@@ -188,55 +168,6 @@ export default function AccountScreen({
             </>
           )}
         </section>
-
-        {!isDemo && (buyDepositOverride || (verified && displayAddr)) ? (
-          <section style={s.buyMorePanel} aria-label="Buy more QUSD">
-            <div style={s.buyMoreHeader}>
-              <QusdIcon size={28} style={s.buyMoreIcon} />
-              <h2 style={s.buyMoreTitle}>Buy More QUSD</h2>
-            </div>
-            <p style={s.buyMoreLead}>
-              Send <strong style={{ color: "var(--text)" }}>USDC (SPL)</strong> on Solana to{" "}
-              <strong style={{ color: "var(--text)" }}>
-                {buyDepositOverride ? "the deposit address" : "your verified address"}
-              </strong>{" "}
-              below. The server credits QUSD at{" "}
-              <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong> after on-chain
-              confirmation.
-            </p>
-            <div style={s.receiveAddressesBlock}>
-              <Suspense fallback={<p style={s.suspenseFallback}>Loading…</p>}>
-                <TestReceiveAddresses
-                  serverDepositAddress={buyDepositOverride ?? displayAddr}
-                  depositAddressError={null}
-                  addressReady
-                  variant="user_deposit"
-                  depositHintOverride={
-                    buyDepositOverride ? (
-                      <>
-                        Only send <strong style={s.buyMoreHintStrong}>USDC</strong> on the{" "}
-                        <strong style={s.buyMoreHintStrong}>Solana Network</strong> to this deposit address (configured
-                        on the server for QUSD credits).
-                      </>
-                    ) : (
-                      <>
-                        Only send <strong style={s.buyMoreHintStrong}>USDC</strong> on the{" "}
-                        <strong style={s.buyMoreHintStrong}>Solana Network</strong> to this <strong>verified</strong>{" "}
-                        wallet — your linked receive address for QUSD credits.
-                      </>
-                    )
-                  }
-                />
-              </Suspense>
-            </div>
-            <p style={s.depositBuySell}>
-              <a href={CHANGENOW_URL} target="_blank" rel="noopener noreferrer" style={s.buySellLink}>
-                Buy/Sell cryptocurrencies
-              </a>{" "}
-              <span style={{ color: "var(--muted)" }}>— instant swaps via ChangeNOW.</span>
-            </p>
-          </section>
-        ) : null}
       </div>
     </div>
   );
@@ -246,16 +177,6 @@ const s: Record<string, CSSProperties> = {
   wrap: { display: "flex", flexDirection: "column", gap: 16 },
   metricsStack: { display: "flex", flexDirection: "column", gap: 16 },
   err: { margin: "8px 0 0", fontSize: 13, color: "var(--danger)" },
-  buyMorePanel: {
-    width: "100%",
-    background:
-      "linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--panel)) 0%, var(--surface) 100%)",
-    border: "1px solid color-mix(in srgb, var(--accent) 28%, var(--border))",
-    borderRadius: 12,
-    padding: "20px 20px 22px",
-    boxShadow:
-      "inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent), 0 4px 24px color-mix(in srgb, var(--text) 5%, transparent)",
-  },
   buyMoreHeader: {
     display: "flex",
     alignItems: "center",
@@ -270,20 +191,6 @@ const s: Record<string, CSSProperties> = {
     letterSpacing: "-0.02em",
     color: "var(--text)",
   },
-  buyMoreLead: {
-    margin: "0 0 14px",
-    padding: "12px 14px",
-    fontSize: 13,
-    lineHeight: 1.55,
-    color: "var(--muted)",
-    borderRadius: 8,
-    border: "1px solid color-mix(in srgb, var(--accent) 22%, var(--border))",
-    background: "color-mix(in srgb, var(--accent) 5%, var(--bg))",
-  },
-  buyMoreHintStrong: {
-    color: "color-mix(in srgb, var(--accent) 92%, #fff)",
-    fontWeight: 700,
-  },
   walletPanelTop: {
     width: "100%",
     background:
@@ -291,12 +198,6 @@ const s: Record<string, CSSProperties> = {
     border: "1px solid color-mix(in srgb, var(--accent) 32%, var(--border))",
     boxShadow:
       "inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent), 0 6px 28px color-mix(in srgb, var(--accent) 8%, transparent)",
-  },
-  depositBuySell: {
-    margin: "12px 0 0",
-    fontSize: 13,
-    lineHeight: 1.5,
-    color: "var(--text)",
   },
   depositExplainer: {
     margin: "0 0 12px",
@@ -365,9 +266,6 @@ const s: Record<string, CSSProperties> = {
     gap: 4,
   },
   statSub: { margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--muted)" },
-  receiveAddressesBlock: { marginTop: 8 },
-  suspenseFallback: { fontSize: 13, color: "var(--muted)" },
-  buySellLink: { color: "var(--accent)", fontWeight: 600 },
   inlineCodeEnv: {
     fontSize: "0.85em",
     fontWeight: 600,

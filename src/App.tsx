@@ -743,6 +743,7 @@ function AppInner() {
               isDemo={demo}
               qusdUnlocked={state.qusd.unlocked}
               solReceiveVerified={ledgerAccountRow?.sol_receive_verified_at != null}
+              serverDepositAddress={ledgerAccountRow?.sol_receive_address?.trim() || null}
               onRefreshAccount={refreshAccountFromServer}
               onGoToAccount={() => setScreen("account")}
             />

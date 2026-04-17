@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
+import { QUSD_PER_USD } from "../engine/qusdVault";
 import { QusdIcon } from "../Qusd";
 import { computeSwapAmounts } from "../lib/swapAmounts";
 
+const TestReceiveAddresses = lazy(() => import("../components/TestReceiveAddresses"));
+
+const CHANGENOW_URL = "https://changenow.io/";
 const USDC_ICON = "/prize-usdc.png";
 
 type SwapConfig = {
@@ -29,6 +33,8 @@ type Props = {
   isDemo: boolean;
   qusdUnlocked: number;
   solReceiveVerified: boolean;
+  /** User’s verified Solana receive address (USDC deposit scan). */
+  serverDepositAddress?: string | null;
   onRefreshAccount?: () => void | Promise<void>;
   onGoToAccount?: () => void;
 };
@@ -42,10 +48,63 @@ const card: CSSProperties = {
   background: "var(--panel)",
 };
 
+const dep: Record<string, CSSProperties> = {
+  panel: {
+    width: "100%",
+    maxWidth: 520,
+    marginTop: 8,
+    background:
+      "linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--panel)) 0%, var(--surface) 100%)",
+    border: "1px solid color-mix(in srgb, var(--accent) 28%, var(--border))",
+    borderRadius: 12,
+    padding: "20px 20px 22px",
+    boxShadow:
+      "inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent), 0 4px 24px color-mix(in srgb, var(--text) 5%, transparent)",
+  },
+  header: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  icon: { flexShrink: 0 },
+  title: {
+    margin: 0,
+    fontSize: "1.15rem",
+    fontWeight: 700,
+    letterSpacing: "-0.02em",
+    color: "var(--text)",
+  },
+  lead: {
+    margin: "0 0 14px",
+    padding: "12px 14px",
+    fontSize: 13,
+    lineHeight: 1.55,
+    color: "var(--muted)",
+    borderRadius: 8,
+    border: "1px solid color-mix(in srgb, var(--accent) 22%, var(--border))",
+    background: "color-mix(in srgb, var(--accent) 5%, var(--bg))",
+  },
+  hintStrong: {
+    color: "color-mix(in srgb, var(--accent) 92%, #fff)",
+    fontWeight: 700,
+  },
+  addressBlock: { marginTop: 8 },
+  suspenseFallback: { fontSize: 13, color: "var(--muted)" },
+  changeNow: {
+    margin: "12px 0 0",
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: "var(--text)",
+  },
+  changeNowLink: { color: "var(--accent)", fontWeight: 600 },
+};
+
 export default function SwapScreen({
   isDemo,
   qusdUnlocked,
   solReceiveVerified,
+  serverDepositAddress = null,
   onRefreshAccount,
   onGoToAccount,
 }: Props) {
@@ -55,6 +114,22 @@ export default function SwapScreen({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  /** When set (`SWAP_USDC_RECEIVE_ADDRESS`), deposit UI shows this address instead of the user wallet. */
+  const [buyDepositOverride, setBuyDepositOverride] = useState<string | null>(null);
+  const displayAddr = serverDepositAddress?.trim() ?? "";
+
+  useEffect(() => {
+    if (isDemo) return;
+    void fetch("/api/config/buy-qusd-deposit", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const a = j && typeof j === "object" && typeof (j as { address?: string }).address === "string"
+          ? (j as { address: string }).address.trim()
+          : "";
+        setBuyDepositOverride(a || null);
+      })
+      .catch(() => setBuyDepositOverride(null));
+  }, [isDemo]);
 
   useEffect(() => {
     void fetch("/api/swap/config", { credentials: "same-origin" })
@@ -309,6 +384,55 @@ export default function SwapScreen({
           </p>
         ) : null}
       </div>
+
+      {!isDemo && (buyDepositOverride || (solReceiveVerified && displayAddr)) ? (
+        <section style={dep.panel} aria-label="Swap USDC to QUSD">
+          <div style={dep.header}>
+            <QusdIcon size={28} style={dep.icon} />
+            <h2 style={dep.title}>Swap USDC to QUSD</h2>
+          </div>
+          <p style={dep.lead}>
+            Send <strong style={{ color: "var(--text)" }}>USDC (SPL)</strong> on Solana to{" "}
+            <strong style={{ color: "var(--text)" }}>
+              {buyDepositOverride ? "the deposit address" : "your verified address"}
+            </strong>{" "}
+            below. The server credits QUSD at{" "}
+            <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong> after on-chain
+            confirmation.
+          </p>
+          <div style={dep.addressBlock}>
+            <Suspense fallback={<p style={dep.suspenseFallback}>Loading…</p>}>
+              <TestReceiveAddresses
+                serverDepositAddress={buyDepositOverride ?? displayAddr}
+                depositAddressError={null}
+                addressReady
+                variant="user_deposit"
+                depositHintOverride={
+                  buyDepositOverride ? (
+                    <>
+                      Only send <strong style={dep.hintStrong}>USDC</strong> on the{" "}
+                      <strong style={dep.hintStrong}>Solana Network</strong> to this deposit address (configured on the
+                      server for QUSD credits).
+                    </>
+                  ) : (
+                    <>
+                      Only send <strong style={dep.hintStrong}>USDC</strong> on the{" "}
+                      <strong style={dep.hintStrong}>Solana Network</strong> to this <strong>verified</strong> wallet —
+                      your linked receive address for QUSD credits.
+                    </>
+                  )
+                }
+              />
+            </Suspense>
+          </div>
+          <p style={dep.changeNow}>
+            <a href={CHANGENOW_URL} target="_blank" rel="noopener noreferrer" style={dep.changeNowLink}>
+              Buy/Sell cryptocurrencies
+            </a>{" "}
+            <span style={{ color: "var(--muted)" }}>— instant swaps via ChangeNOW.</span>
+          </p>
+        </section>
+      ) : null}
 
       <div style={card}>
         <p style={{ margin: "0 0 10px", fontWeight: 650, fontSize: "0.95rem" }}>Swap rules (summary)</p>
