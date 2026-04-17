@@ -164,6 +164,11 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
+function parseEnvNumber(raw: string | undefined, fallback: number): number {
+  const n = Number.parseFloat((raw ?? "").trim());
+  return Number.isFinite(n) ? n : fallback;
+}
+
 type AccountRow = Record<string, unknown>;
 
 function attachLedgerBalances(database: SqliteDb, row: AccountRow): AccountRow {
@@ -364,6 +369,94 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         console.error("[account-api] GET /api/account/perp-closes:", e);
         sendJson(res, 500, {
           error: "perp_closes_query_failed",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+      return;
+    }
+
+    if (req.method === "GET" && url === "/api/account/swap-history") {
+      const token = parseCookies(req.headers.cookie)[USER_COOKIE];
+      if (!token) {
+        sendJson(res, 401, { error: "Not authenticated" });
+        return;
+      }
+      let payload: { email?: string };
+      try {
+        payload = jwt.verify(token, jwtSecret!) as { email?: string };
+      } catch {
+        sendJson(res, 401, { error: "Invalid token" });
+        return;
+      }
+      if (!payload.email || typeof payload.email !== "string") {
+        sendJson(res, 401, { error: "Invalid token" });
+        return;
+      }
+      try {
+        const email = payload.email.toLowerCase();
+        const row = loadOrCreateRow(email);
+        if (!row?.id) {
+          sendJson(res, 503, { error: "no_account" });
+          return;
+        }
+        const database = getDb();
+        if (!database) {
+          sendJson(res, 503, { error: "db_missing" });
+          return;
+        }
+        const accountId = String(row.id);
+        const qs = new URL(req.url ?? "", "http://localhost").searchParams;
+        const page = Math.max(1, Number.parseInt(qs.get("page") ?? "1", 10) || 1);
+        const pageSize = Math.min(100, Math.max(1, Number.parseInt(qs.get("page_size") ?? "15", 10) || 15));
+        const offset = (page - 1) * pageSize;
+        const swapRate = parseEnvNumber(env.SWAP_QUSD_USDC_RATE, 0);
+        const countRow = database
+          .prepare(
+            `SELECT COUNT(*) AS c FROM qusd_ledger
+             WHERE account_id = ? AND entry_type IN ('qusd_swap', 'qusd_swap_refund')`,
+          )
+          .get(accountId) as { c: number };
+        const total = Number(countRow.c) || 0;
+        const rawRows = database
+          .prepare(
+            `SELECT id, created_at, entry_type, unlocked_delta, ref_id AS swap_id
+             FROM qusd_ledger
+             WHERE account_id = ? AND entry_type IN ('qusd_swap', 'qusd_swap_refund')
+             ORDER BY created_at DESC
+             LIMIT ? OFFSET ?`,
+          )
+          .all(accountId, pageSize, offset) as {
+          id: number;
+          created_at: number;
+          entry_type: string;
+          unlocked_delta: number;
+          swap_id: string;
+        }[];
+        const rows = rawRows.map((r) => {
+          const qusd = Math.abs(Number(r.unlocked_delta) || 0);
+          const isRefund = r.entry_type === "qusd_swap_refund";
+          const estUsdc =
+            !isRefund && swapRate > 0 && qusd > 0 ? qusd / swapRate : null;
+          return {
+            id: r.id,
+            created_at: r.created_at,
+            kind: isRefund ? ("refund" as const) : ("swap" as const),
+            swap_id: r.swap_id,
+            qusd_amount: qusd,
+            estimated_usdc: estUsdc,
+          };
+        });
+        sendJson(res, 200, {
+          rows,
+          total,
+          page,
+          page_size: pageSize,
+          swap_qusd_usdc_rate: swapRate,
+        });
+      } catch (e) {
+        console.error("[account-api] GET /api/account/swap-history:", e);
+        sendJson(res, 500, {
+          error: "swap_history_query_failed",
           message: e instanceof Error ? e.message : String(e),
         });
       }

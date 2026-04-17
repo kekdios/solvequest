@@ -1,8 +1,27 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import { uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
+import { useSessionAuth } from "../auth/sessionAuth";
+import { uiBtnGhost, uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
 import { QusdAmount } from "../Qusd";
 
 const LINK_VERIFY_BONUS_QUSD = 10_000;
+
+const SWAP_HISTORY_PAGE_SIZE = 15;
+
+type SwapHistoryRow = {
+  id: number;
+  created_at: number;
+  kind: "swap" | "refund";
+  swap_id: string;
+  qusd_amount: number;
+  estimated_usdc: number | null;
+};
+
+function fmtSwapTs(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 /** Stat value text was 2rem; reduced by 40% → 60% scale. */
 const STAT_VALUE_FS = "1.2rem";
@@ -37,9 +56,15 @@ export default function AccountScreen({
   qusdUnlocked,
   onRefreshAccount,
 }: Props) {
+  const { authLoading, user, refreshUser } = useSessionAuth();
   const [draftAddress, setDraftAddress] = useState("");
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [swapPage, setSwapPage] = useState(1);
+  const [swapTotal, setSwapTotal] = useState(0);
+  const [swapRows, setSwapRows] = useState<SwapHistoryRow[]>([]);
+  const [swapLoading, setSwapLoading] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
   const verified = Boolean(solReceiveVerified);
   const displayAddr = serverDepositAddress?.trim() ?? "";
 
@@ -77,6 +102,56 @@ export default function AccountScreen({
       setVerifyBusy(false);
     }
   }, [draftAddress, verifyBusy, verified, onRefreshAccount]);
+
+  const loadSwapHistory = useCallback(
+    async (p: number) => {
+      if (isDemo || authLoading || !user) {
+        setSwapLoading(false);
+        return;
+      }
+      setSwapLoading(true);
+      setSwapError(null);
+      try {
+        let r = await fetch(
+          `/api/account/swap-history?page=${p}&page_size=${SWAP_HISTORY_PAGE_SIZE}`,
+          { credentials: "include" },
+        );
+        if (r.status === 401) {
+          await refreshUser();
+          r = await fetch(
+            `/api/account/swap-history?page=${p}&page_size=${SWAP_HISTORY_PAGE_SIZE}`,
+            { credentials: "include" },
+          );
+        }
+        if (!r.ok) {
+          setSwapError(r.status === 401 ? "Sign in to see swap history." : "Could not load swap history.");
+          setSwapRows([]);
+          setSwapTotal(0);
+          return;
+        }
+        const data = (await r.json()) as {
+          rows?: SwapHistoryRow[];
+          total?: number;
+          page?: number;
+        };
+        setSwapRows(data.rows ?? []);
+        setSwapTotal(Number(data.total) || 0);
+        setSwapPage(Number(data.page) || p);
+      } catch {
+        setSwapError("Network error.");
+        setSwapRows([]);
+        setSwapTotal(0);
+      } finally {
+        setSwapLoading(false);
+      }
+    },
+    [isDemo, authLoading, user, refreshUser],
+  );
+
+  useEffect(() => {
+    if (isDemo) return;
+    void loadSwapHistory(1);
+  }, [isDemo, loadSwapHistory]);
 
   const displayName = coolUsername?.trim() || "";
 
@@ -187,6 +262,91 @@ export default function AccountScreen({
             </>
           )}
         </section>
+
+        {!isDemo ? (
+          <section style={{ ...s.statHero, ...s.swapHistoryPanel }} aria-label="QUSD to USDC swap history">
+            <div style={s.buyMoreHeader}>
+              <img
+                src="/icon-sol.png"
+                alt=""
+                width={28}
+                height={28}
+                style={{ ...s.buyMoreIcon, objectFit: "contain" }}
+              />
+              <h2 style={s.buyMoreTitle}>Swap history</h2>
+            </div>
+            <p style={{ ...s.statSub, marginBottom: 12 }}>
+              QUSD→USDC swaps from the Swap page. Refunds appear if an on-chain USDC send failed after your QUSD was
+              debited.
+            </p>
+            {swapError ? (
+              <p style={s.err} role="alert">
+                {swapError}
+              </p>
+            ) : null}
+            {swapLoading && swapRows.length === 0 ? (
+              <p style={{ color: "var(--muted)", fontSize: 13 }}>Loading…</p>
+            ) : (
+              <div className="app-table-scroll">
+                <table className="data-table" style={{ width: "100%", minWidth: 420, fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Type</th>
+                      <th>QUSD</th>
+                      <th>Est. USDC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {swapRows.map((row) => (
+                      <tr key={`${row.kind}-${row.id}`}>
+                        <td className="mono" style={{ whiteSpace: "nowrap" }}>
+                          {fmtSwapTs(row.created_at)}
+                        </td>
+                        <td>{row.kind === "refund" ? "Refund" : "Swap"}</td>
+                        <td className="mono">{row.qusd_amount.toFixed(2)}</td>
+                        <td className="mono">
+                          {row.estimated_usdc != null ? row.estimated_usdc.toFixed(6) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {swapRows.length === 0 && !swapLoading && !swapError ? (
+              <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>No swaps yet.</p>
+            ) : null}
+            {swapTotal > 0 ? (
+              <div style={s.swapPager}>
+                <span style={{ color: "var(--muted)", fontSize: 13 }}>
+                  Page {swapPage} of {Math.max(1, Math.ceil(swapTotal / SWAP_HISTORY_PAGE_SIZE))} · {swapTotal} total
+                </span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    style={{ ...uiBtnGhost, opacity: swapPage <= 1 ? 0.45 : 1 }}
+                    disabled={swapPage <= 1 || swapLoading}
+                    onClick={() => void loadSwapHistory(Math.max(1, swapPage - 1))}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      ...uiBtnGhost,
+                      opacity: swapPage >= Math.ceil(swapTotal / SWAP_HISTORY_PAGE_SIZE) ? 0.45 : 1,
+                    }}
+                    disabled={swapPage >= Math.ceil(swapTotal / SWAP_HISTORY_PAGE_SIZE) || swapLoading}
+                    onClick={() => void loadSwapHistory(swapPage + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </div>
     </div>
   );
@@ -304,5 +464,16 @@ const s: Record<string, CSSProperties> = {
     fontSize: "0.85em",
     fontWeight: 600,
     color: "var(--muted)",
+  },
+  swapHistoryPanel: {
+    width: "100%",
+  },
+  swapPager: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 16,
   },
 };

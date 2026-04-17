@@ -831,6 +831,10 @@ export default function SwapScreen({
 
       <div style={card}>
         <p style={{ margin: "0 0 14px", fontWeight: 650, fontSize: "0.95rem" }}>How it works (summary)</p>
+        <p style={{ ...dep.summaryFollowText, margin: "0 0 14px" }}>
+          Swapping between QUSD and USDC (including whether a swap is available) and the exchange rates applied are
+          determined solely by Solve Quest, as described in the Terms of Service.
+        </p>
 
         <p style={dep.summaryDirection}>USDC → QUSD (you send USDC)</p>
         <ul style={dep.summaryListTightBottom}>

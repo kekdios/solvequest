@@ -48,7 +48,14 @@ export default function TermsScreen() {
         We may suspend or adjust promotions to prevent abuse or comply with law.
       </p>
 
-      <h2>6. Prohibited conduct</h2>
+      <h2>6. QUSD and USDC swaps</h2>
+      <p>
+        Where the Service allows swapping or conversion between QUSD and USDC, the availability, rules, and execution of
+        those swaps are determined solely by Solve Quest. Exchange rates for QUSD and USDC (in either direction) are set
+        solely by Solve Quest and may change, subject to these Terms and any rates or limits shown in the app.
+      </p>
+
+      <h2>7. Prohibited conduct</h2>
       <p>You agree not to:</p>
       <ul>
         <li>Use the Service in violation of law or third-party rights</li>
@@ -57,21 +64,21 @@ export default function TermsScreen() {
         <li>Mislead us or other users, or exploit bugs or vulnerabilities</li>
       </ul>
 
-      <h2>7. Third-party data and networks</h2>
+      <h2>8. Third-party data and networks</h2>
       <p>
         The Service may display prices or data from third parties (for example, index or mark data attributed to
         Hyperliquid or similar sources). Blockchain transactions may rely on public networks such as Solana. We do not
         control third-party systems; their availability and accuracy are not guaranteed.
       </p>
 
-      <h2>8. Disclaimers</h2>
+      <h2>9. Disclaimers</h2>
       <p>
         THE SERVICE IS PROVIDED “AS IS” AND “AS AVAILABLE,” WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED,
         INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT, TO THE FULLEST EXTENT
         PERMITTED BY LAW.
       </p>
 
-      <h2>9. Limitation of liability</h2>
+      <h2>10. Limitation of liability</h2>
       <p>
         TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE AND OUR AFFILIATES WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
         SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, DATA, OR GOODWILL, ARISING FROM YOUR USE OF
@@ -80,25 +87,25 @@ export default function TermsScreen() {
         U.S. DOLLARS (USD $100), EXCEPT WHERE PROHIBITED BY LAW.
       </p>
 
-      <h2>10. Changes</h2>
+      <h2>11. Changes</h2>
       <p>
         We may modify these Terms from time to time. We will post the updated Terms with a new “Last updated” date.
         Continued use after changes constitutes acceptance of the revised Terms.
       </p>
 
-      <h2>11. Termination</h2>
+      <h2>12. Termination</h2>
       <p>
         We may suspend or terminate access to the Service if you breach these Terms or if we need to protect the Service
         or other users. You may stop using the Service at any time.
       </p>
 
-      <h2>12. Governing law</h2>
+      <h2>13. Governing law</h2>
       <p>
         These Terms are governed by the laws of the United States and the State of Delaware, excluding conflict-of-law
         rules, unless applicable law requires otherwise.
       </p>
 
-      <h2>13. Contact</h2>
+      <h2>14. Contact</h2>
       <p>
         Questions about these Terms: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
       </p>
