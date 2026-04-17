@@ -105,14 +105,32 @@ const dep: Record<string, CSSProperties> = {
     color: "var(--text)",
   },
   changeNowLink: { color: "var(--accent)", fontWeight: 600 },
-  stepsList: {
-    margin: "0 0 14px",
-    paddingLeft: 20,
+  /** Matches QUSD→USDC summary bullets: muted body copy. */
+  summaryList: {
+    margin: 0,
+    paddingLeft: 18,
+    color: "var(--muted)",
     fontSize: 13,
-    lineHeight: 1.65,
-    color: "var(--text)",
+    lineHeight: 1.55,
+    maxWidth: 520,
   },
-  stepLi: { marginBottom: 8 },
+  summaryListTightBottom: {
+    margin: "0 0 12px",
+    paddingLeft: 18,
+    color: "var(--muted)",
+    fontSize: 13,
+    lineHeight: 1.55,
+    maxWidth: 520,
+  },
+  summaryListLi: { marginBottom: 8 },
+  summaryFollowText: {
+    margin: "8px 0 0",
+    padding: 0,
+    color: "var(--muted)",
+    fontSize: 13,
+    lineHeight: 1.55,
+    maxWidth: 520,
+  },
   summaryDirection: {
     margin: "0 0 8px",
     fontSize: 13,
@@ -126,16 +144,6 @@ const dep: Record<string, CSSProperties> = {
     fontWeight: 700,
     letterSpacing: "-0.01em",
     color: "var(--text)",
-  },
-  monitorNote: {
-    margin: "0 0 0",
-    padding: "12px 14px",
-    fontSize: 12,
-    lineHeight: 1.55,
-    color: "var(--muted)",
-    borderRadius: 8,
-    border: "1px solid color-mix(in srgb, var(--border) 90%, transparent)",
-    background: "color-mix(in srgb, var(--muted) 6%, var(--bg))",
   },
   swapProgress: {
     marginTop: 16,
@@ -759,61 +767,56 @@ export default function SwapScreen({
         <p style={{ margin: "0 0 14px", fontWeight: 650, fontSize: "0.95rem" }}>How it works (summary)</p>
 
         <p style={dep.summaryDirection}>USDC → QUSD (you send USDC)</p>
-        <ul style={{ ...dep.stepsList, marginBottom: 12 }}>
-          <li style={dep.stepLi}>
+        <ul style={dep.summaryListTightBottom}>
+          <li style={dep.summaryListLi}>
             <strong>Send USDC</strong> on the Solana network to the address in the panel above (only USDC — wrong tokens
             can be lost).
           </li>
-          <li style={dep.stepLi}>
+          <li style={dep.summaryListLi}>
             <strong>Wait for confirmation</strong> — your wallet or explorer will show when the transaction settles.
           </li>
-          <li style={dep.stepLi}>
+          <li style={dep.summaryListLi}>
             <strong>QUSD credit</strong> — we add QUSD to your Solve Quest balance when our system sees the deposit on
             chain.
           </li>
         </ul>
-        <p style={{ ...dep.monitorNote, marginTop: 0 }}>
+        <p style={dep.summaryFollowText}>
           {autoCreditUsdcEnabled === true ? (
             <>
-              <strong style={{ color: "var(--text)" }}>Automatic processing is on:</strong> the server checks the
-              blockchain on a timer (not when you press a button). After Solana confirms your transfer, QUSD usually
-              appears within a few minutes — refresh your balance or revisit this page.
+              <strong>Automatic processing is on:</strong> the server checks the blockchain on a timer (not when you press
+              a button). After Solana confirms your transfer, QUSD usually appears within a few minutes — refresh your
+              balance or revisit this page.
             </>
           ) : autoCreditUsdcEnabled === false ? (
             <>
-              <strong style={{ color: "var(--warn)" }}>Automatic chain monitoring may be off</strong> on this
-              deployment. If QUSD doesn’t show up, contact support with your transaction signature from your wallet.
+              <strong>Automatic chain monitoring may be off</strong> on this deployment. If QUSD doesn’t show up, contact
+              support with your transaction signature from your wallet.
             </>
           ) : (
             <>
-              After your transfer confirms, QUSD is credited when our backend processes your deposit — often within a
-              few minutes.
+              After your transfer confirms, QUSD is credited when our backend processes your deposit — often within a few
+              minutes.
             </>
           )}
         </p>
 
         <p style={dep.summaryDirectionSpaced}>QUSD → USDC (in-app swap)</p>
-        <ul
-          style={{
-            margin: 0,
-            paddingLeft: 18,
-            color: "var(--muted)",
-            fontSize: 13,
-            lineHeight: 1.55,
-            maxWidth: 520,
-          }}
-        >
-          <li>You need a verified Solana address on Account — USDC is sent to that wallet.</li>
-          <li>
+        <ul style={dep.summaryList}>
+          <li style={dep.summaryListLi}>You need a verified Solana address on Account — USDC is sent to that wallet.</li>
+          <li style={dep.summaryListLi}>
             Each swap amount must be <strong>greater than</strong> the minimum QUSD (see Exchange rate in the panel
             above).
           </li>
-          <li>
+          <li style={dep.summaryListLi}>
             USDC out = QUSD ÷ exchange rate (QUSD per 1 USDC), rounded to 2 decimals, then capped by the max USDC per
             transaction and by treasury USDC on hand (if capped, QUSD deducted matches the USDC actually sent).
           </li>
-          <li>Swaps only run when the treasury holds USDC and enough SOL for fees (≥ 0.001 SOL).</li>
-          <li>On success, QUSD is deducted first; if the USDC transfer fails, your QUSD is refunded automatically.</li>
+          <li style={dep.summaryListLi}>
+            Swaps only run when the treasury holds USDC and enough SOL for fees (≥ 0.001 SOL).
+          </li>
+          <li style={dep.summaryListLi}>
+            On success, QUSD is deducted first; if the USDC transfer fails, your QUSD is refunded automatically.
+          </li>
         </ul>
       </div>
     </div>
