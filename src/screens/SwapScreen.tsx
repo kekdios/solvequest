@@ -96,9 +96,12 @@ export default function SwapScreen({
 
   /** Uncapped USDC if full balance above minimum were swappable: (balance − SWAP_ABOVE_AMOUNT) ÷ rate. */
   const hypotheticalFullBalanceUsdc = useMemo(() => {
+    if (!(rate > 0)) return null;
+    if (!Number.isFinite(qusdUnlocked) || !Number.isFinite(minAbove)) return null;
     const b = qusdUnlocked - minAbove;
-    if (!(rate > 0) || !Number.isFinite(b) || b <= 0) return null;
-    return Math.round((b / rate) * 100) / 100;
+    if (!Number.isFinite(b)) return null;
+    const raw = Math.max(0, b) / rate;
+    return Math.round(raw * 100) / 100;
   }, [qusdUnlocked, minAbove, rate]);
 
   const canSubmit =
@@ -224,10 +227,6 @@ export default function SwapScreen({
               border: "1px solid var(--border)",
             }}
           >
-            <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
-              (QUSD balance − <span className="mono">SWAP_ABOVE_AMOUNT</span>) ÷{" "}
-              <span className="mono">SWAP_QUSD_USDC_RATE</span> = USDC
-            </p>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <img src={USDC_ICON} alt="" width={28} height={28} />
               <div>
