@@ -2,14 +2,14 @@
 
 This document describes what the **current** Solve Quest app does, how it is structured, where configuration lives, and how database / Solana / deploy pieces fit together.
 
-**Scope:** This repository implements **trading UI, QUSD ledger, Solana buy/sell QUSD, and auth**. Older docs or chat exports may describe unrelated legacy products; ignore those when reading this codebase.
+**Scope:** This repository implements **trading UI, QUSD ledger, Solana buy QUSD + QUSD→USDC swap, and auth**. Older docs or chat exports may describe unrelated legacy products; ignore those when reading this codebase.
 
 ---
 
 ## What the app is
 
 - **Solve Quest** is a **single deployment**: a **Vite + React 19** SPA (`src/`) and an **Express** server (`server/index.ts`) that serves **`/api/*`**, proxies **Solana JSON-RPC** at **`/solana-rpc`**, and in production serves the **built static site** from **`dist/`** with SPA fallback.
-- **Product surface**: landing, email OTP auth, in-app **Quick start** (sidebar), **perpetual-style trading UI** (**Trade** screen; Hyperliquid-derived index marks), **QUSD** balances, **history** of closed perps, **buy QUSD** (Solana USDC → QUSD crediting via verified receive address + server scan), **sell QUSD** (QUSD → QUEST from treasury), **Prize** (config-driven pool copy), **Leaderboard** (public **`GET /api/leaderboard`** — top accounts by ledger QUSD, masked email), optional **Visitors** (admin), and account settings.
+- **Product surface**: landing, email OTP auth, in-app **Quick start** (sidebar), **perpetual-style trading UI** (**Trade** screen; Hyperliquid-derived index marks), **QUSD** balances, **history** of closed perps, **buy QUSD** (Solana USDC → QUSD crediting via verified receive address + server scan), **Swap** (QUSD → USDC from treasury; **`plugins/swapApiPlugin.ts`**), **Prize** (seasonal pool amount from env; public **`GET /api/prize/config`**), **Leaderboard** (public **`GET /api/leaderboard`** — top accounts by ledger QUSD, masked email), optional **Visitors** (admin), and account settings.
 - **Default route (SPA)**: after **`/api/auth/me`** resolves, a **signed-in** user is taken to **Trade** once per full page load; **not signed in** → **Home** (landing). Users can still open **Home** from the sidebar while logged in.
 - **Branding / public site**: production is commonly exposed at **`https://solvequest.io`** (DNS → your VPS; exact IP is **not fixed in code**—use DNS or your host’s dashboard).
 
@@ -53,7 +53,8 @@ Vite (dev/build) also reads project `.env` / `.env.local` per Vite rules for **`
 | Solana | `SOLANA_RPC_PROXY_TARGET` or `SOLANA_RPC_URL`, **`SOLANA_TREASURY_ADDRESS`** + **`SOLANA_TREASURY_KEY_B64`** (server; treasury pubkey also exposed read-only via **`GET /api/config/treasury`**). Optional **`VITE_*`** for RPC tuning in the browser (see `src/lib/solanaChainConfig.ts`). |
 | HD master (optional) | **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** (server-only) — only if you do **not** set **`SOLANA_TREASURY_KEY_B64`** and instead derive the treasury key via HD (`server/solanaHdDerive.ts`). |
 | Buy QUSD (worker) | `QUSD_MULTIPLIER` / `VITE_QUSD_MULTIPLIER`, optional **`SOLVEQUEST_DEPOSIT_SCAN`** + interval — background USDC→QUSD crediting from each account’s **`sol_receive_address`**. |
-| Sell QUSD (API) | `QUEST_MINT`, `QUEST_MULTIPLIER`; optional **`PRIZE_AMOUNT`** / **`CLAIM_QUEST_AMOUNT`** (marketing copy on the **Prize** screen). Requires JWT/auth configured like other `/api/*` routes. |
+| Prize (display) | **`PRIZE_AMOUNT`** — USDC pool number for landing and **Prize** screen; exposed publicly via **`GET /api/prize/config`** (`plugins/prizeConfigApiPlugin.ts`). |
+| Swap QUSD→USDC | **`SWAP_ABOVE_AMOUNT`**, **`SWAP_QUSD_USDC_RATE`** (QUSD per 1 USDC), **`SWAP_MAXIMUM_USDC_AMOUNT`**, optional **`SWAP_USDC_RECEIVE_ADDRESS`**; treasury **`SOLANA_TREASURY_*`** — see **`plugins/swapApiPlugin.ts`**. |
 | Admin / visitors | Optional **`ADMIN_EMAIL`** — if set and equal to the JWT user’s email (case-insensitive), **`is_admin`** is returned on **`GET /api/account/me`** and the SPA shows **Visitors**; **`GET /api/admin/visitors`** lists rows from the **`visitors`** table (IP, geo label, path, timestamp). Logging uses **`POST /api/visitors/log`** (JSON `{ "path": "/trade" }`, no auth). |
 | Server | `PORT` (production default often **3000** in code, but **systemd** may set e.g. **3001**—must match nginx) |
 
@@ -191,7 +192,8 @@ After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10
   - **First scan** (no row in **`deposit_scan_state`** or null watermark): the worker **paginates** signatures on the USDC ATA and credits inbound USDC **oldest → newest** (so a fresh DB or reset still picks up existing on-chain history).
   - **Stuck watermark**: if **`deposit_credits`** sum is ~0 but the user’s USDC ATA still holds USDC, the worker **clears** **`deposit_scan_state`** for that account and rescans (fixes the legacy case where a watermark advanced without credits).
   - **Parsing**: inbound USDC is detected from meta **pre/post token balances**, matching the wallet’s USDC **ATA** by **`accountIndex`** when possible, else by **`owner`** (see **`usdcNetChangeForWallet`** in **`server/solanaUsdcScan.ts`**).
-- **Sell QUSD**: **`plugins/qusdSellApiPlugin.ts`** exposes **`GET /api/qusd/sell/config`**, **`GET /api/qusd/sell/me`**, **`POST /api/qusd/sell`** — debits QUSD from the ledger and sends QUEST from treasury to the verified receive address (see **`server/qusdSellTransfer.ts`**). On first use, the server creates the treasury’s **QUEST associated token account** if missing (treasury pays rent in SOL); you must still **fund that ATA with QUEST** for payouts to succeed.
+- **Swap (QUSD → USDC)**: **`plugins/swapApiPlugin.ts`** exposes swap config, preflight, and **`POST /api/swap`** — debits QUSD from the ledger and sends **USDC** from the treasury to the user’s verified Solana receive address (see **`server/usdcSwapTransfer.ts`**). The treasury must hold **USDC** and **SOL** for fees; first send may create the user’s USDC ATA (treasury pays rent).
+- **Prize pool (marketing)**: **`plugins/prizeConfigApiPlugin.ts`** — public **`GET /api/prize/config`** returns **`prize_amount`** from **`PRIZE_AMOUNT`** for the Prize page and landing copy.
 - **Deposit addresses**: Users link their **own** Solana wallet via **`POST /api/account/verify-solana-address`** (on-chain check); the server stores **`sol_receive_address`** and does **not** generate or hold user deposit private keys.
 - **CLI provisioning**: **`npm run db:provision`** runs **`tsx scripts/provision-account.ts`** — inserts a dev test account with a random **`sol_receive_address`** (local keypair; dev only).
 
@@ -201,7 +203,7 @@ After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10
 
 - **Users**: email OTP via **Resend** + **JWT** cookie (`auth_token`).
 - **Account state**: client **`PUT /api/account/state`** with optimistic locking on **`sync_version`**.
-- **Public APIs** (no JWT): **`GET /api/qusd/sell/config`** (prize pool marketing numbers), **`GET /api/leaderboard`** (top QUSD totals; optional cookie highlights the current user’s row).
+- **Public APIs** (no JWT): **`GET /api/prize/config`** (prize pool display number), **`GET /api/leaderboard`** (top QUSD totals; optional cookie highlights the current user’s row), swap **`GET /api/swap/config`** (when configured).
 
 ---
 
@@ -250,4 +252,4 @@ npm run treasury:b64-to-wallet -- '<B64>'   # existing base64 secret → Base58 
 
 ## Reviewing archived “website replacement” exports
 
-Exports such as **`cursor_website_replacement_recommendati.md`** may discuss merging another frontend repo (**e.g. `/Users/private/insured`**) with Express and env layout. The **current** tree is already **React + Express** in one project. Use this file as the description of **today’s** layout. Ignore product assumptions in those exports that don’t match perps + QUSD + Solana buy/sell flows.
+Exports such as **`cursor_website_replacement_recommendati.md`** may discuss merging another frontend repo (**e.g. `/Users/private/insured`**) with Express and env layout. The **current** tree is already **React + Express** in one project. Use this file as the description of **today’s** layout. Ignore product assumptions in those exports that don’t match perps + QUSD + Solana buy QUSD and QUSD→USDC swap flows.

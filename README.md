@@ -1,6 +1,6 @@
 # Solve Quest
 
-Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), **email (OTP) auth**, **Leaderboard** (top QUSD balances), and Solana flows: **buy QUSD** (USDC to your verified address → server credits QUSD) and **sell QUSD** (QUSD → QUEST from treasury). With a valid sign-in session, the SPA opens on **Trade**; without a session, it opens on **Home** (landing).
+Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), **email (OTP) auth**, **Leaderboard** (top QUSD balances), and Solana flows: **buy QUSD** (USDC to your verified address → server credits QUSD), **swap** (QUSD → USDC from treasury to your verified address), and a **Prize** page (seasonal pool copy from **`PRIZE_AMOUNT`**). With a valid sign-in session, the SPA opens on **Trade**; without a session, it opens on **Home** (landing).
 
 **Stack:** React 19 + Vite · Express (`server/index.ts`) · SQLite (`better-sqlite3`) · Solana (web3.js, SPL).
 
@@ -35,7 +35,7 @@ Optional **`ADMIN_EMAIL`**: when it matches the signed-in user’s email (case-i
 
 ## Docs
 
-- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana (QUSD buy scan worker, sell API, treasury), droplet notes. Default production SSH (matches `scripts/deploy.sh`): **`ssh root@152.42.168.173`**.
+- **[docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)** — deployment, env, SQLite ledger, Solana (QUSD buy scan worker, QUSD→USDC swap API, prize config, treasury), droplet notes. Default production SSH (matches `scripts/deploy.sh`): **`ssh root@152.42.168.173`**.
 
 ## Repository
 

@@ -28,7 +28,7 @@
 | **SPA (Vite/React)** | Demo mode UI; registered user UI; **no** user private keys in the bundle. |
 | **API (Node)** | Email OTP, JWT/session cookie; account CRUD; optional QUSD buy scan worker (`server/qusdBuyScanWorker.ts`). |
 | **SQLite** | `accounts` (`sol_receive_address`, …), QUSD ledger, deposit idempotency, perp tables. |
-| **Secrets** | **`SOLANA_TREASURY_ADDRESS`** + **`SOLANA_TREASURY_KEY_B64`** for treasury signing (sell QUSD → QUEST). Optional **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** only if you derive treasury via HD instead of `SOLANA_TREASURY_KEY_B64`. User deposit keys are never held by the server. |
+| **Secrets** | **`SOLANA_TREASURY_ADDRESS`** + **`SOLANA_TREASURY_KEY_B64`** for treasury signing (QUSD → USDC swap sends). Optional **`SOLANA_CUSTODIAL_MASTER_KEY_B64`** only if you derive treasury via HD instead of `SOLANA_TREASURY_KEY_B64`. User deposit keys are never held by the server. |
 
 ---
 
