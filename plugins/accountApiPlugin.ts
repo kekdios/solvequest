@@ -25,6 +25,15 @@ import {
   insertPerpCloseSettlement,
   insertPerpMarginLock,
 } from "../server/qusdLedger";
+import {
+  accountSnapshotMatchesDb,
+  type PerpCloseEventIn,
+  type PerpOpenIn,
+  validateDuplicateCloseIds,
+  validateOpensAndClosesDisjoint,
+  validateOpenPositionsForPut,
+  validatePerpClosesAndBuildSettlements,
+} from "../server/accountStatePutTrust";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -728,16 +737,101 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
             return;
           }
           const now = Date.now();
+
+          const snap = database
+            .prepare(
+              `SELECT usdc_balance, coverage_limit_qusd, premium_accrued_usdc, covered_losses_qusd,
+                      coverage_used_qusd, accumulated_losses_qusd, COALESCE(bonus_repaid_usdc, 0) AS bonus_repaid_usdc
+               FROM accounts WHERE id = ?`,
+            )
+            .get(accountId) as {
+              usdc_balance: number;
+              coverage_limit_qusd: number;
+              premium_accrued_usdc: number;
+              covered_losses_qusd: number;
+              coverage_used_qusd: number;
+              accumulated_losses_qusd: number;
+              bonus_repaid_usdc: number;
+            } | undefined;
+
+          if (!snap) {
+            sendJson(res, 503, { error: "no_account" });
+            return;
+          }
+
+          if (!accountSnapshotMatchesDb(body, snap)) {
+            sendJson(res, 400, {
+              error: "account_snapshot_mismatch",
+              message:
+                "Account totals must match the server’s last saved copy. Refresh or open Account to sync, then try again.",
+            });
+            return;
+          }
+
+          const closes = body.perp_close_events ?? [];
+          const dup = validateDuplicateCloseIds(closes as PerpCloseEventIn[]);
+          if (!dup.ok) {
+            sendJson(res, dup.status, { error: dup.error, message: dup.message });
+            return;
+          }
+          const disj = validateOpensAndClosesDisjoint(
+            closes as PerpCloseEventIn[],
+            body.open_perp_positions as PerpOpenIn[],
+          );
+          if (!disj.ok) {
+            sendJson(res, disj.status, { error: disj.error, message: disj.message });
+            return;
+          }
+
+          const dbOpenRows = database
+            .prepare(
+              `SELECT position_id, symbol, side, entry_price, notional_usdc, leverage, margin_usdc, opened_at
+               FROM perp_open_positions WHERE account_id = ?`,
+            )
+            .all(accountId) as {
+              position_id: string;
+              symbol: string;
+              side: string;
+              entry_price: number;
+              notional_usdc: number;
+              leverage: number;
+              margin_usdc: number;
+              opened_at: number;
+            }[];
+
+          const prevOpenIds = new Set(dbOpenRows.map((r) => r.position_id));
+          const dbById = new Map(dbOpenRows.map((r) => [r.position_id, r]));
+
+          const openVal = validateOpenPositionsForPut(
+            prevOpenIds,
+            dbById,
+            body.open_perp_positions as PerpOpenIn[],
+          );
+          if (!openVal.ok) {
+            sendJson(res, openVal.status, { error: openVal.error, message: openVal.message });
+            return;
+          }
+
+          const closeVal = await validatePerpClosesAndBuildSettlements(
+            env,
+            dbOpenRows,
+            closes as PerpCloseEventIn[],
+          );
+          if (!closeVal.ok) {
+            sendJson(res, closeVal.status, { error: closeVal.error, message: closeVal.message });
+            return;
+          }
+
+          const settlementById = new Map(closeVal.settlements.map((s) => [s.positionId, s]));
+
           try {
             const run = database.transaction(() => {
-              const prevOpens = database
-                .prepare(`SELECT position_id FROM perp_open_positions WHERE account_id = ?`)
-                .all(accountId) as { position_id: string }[];
-              const prevOpenIds = new Set(prevOpens.map((r) => r.position_id));
-
-              for (const e of body.perp_close_events ?? []) {
-                const credit = e.marginUsdc + e.realizedPnlQusd;
-                insertPerpCloseSettlement(database, accountId, e.positionId, credit, now);
+              for (const e of closes) {
+                const s = settlementById.get(e.positionId);
+                if (!s) {
+                  throw new Error("missing_settlement");
+                }
+                insertPerpCloseSettlement(database, accountId, e.positionId, s.creditQusd, now);
               }
 
               database.prepare(`DELETE FROM perp_open_positions WHERE account_id = ?`).run(accountId);
@@ -800,7 +894,11 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                   exit_price, realized_pnl_qusd, closed_at, inserted_at
                 ) VALUES (?, ?, 'close', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               );
-              for (const e of body.perp_close_events ?? []) {
+              for (const e of closes) {
+                const s = settlementById.get(e.positionId);
+                if (!s) {
+                  throw new Error("missing_settlement");
+                }
                 insClose.run(
                   accountId,
                   e.positionId,
@@ -812,7 +910,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
                   e.marginUsdc,
                   e.openedAt,
                   e.exitPrice,
-                  e.realizedPnlQusd,
+                  s.serverUpl,
                   e.closedAt,
                   now,
                 );

@@ -1,4 +1,5 @@
-import { COMMODITY_PERP_SYMBOLS, MAIN_PERP_SYMBOLS, type PerpSymbol } from "./perps";
+import type { PerpSymbol } from "./perps";
+import { fetchHyperliquidMidsCore } from "./hyperliquidMidsCore";
 
 const DEFAULT_HL_INFO_URL = "https://api.hyperliquid.xyz/info";
 
@@ -12,22 +13,9 @@ export function getHyperliquidInfoUrl(): string {
   return getHlInfoUrl();
 }
 
-function hlAuthHeaders(): Record<string, string> {
+function hlApiKey(): string | undefined {
   const key = (import.meta.env.HYPERLIQUID_API_KEY as string | undefined)?.trim();
-  if (!key) return {};
-  return { Authorization: `Bearer ${key}` };
-}
-
-function postInfo(body: object, signal?: AbortSignal): Promise<Response> {
-  return fetch(getHlInfoUrl(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...hlAuthHeaders(),
-    },
-    body: JSON.stringify(body),
-    signal,
-  });
+  return key || undefined;
 }
 
 /**
@@ -35,78 +23,6 @@ function postInfo(body: object, signal?: AbortSignal): Promise<Response> {
  * 5s ≈ 12 req/min → well under typical REST caps.
  */
 export const HL_POLL_INTERVAL_MS = 5000;
-
-/** Main dex: `allMids` keys. */
-const HL_MAIN_COIN: Record<(typeof MAIN_PERP_SYMBOLS)[number], string> = {
-  "BTC-PERP": "BTC",
-  "ETH-PERP": "ETH",
-  "SOL-PERP": "SOL",
-};
-
-/** HIP-3 dex `xyz`: commodity perp asset names in meta. */
-const HL_XYZ_COMMODITY: Record<(typeof COMMODITY_PERP_SYMBOLS)[number], string> = {
-  "GOLD-PERP": "xyz:GOLD",
-  "SILVER-PERP": "xyz:SILVER",
-  "OIL-PERP": "xyz:CL",
-};
-
-/** HL JSON sometimes uses strings; be tolerant of numbers too. */
-function parseHlNumber(raw: unknown): number | null {
-  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return raw;
-  if (typeof raw === "string") {
-    const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return null;
-}
-
-async function fetchMainDexMids(signal?: AbortSignal): Promise<Record<(typeof MAIN_PERP_SYMBOLS)[number], number> | null> {
-  const res = await postInfo({ type: "allMids" }, signal);
-  if (!res.ok) return null;
-
-  const data: unknown = await res.json();
-  if (!data || typeof data !== "object") return null;
-  const mids = data as Record<string, unknown>;
-
-  const out: Partial<Record<(typeof MAIN_PERP_SYMBOLS)[number], number>> = {};
-  for (const sym of MAIN_PERP_SYMBOLS) {
-    const n = parseHlNumber(mids[HL_MAIN_COIN[sym]]);
-    if (n === null) return null;
-    out[sym] = n;
-  }
-  return out as Record<(typeof MAIN_PERP_SYMBOLS)[number], number>;
-}
-
-/**
- * Gold / silver / oil marks from HIP-3 dex `xyz` (`metaAndAssetCtxs` markPx).
- */
-async function fetchXyzCommodityMarks(signal?: AbortSignal): Promise<Record<
-  (typeof COMMODITY_PERP_SYMBOLS)[number],
-  number
-> | null> {
-  const res = await postInfo({ type: "metaAndAssetCtxs", dex: "xyz" }, signal);
-  if (!res.ok) return null;
-
-  const data: unknown = await res.json();
-  if (!Array.isArray(data) || data.length < 2) return null;
-  const meta = data[0] as { universe?: { name: string }[] };
-  const ctxs = data[1] as { markPx?: string }[];
-  if (!meta?.universe || !Array.isArray(ctxs)) return null;
-
-  const names = meta.universe.map((u) => u.name);
-  const out: Partial<Record<(typeof COMMODITY_PERP_SYMBOLS)[number], number>> = {};
-
-  for (const sym of COMMODITY_PERP_SYMBOLS) {
-    const hlName = HL_XYZ_COMMODITY[sym];
-    const idx = names.indexOf(hlName);
-    if (idx < 0 || idx >= ctxs.length) return null;
-    const n = parseHlNumber(ctxs[idx]?.markPx);
-    if (n === null) return null;
-    out[sym] = n;
-  }
-
-  return out as Record<(typeof COMMODITY_PERP_SYMBOLS)[number], number>;
-}
 
 export type HyperliquidMidsResult = {
   /** Full index set from Hyperliquid only; `null` if either API leg failed or the network errored. */
@@ -120,24 +36,10 @@ export type HyperliquidMidsResult = {
  * Returns `marks: null` when either leg is missing — callers must not substitute placeholder prices.
  */
 export async function fetchHyperliquidMids(signal?: AbortSignal): Promise<HyperliquidMidsResult> {
-  let main: Awaited<ReturnType<typeof fetchMainDexMids>> = null;
-  let xyz: Awaited<ReturnType<typeof fetchXyzCommodityMarks>> = null;
-  try {
-    [main, xyz] = await Promise.all([fetchMainDexMids(signal), fetchXyzCommodityMarks(signal)]);
-  } catch {
-    // Network / CORS / abort — no synthetic marks.
-  }
-
-  if (signal?.aborted) {
-    throw new DOMException("Aborted", "AbortError");
-  }
-
-  if (main === null || xyz === null) {
-    return { marks: null, allLive: false };
-  }
-
-  return {
-    marks: { ...main, ...xyz } as Record<PerpSymbol, number>,
-    allLive: true,
-  };
+  const r = await fetchHyperliquidMidsCore({
+    infoUrl: getHlInfoUrl(),
+    apiKey: hlApiKey(),
+    signal,
+  });
+  return { marks: r.marks, allLive: r.allLive };
 }
