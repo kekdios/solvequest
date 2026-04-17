@@ -143,6 +143,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
               .
             </span>
           </p>
+          <p className="lp-hero-swap-line">Swap QUSD trading profits for USDC *</p>
           <p className="lp-hero-nodeposit">No deposit required to start.</p>
 
           <div className="lp-hero-aside">

@@ -93,6 +93,15 @@
   color: var(--text);
 }
 
+.lp-hero-swap-line {
+  margin: clamp(8px, 1.5vw, 14px) auto 0;
+  max-width: 44ch;
+  font-size: clamp(0.92rem, 2.1vw, 1.02rem);
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .lp-hero-nodeposit {
   margin: clamp(10px, 2vw, 16px) auto 0;
   max-width: 36ch;
