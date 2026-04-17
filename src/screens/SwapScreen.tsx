@@ -141,7 +141,7 @@ export default function SwapScreen({
         return;
       }
       setOkMsg(
-        `Sent ${j.usdc_sent != null ? j.usdc_sent.toFixed(6) : ""} USDC. Debited ${j.qusd_debited != null ? j.qusd_debited.toFixed(2) : ""} QUSD. Tx: ${j.signature?.slice(0, 12)}…`,
+        `Sent ${j.usdc_sent != null ? j.usdc_sent.toFixed(6) : ""} USDC. Deducted ${j.qusd_debited != null ? j.qusd_debited.toFixed(2) : ""} QUSD. Tx: ${j.signature?.slice(0, 12)}…`,
       );
       setDraft("");
       await onRefreshAccount?.();
@@ -280,7 +280,7 @@ export default function SwapScreen({
               {usdcOut.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })} USDC
             </p>
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)" }}>
-              QUSD debited after caps:{" "}
+              QUSD deducted after caps:{" "}
               <strong className="mono">{qusdDebit.toLocaleString(undefined, { maximumFractionDigits: 8 })}</strong>
               {qusdDebit < qIn - 1e-9 ? (
                 <span> (capped by treasury balance or max USDC)</span>
@@ -329,10 +329,10 @@ export default function SwapScreen({
           </li>
           <li>
             USDC out = QUSD ÷ exchange rate (QUSD per 1 USDC), rounded to 2 decimals, then capped by the max USDC per
-            transaction and by treasury USDC on hand (if capped, QUSD debited matches the USDC actually sent).
+            transaction and by treasury USDC on hand (if capped, QUSD deducted matches the USDC actually sent).
           </li>
           <li>Swaps only run when the treasury holds USDC and enough SOL for fees (≥ 0.001 SOL).</li>
-          <li>On success, QUSD is debited first; if the USDC transfer fails, your QUSD is refunded automatically.</li>
+          <li>On success, QUSD is deducted first; if the USDC transfer fails, your QUSD is refunded automatically.</li>
         </ul>
       </div>
     </div>
