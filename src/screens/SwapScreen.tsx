@@ -160,37 +160,15 @@ export default function SwapScreen({
         Account). Rate and limits come from the server.
       </p>
 
-      <div style={{ ...card, marginTop: 0 }}>
-        <p style={{ margin: "0 0 10px", fontWeight: 650, fontSize: "0.95rem" }}>Swap rules (summary)</p>
-        <ul
-          style={{
-            margin: 0,
-            paddingLeft: 18,
-            color: "var(--muted)",
-            fontSize: 13,
-            lineHeight: 1.55,
-            maxWidth: 520,
-          }}
-        >
-          <li>You need a verified Solana address on Account — USDC is sent there.</li>
-          <li>
-            Each swap amount must be <strong>greater than</strong> the minimum QUSD (see the rate card and field
-            placeholder below).
-          </li>
-          <li>
-            USDC out = QUSD × rate, then capped by the max USDC per transaction and by treasury USDC on hand (if capped,
-            QUSD debited matches the lower USDC amount).
-          </li>
-          <li>Swaps only run when the treasury holds USDC and enough SOL for fees (≥ 0.001 SOL).</li>
-          <li>On success, QUSD is debited first; if the USDC transfer fails, your QUSD is refunded automatically.</li>
-        </ul>
-      </div>
-
       {cfg ? (
         <div style={card}>
           <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--muted)" }}>Reference rate</p>
           <p style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>
-            1 QUSD → {rate > 0 ? rate.toLocaleString(undefined, { maximumFractionDigits: 8 }) : "—"} USDC
+            1 USDC = {rate > 0 ? rate.toLocaleString(undefined, { maximumFractionDigits: 8 }) : "—"} QUSD
+          </p>
+          <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)" }}>
+            USDC received = your QUSD ÷ this rate, rounded to 2 decimal places (before per-transaction and treasury
+            caps).
           </p>
           <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--muted)" }}>
             Minimum swap: greater than {minAbove.toLocaleString()} QUSD · Max USDC per transaction:{" "}
@@ -250,7 +228,7 @@ export default function SwapScreen({
               <span style={{ fontWeight: 600 }}>You receive (estimate)</span>
             </div>
             <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }} className="mono">
-              {usdcOut.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC
+              {usdcOut.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })} USDC
             </p>
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)" }}>
               QUSD debited after caps:{" "}
@@ -281,6 +259,32 @@ export default function SwapScreen({
             {okMsg}
           </p>
         ) : null}
+      </div>
+
+      <div style={card}>
+        <p style={{ margin: "0 0 10px", fontWeight: 650, fontSize: "0.95rem" }}>Swap rules (summary)</p>
+        <ul
+          style={{
+            margin: 0,
+            paddingLeft: 18,
+            color: "var(--muted)",
+            fontSize: 13,
+            lineHeight: 1.55,
+            maxWidth: 520,
+          }}
+        >
+          <li>You need a verified Solana address on Account — USDC is sent there.</li>
+          <li>
+            Each swap amount must be <strong>greater than</strong> the minimum QUSD (see the rate card and swap field
+            above).
+          </li>
+          <li>
+            USDC out = QUSD ÷ reference rate (QUSD per 1 USDC), rounded to 2 decimals, then capped by the max USDC per
+            transaction and by treasury USDC on hand (if capped, QUSD debited matches the USDC actually sent).
+          </li>
+          <li>Swaps only run when the treasury holds USDC and enough SOL for fees (≥ 0.001 SOL).</li>
+          <li>On success, QUSD is debited first; if the USDC transfer fails, your QUSD is refunded automatically.</li>
+        </ul>
       </div>
     </div>
   );

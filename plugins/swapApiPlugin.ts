@@ -129,6 +129,7 @@ export function createSwapApiMiddleware(env: Record<string, string>, root: strin
 
   const treasuryEnv = envForTreasury(env);
   const swapAbove = parseEnvNumber(env.SWAP_ABOVE_AMOUNT, 0);
+  /** QUSD per 1 USDC; USDC out = QUSD ÷ rate (see `computeSwapAmounts`). */
   const swapRate = parseEnvNumber(env.SWAP_QUSD_USDC_RATE, 0);
   const swapMaxUsdc = parseEnvNumber(env.SWAP_MAXIMUM_USDC_AMOUNT, 0);
   const buyDepositAddr = (env.SWAP_USDC_RECEIVE_ADDRESS ?? "").trim();
