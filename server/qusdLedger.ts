@@ -135,3 +135,19 @@ export function insertQusdSwapRefund(
     .run(accountId, at, qusdAmount, swapId);
 }
 
+/** One lifetime daily-prize credit per account (idempotent via ref_id `lifetime`). */
+export function insertDailyPrizeLedgerCredit(
+  database: SqliteDb,
+  accountId: string,
+  qusdAmount: number,
+  at: number,
+): void {
+  if (qusdAmount <= 0) return;
+  database
+    .prepare(
+      `INSERT OR IGNORE INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
+       VALUES (?, ?, 'daily_prize', ?, 0, 'daily_prize', 'lifetime')`,
+    )
+    .run(accountId, at, qusdAmount);
+}
+

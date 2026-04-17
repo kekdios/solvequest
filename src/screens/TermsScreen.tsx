@@ -47,6 +47,13 @@ export default function TermsScreen() {
         otherwise. Promotional awards, prize pools, and eligibility rules are described in the app and may change.
         We may suspend or adjust promotions to prevent abuse or comply with law.
       </p>
+      <p>
+        <strong>Daily QUSD prize.</strong> Where enabled, the Service may automatically credit a configured QUSD amount
+        (see the Prize and Leaderboard screens) to one eligible account per day based on leaderboard standings, subject
+        to a limit of one such prize per account over the lifetime of the account. Awards run on a schedule (for example
+        4:00 PM US Eastern Time) when the server is operating; we do not guarantee uninterrupted or error-free execution.
+        Displayed winner names use the public leaderboard handle assigned in the app.
+      </p>
 
       <h2>6. QUSD and USDC swaps</h2>
       <p>

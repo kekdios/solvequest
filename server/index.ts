@@ -18,6 +18,7 @@ import { createLandingStatsApiMiddleware } from "../plugins/landingStatsApiPlugi
 import { createSwapApiMiddleware } from "../plugins/swapApiPlugin";
 import { getDepositScanHealth } from "./depositScanHealth";
 import { startQusdBuyScanWorker } from "./qusdBuyScanWorker";
+import { startDailyPrizeScheduler } from "./dailyPrizeScheduler";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -78,7 +79,7 @@ app.get("/api/config/treasury", (_req, res) => {
 
 app.use(createUserAuthMiddleware(env, mode));
 app.use(createAccountApiMiddleware(env, root));
-app.use(createPrizeConfigApiMiddleware(env));
+app.use(createPrizeConfigApiMiddleware(env, root));
 app.use(createVisitorsApiMiddleware(env, root));
 app.use(createAdminSwapDashboardApiMiddleware(env, root));
 app.use(createLeaderboardApiMiddleware(env, root));
@@ -137,4 +138,5 @@ app.listen(port, () => {
     );
   }
   startQusdBuyScanWorker(root, process.env);
+  startDailyPrizeScheduler(root, process.env);
 });

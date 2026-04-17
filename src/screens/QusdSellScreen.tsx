@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { uiFieldLabel } from "../ui/appSurface";
 import { QusdIcon } from "../Qusd";
 import { isDemoMode, useAuthMode } from "../auth/sessionAuth";
+import PrizeAwardRoll, { type PrizeAwardApiRow } from "../components/PrizeAwardRoll";
 
 const PRIZE_CONTACT_EMAIL = "privacyemail369@gmail.com";
 
@@ -34,15 +35,25 @@ export default function QusdSellScreen({
   const demo = isDemoMode(authMode);
 
   const [config, setConfig] = useState<PrizeConfig | null>(null);
+  const [awardRows, setAwardRows] = useState<PrizeAwardApiRow[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/prize/config", { credentials: "same-origin" })
-      .then((r) => r.json())
-      .then((j) => {
+    void Promise.all([
+      fetch("/api/prize/config", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/prize/awards?limit=12", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([cfg, aw]) => {
         if (cancelled) return;
-        setConfig(j as PrizeConfig);
+        if (cfg && typeof cfg === "object" && "prize_amount" in cfg) {
+          setConfig(cfg as PrizeConfig);
+        }
+        const rows =
+          aw && typeof aw === "object" && Array.isArray((aw as { rows?: unknown }).rows)
+            ? ((aw as { rows: PrizeAwardApiRow[] }).rows ?? [])
+            : [];
+        setAwardRows(rows);
       })
       .catch(() => {
         if (cancelled) return;
@@ -92,6 +103,19 @@ export default function QusdSellScreen({
         <strong>Each account may win the daily prize at most once.</strong> That&apos;s separate from{" "}
         <strong>trading profits</strong>: when you close trades in the green, your balance grows in QUSD too.
       </p>
+
+      <p style={{ marginTop: 14, lineHeight: 1.6, maxWidth: 640, fontSize: 14, color: "var(--muted)" }}>
+        <strong style={{ color: "var(--text)" }}>How awards run:</strong> while the live server is up, an automatic job
+        fires every calendar day at <strong>4:00 PM US Eastern Time</strong>. It credits the configured{" "}
+        <strong>PRIZE_AMOUNT</strong> (from server environment) in QUSD to the <strong>top prize-eligible</strong> player
+        — the highest total QUSD on the leaderboard among accounts that have <strong>not</strong> already won. The
+        winner&apos;s public <strong>leaderboard name</strong> (cool username) is stored with each award.
+      </p>
+
+      <PrizeAwardRoll
+        rows={awardRows}
+        processNote="Trophy rows list the leaderboard name, QUSD amount, and when the server recorded the credit."
+      />
 
       <div
         style={{

@@ -1,4 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import PrizeAwardRoll, { type PrizeAwardApiRow } from "../components/PrizeAwardRoll";
+
 const QUSD_ICON = "/icon-qusd.png";
 
 type PrizeConfig = {
@@ -18,6 +20,7 @@ type LbRow = {
 export default function LeaderboardScreen() {
   const [config, setConfig] = useState<PrizeConfig | null>(null);
   const [rows, setRows] = useState<LbRow[]>([]);
+  const [awardRows, setAwardRows] = useState<PrizeAwardApiRow[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,14 +29,22 @@ export default function LeaderboardScreen() {
       fetch("/api/prize/config", { credentials: "same-origin" })
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
+      fetch("/api/prize/awards?limit=12", { credentials: "same-origin" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
       fetch("/api/leaderboard?limit=50", { credentials: "include" })
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
-    ]).then(([cfg, lb]) => {
+    ]).then(([cfg, aw, lb]) => {
       if (cancelled) return;
       if (cfg && typeof cfg === "object" && "prize_amount" in cfg) {
         setConfig(cfg as PrizeConfig);
       }
+      const awards =
+        aw && typeof aw === "object" && Array.isArray((aw as { rows?: unknown }).rows)
+          ? ((aw as { rows: PrizeAwardApiRow[] }).rows ?? [])
+          : [];
+      setAwardRows(awards);
       const list =
         lb && typeof lb === "object" && Array.isArray((lb as { rows?: unknown }).rows)
           ? ((lb as { rows: LbRow[] }).rows ?? [])
@@ -69,6 +80,12 @@ export default function LeaderboardScreen() {
         <strong>one daily prize win per account</strong> (lifetime). Rankings below are total QUSD (ledger). The{" "}
         <strong>Prize #</strong> column is your standing among traders still eligible for that prize. To convert trading
         profits to real <strong>USDC</strong>, use <strong>Swap</strong> after you verify your Solana address.
+      </p>
+
+      <p style={{ marginTop: 12, lineHeight: 1.55, maxWidth: 640, fontSize: 13, color: "var(--muted)" }}>
+        <strong style={{ color: "var(--text)" }}>Automatic award:</strong> at <strong>4:00 PM US Eastern</strong> each
+        day, the server credits <strong>PRIZE_AMOUNT</strong> QUSD to the top prize-eligible player (see{" "}
+        <strong>Prize</strong> for details). Recent winners are listed below.
       </p>
 
       <h2 style={s.h2}>Top players by QUSD</h2>
@@ -129,6 +146,11 @@ export default function LeaderboardScreen() {
           </table>
         </div>
       )}
+
+      <PrizeAwardRoll
+        rows={awardRows}
+        processNote="Each row shows the leaderboard name, amount, and server time when the daily job credited QUSD."
+      />
     </div>
   );
 }
