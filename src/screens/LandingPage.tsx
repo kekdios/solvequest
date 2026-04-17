@@ -69,8 +69,6 @@ type LandingStats = {
 
 export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivacy }: Props) {
   const [prizeAmount, setPrizeAmount] = useState<number | null | undefined>(undefined);
-  const [claimQuestAmount, setClaimQuestAmount] = useState<number | null | undefined>(undefined);
-  const [questMultiplier, setQuestMultiplier] = useState<number | null | undefined>(undefined);
   const [lbRows, setLbRows] = useState<LeaderboardPreviewRow[]>([]);
   const [lbLoading, setLbLoading] = useState(true);
   const [stats, setStats] = useState<LandingStats | null>(null);
@@ -78,28 +76,18 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      fetch("/api/qusd/sell/config", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/prize/config", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)),
       fetch("/api/leaderboard?limit=3", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)),
       fetch("/api/landing-stats", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([cfg, lb, st]) => {
         if (cancelled) return;
         if (cfg && typeof cfg === "object" && "prize_amount" in cfg) {
-          const c = cfg as {
-            prize_amount?: number;
-            claim_quest_amount?: number;
-            quest_multiplier?: number;
-          };
+          const c = cfg as { prize_amount?: number };
           const n = c.prize_amount;
           setPrizeAmount(typeof n === "number" && Number.isFinite(n) ? n : null);
-          const cq = c.claim_quest_amount;
-          setClaimQuestAmount(typeof cq === "number" && Number.isFinite(cq) ? cq : null);
-          const qm = c.quest_multiplier;
-          setQuestMultiplier(typeof qm === "number" && Number.isFinite(qm) ? qm : null);
         } else {
           setPrizeAmount(null);
-          setClaimQuestAmount(null);
-          setQuestMultiplier(null);
         }
         const rows =
           lb && typeof lb === "object" && Array.isArray((lb as { rows?: unknown }).rows)
@@ -120,8 +108,6 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
       .catch(() => {
         if (!cancelled) {
           setPrizeAmount(null);
-          setClaimQuestAmount(null);
-          setQuestMultiplier(null);
           setLbRows([]);
           setLbLoading(false);
         }
@@ -137,20 +123,6 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
       : prizeAmount === null
         ? "—"
         : prizeAmount.toLocaleString(undefined, { maximumFractionDigits: 2 });
-
-  const claimQuestStr =
-    claimQuestAmount === undefined
-      ? "…"
-      : claimQuestAmount === null
-        ? "—"
-        : claimQuestAmount.toLocaleString(undefined, { maximumFractionDigits: 6 });
-
-  const questMultStr =
-    questMultiplier === undefined
-      ? "…"
-      : questMultiplier === null
-        ? "—"
-        : questMultiplier.toLocaleString(undefined, { maximumFractionDigits: 0 });
 
   return (
     <div className="lp">
@@ -330,7 +302,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           How prizes &amp; USDC work
         </h2>
         <p className="lp-section-lead lp-section-lead--tight">
-          Short answers — full rules, QUEST purchase, and timing are on the{" "}
+          Short answers — full rules and timing are on the{" "}
           {onGoToPrize ? (
             <button type="button" className="lp-text-link" onClick={onGoToPrize}>
               Prize
@@ -353,11 +325,8 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           <details className="lp-faq-item">
             <summary>How does trading performance connect to the USDC pool?</summary>
             <p>
-              You compete using QUSD on the leaderboard. To bridge toward prize eligibility, the app uses{" "}
-              <strong>QUEST</strong> (on Solana): you spend QUSD to buy QUEST at the configured rate (currently{" "}
-              <strong>{questMultStr} QUSD per 1 QUEST</strong>). Holding at least{" "}
-              <strong>{claimQuestStr} QUEST</strong> is required to <em>claim</em> prize qualification as described on
-              the Prize screen — read that page for the authoritative rules.
+              You compete using QUSD on the leaderboard. How eligibility and winners relate to the seasonal USDC pool
+              is defined on the Prize page and may change between seasons — read that page for the current rules.
             </p>
           </details>
           <details className="lp-faq-item">
@@ -514,7 +483,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
               <strong>${usdPart} USDC</strong> prize pool
             </p>
             <p className="lp-prize-urgency-copy">
-              Rules, QUEST requirements, and timing are on the{" "}
+              Rules and timing are on the{" "}
               {onGoToPrize ? (
                 <button type="button" className="lp-text-link" onClick={onGoToPrize}>
                   Prize

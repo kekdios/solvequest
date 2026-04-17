@@ -1,5 +1,5 @@
 /**
- * Express server: /api/* (auth, account, QUSD sell), Solana RPC proxy, static SPA + fallback.
+ * Express server: /api/* (auth, account, prize config, swap), Solana RPC proxy, static SPA + fallback.
  */
 import "./loadEnv";
 import express from "express";
@@ -10,7 +10,7 @@ import { PublicKey } from "@solana/web3.js";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { createUserAuthMiddleware } from "../plugins/userAuthApiPlugin";
 import { createAccountApiMiddleware } from "../plugins/accountApiPlugin";
-import { createQusdSellApiMiddleware } from "../plugins/qusdSellApiPlugin";
+import { createPrizeConfigApiMiddleware } from "../plugins/prizeConfigApiPlugin";
 import { createVisitorsApiMiddleware } from "../plugins/visitorsApiPlugin";
 import { createLeaderboardApiMiddleware } from "../plugins/leaderboardApiPlugin";
 import { createLandingStatsApiMiddleware } from "../plugins/landingStatsApiPlugin";
@@ -70,7 +70,7 @@ app.get("/api/config/treasury", (_req, res) => {
 
 app.use(createUserAuthMiddleware(env, mode));
 app.use(createAccountApiMiddleware(env, root));
-app.use(createQusdSellApiMiddleware(env, root));
+app.use(createPrizeConfigApiMiddleware(env));
 app.use(createVisitorsApiMiddleware(env, root));
 app.use(createLeaderboardApiMiddleware(env, root));
 app.use(createLandingStatsApiMiddleware(env, root));

@@ -1,13 +1,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { QusdIcon } from "../Qusd";
-
 const USDC_ICON = "/prize-usdc.png";
-const QUEST_ICON = "/prize-quest.png";
 
-type SellConfig = {
+type PrizeConfig = {
   prize_amount: number;
-  claim_quest_amount: number;
-  quest_multiplier: number;
 };
 
 type LbRow = {
@@ -19,14 +14,14 @@ type LbRow = {
 };
 
 export default function LeaderboardScreen() {
-  const [config, setConfig] = useState<SellConfig | null>(null);
+  const [config, setConfig] = useState<PrizeConfig | null>(null);
   const [rows, setRows] = useState<LbRow[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      fetch("/api/qusd/sell/config", { credentials: "same-origin" })
+      fetch("/api/prize/config", { credentials: "same-origin" })
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
       fetch("/api/leaderboard?limit=50", { credentials: "include" })
@@ -35,7 +30,7 @@ export default function LeaderboardScreen() {
     ]).then(([cfg, lb]) => {
       if (cancelled) return;
       if (cfg && typeof cfg === "object" && "prize_amount" in cfg) {
-        setConfig(cfg as SellConfig);
+        setConfig(cfg as PrizeConfig);
       }
       const list =
         lb && typeof lb === "object" && Array.isArray((lb as { rows?: unknown }).rows)
@@ -50,8 +45,6 @@ export default function LeaderboardScreen() {
   }, []);
 
   const prizeAmount = config?.prize_amount ?? 0;
-  const claimAmt = config?.claim_quest_amount ?? 0;
-  const mult = config?.quest_multiplier ?? 1000;
 
   return (
     <div>
@@ -70,23 +63,8 @@ export default function LeaderboardScreen() {
       </div>
 
       <p style={{ marginTop: 18, lineHeight: 1.6, maxWidth: 640 }}>
-        To claim the prize you must have{" "}
-        <strong style={{ whiteSpace: "nowrap" }}>
-          <img
-            src={QUEST_ICON}
-            alt=""
-            width={18}
-            height={18}
-            style={{ verticalAlign: "-4px", marginRight: 4, objectFit: "contain" }}
-          />
-          {claimAmt.toLocaleString(undefined, { maximumFractionDigits: 6 })} QUEST
-        </strong>
-        . Spend{" "}
-        <span style={{ whiteSpace: "nowrap" }}>
-          <QusdIcon size={16} />
-          <strong> QUSD</strong>
-        </span>{" "}
-        to receive QUEST at <strong>{mult.toLocaleString()} QUSD per 1 QUEST</strong>.
+        Eligibility and prize rules are on the <strong>Prize</strong> page. You compete using QUSD on the leaderboard
+        below.
       </p>
 
       <h2 style={s.h2}>Top players by QUSD</h2>

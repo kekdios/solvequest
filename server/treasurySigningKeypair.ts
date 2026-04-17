@@ -1,5 +1,5 @@
 /**
- * Resolves the key that controls SOLANA_TREASURY_ADDRESS for signing (e.g. QUEST sends).
+ * Resolves the key that controls SOLANA_TREASURY_ADDRESS for signing (e.g. USDC swap sends).
  *
  * Precedence:
  * 1. **SOLANA_TREASURY_KEY_B64** — base64 of raw key bytes. Supported shapes after decode:
@@ -88,7 +88,7 @@ function keypairFromTreasurySecretB64(
   const want = treasuryPk.toBase58();
   const alt = uniq[0];
   const hint = alt
-    ? ` Export the keypair for ${want}, or change SOLANA_TREASURY_ADDRESS to ${alt} if that is the wallet that should hold QUEST and pay fees.`
+    ? ` Export the keypair for ${want}, or change SOLANA_TREASURY_ADDRESS to ${alt} if that is the wallet that should hold treasury tokens and pay fees.`
     : " Check that the value is base64 of a Solana JSON keypair (64 numbers) or 32-byte seed.";
   return {
     ok: false,

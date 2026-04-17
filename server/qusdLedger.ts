@@ -102,40 +102,6 @@ export function insertPerpCloseSettlement(
     .run(accountId, at, creditUnlocked, positionId);
 }
 
-/** Spend QUSD to buy QUEST (server sends QUEST on-chain). Idempotent per buy_id. */
-export function insertQuestPurchaseSpend(
-  database: SqliteDb,
-  accountId: string,
-  qusdAmount: number,
-  buyId: string,
-  at: number,
-): void {
-  if (qusdAmount <= 0) return;
-  database
-    .prepare(
-      `INSERT OR IGNORE INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
-       VALUES (?, ?, 'quest_purchase', ?, 0, 'quest_buy', ?)`,
-    )
-    .run(accountId, at, -qusdAmount, buyId);
-}
-
-/** Refund QUSD when QUEST transfer failed after a debit. */
-export function insertQuestPurchaseRefund(
-  database: SqliteDb,
-  accountId: string,
-  qusdAmount: number,
-  buyId: string,
-  at: number,
-): void {
-  if (qusdAmount <= 0) return;
-  database
-    .prepare(
-      `INSERT OR IGNORE INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
-       VALUES (?, ?, 'quest_purchase_refund', ?, 0, 'quest_buy_refund', ?)`,
-    )
-    .run(accountId, at, qusdAmount, buyId);
-}
-
 /** Spend QUSD for QUSD→USDC swap (server sends USDC from treasury). Idempotent per swap_id. */
 export function insertQusdSwapSpend(
   database: SqliteDb,

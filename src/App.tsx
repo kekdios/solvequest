@@ -234,7 +234,7 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   },
   sellQusd: {
     title: "Prize",
-    lead: "Prize pool, QUEST purchase with QUSD, and balances.",
+    lead: "Seasonal USDC prize pool and how to get in touch.",
   },
   leaderboard: {
     title: "Leaderboard",
@@ -733,7 +733,6 @@ function AppInner() {
               qusdUnlocked={state.qusd.unlocked}
               solReceiveVerified={ledgerAccountRow?.sol_receive_verified_at != null}
               serverDepositAddress={ledgerAccountRow?.sol_receive_address?.trim() || null}
-              onRefreshAccount={refreshAccountFromServer}
             />
           )}
 
