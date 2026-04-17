@@ -192,6 +192,33 @@ After **`systemctl start`**, wait ~2s or until **`journalctl -u solvequest -n 10
   - **First scan** (no row in **`deposit_scan_state`** or null watermark): the worker **paginates** signatures on the USDC ATA and credits inbound USDC **oldest → newest** (so a fresh DB or reset still picks up existing on-chain history).
   - **Stuck watermark**: if **`deposit_credits`** sum is ~0 but the user’s USDC ATA still holds USDC, the worker **clears** **`deposit_scan_state`** for that account and rescans (fixes the legacy case where a watermark advanced without credits).
   - **Parsing**: inbound USDC is detected from meta **pre/post token balances**, matching the wallet’s USDC **ATA** by **`accountIndex`** when possible, else by **`owner`** (see **`usdcNetChangeForWallet`** in **`server/solanaUsdcScan.ts`**).
+
+#### USDC deposit scan — Solana JSON-RPC calls (and 429 errors)
+
+The worker and **`runQusdBuyScanOnce`** use **`@solana/web3.js`** `Connection` against **`SOLANA_RPC_URL`** or **`SOLANA_RPC_PROXY_TARGET`** (else public mainnet). Each **account** with a **`sol_receive_address`** runs **`processAccount`** (`server/qusdBuyScanWorker.ts`), which calls into **`scanNewUsdcDeposits`** (`server/solanaUsdcScan.ts`). Typical JSON-RPC methods involved:
+
+| Call (logical) | What it does in this flow |
+|----------------|---------------------------|
+| **`getTokenAccountBalance`** | Reads the user’s **canonical USDC ATA** balance (human USDC) to compare with **`deposit_credits`** and optionally **clear a stale watermark** when there is on-chain USDC but no credited deposits. |
+| **`getSignaturesForAddress`** | Lists transaction signatures that touched the **USDC ATA** (not the owner wallet). **Incremental scans** (watermark set): one request, up to **40** newest signatures. **First / full-history scans** (no watermark): **paginated** in batches of **40** (up to **1000** pages = up to **40k** signatures) until history is exhausted. |
+| **`getTransaction`** (used via **`getParsedTransaction`**) | For **each** signature the scanner needs to evaluate, fetches the **parsed** transaction (version 0) to read **pre/post token balances** and compute net USDC inbound to the user’s ATA (**`usdcNetChangeForWallet`**). |
+
+**Call pattern summary**
+
+- **Always**: at least **one** `getTokenAccountBalance` per account per pass.
+- **Then**: at least **one** `getSignaturesForAddress` on the USDC ATA (often more on a cold / full-history scan).
+- **Then**: **one `getParsedTransaction` per signature** processed in order (oldest→newest on first scan; only “new” sigs after the watermark on incremental runs). A wallet with a long ATA history can therefore trigger **hundreds or thousands** of `getParsedTransaction` calls in a single pass.
+
+**Why you see `429 Too Many Requests`**
+
+Public endpoints (e.g. **`api.mainnet-beta.solana.com`**) enforce **per-method and per-IP** limits. Bursts of **`getParsedTransaction`** (and sometimes repeated **`getSignaturesForAddress`**) often hit **“Too many requests for a specific RPC call”** — the deposit scan is RPC-heavy by design on large histories.
+
+**Operational mitigations (configuration / capacity, not code)**
+
+- Point the server at a **dedicated or paid** RPC (**`SOLANA_RPC_URL`** / **`SOLANA_RPC_PROXY_TARGET`**) with higher limits.
+- Avoid running **manual admin “deposit scan”** plus a tight **background interval** against the same low-quota endpoint simultaneously.
+- Expect **first-time** or **watermark-reset** scans to be the heaviest; incremental scans are lighter once a watermark is stored in **`deposit_scan_state`**.
+
 - **Swap (QUSD → USDC)**: **`plugins/swapApiPlugin.ts`** exposes swap config, preflight, and **`POST /api/swap`** — debits QUSD from the ledger and sends **USDC** from the treasury to the user’s verified Solana receive address (see **`server/usdcSwapTransfer.ts`**). The treasury must hold **USDC** and **SOL** for fees; first send may create the user’s USDC ATA (treasury pays rent).
 - **Prize pool (marketing)**: **`plugins/prizeConfigApiPlugin.ts`** — public **`GET /api/prize/config`** returns **`prize_amount`** from **`PRIZE_AMOUNT`** for the Prize page and landing copy.
 - **Deposit addresses**: Users link their **own** Solana wallet via **`POST /api/account/verify-solana-address`** (on-chain check); the server stores **`sol_receive_address`** and does **not** generate or hold user deposit private keys.

@@ -31,6 +31,12 @@ export function resolveDbPath(root: string, env: NodeJS.ProcessEnv): string {
   return env.SOLVEQUEST_DB_PATH?.trim() || path.join(root, "data", "solvequest.db");
 }
 
+/**
+ * JSON-RPC base URL for deposit scans (and this module’s `Connection`).
+ * Order: **`SOLANA_RPC_URL`** (dedicated / paid / alternate node — use as primary when set) →
+ * **`SOLANA_RPC_PROXY_TARGET`** (same as Express `/solana-rpc` upstream, if set) → public mainnet-beta.
+ * There is no automatic retry switching between URLs; set **`SOLANA_RPC_URL`** to avoid public-RPC 429s.
+ */
 export function rpcUrl(env: NodeJS.ProcessEnv): string {
   return (
     env.SOLANA_RPC_URL?.trim() ||
