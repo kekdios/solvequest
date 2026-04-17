@@ -15,6 +15,7 @@
     "db:init": "node scripts/init-db.mjs",
     "db:migrate": "node scripts/migrate-all.mjs",
     "db:provision": "tsx scripts/provision-account.ts",
+    "prize:record-winner": "tsx scripts/record-daily-prize-winner.ts",
     "treasury:gen": "tsx scripts/generate-treasury-keypair.ts",
     "treasury:b64-to-wallet": "tsx scripts/treasury-b64-to-wallet.ts"
   },

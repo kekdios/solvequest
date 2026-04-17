@@ -15,6 +15,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
+import { assignCoolUsernameIfMissing } from "../server/coolUsername";
 import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
 import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
 import {
@@ -249,7 +250,7 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
       }
       try {
         const email = payload.email.toLowerCase();
-        const row = loadOrCreateRow(email);
+        let row = loadOrCreateRow(email);
         if (!row) {
           if (!fs.existsSync(dbPath)) {
             sendJson(res, 503, {
@@ -266,6 +267,12 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         }
         const database = getDb();
         const accountId = String(row.id);
+        if (database) {
+          const u = assignCoolUsernameIfMissing(database, accountId);
+          if (u) {
+            row = { ...row, username: u };
+          }
+        }
         let openPerp: ReturnType<typeof loadOpenPositions> = [];
         try {
           openPerp =

@@ -2,6 +2,7 @@
  * Idempotent SQLite fixes for `accounts` (older DBs). Called when opening the DB in API / deposit worker.
  */
 import type Database from "better-sqlite3";
+import { ensureDailyPrizeWinnersSchema } from "./ensureDailyPrizeWinnersSchema";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -43,4 +44,17 @@ export function ensureAccountsSchema(database: SqliteDb): void {
   } catch {
     /* older DBs without optional columns */
   }
+
+  const hasUsername = cols.some((c) => c.name === "username");
+  if (!hasUsername) {
+    database.exec(`ALTER TABLE accounts ADD COLUMN username TEXT;`);
+    console.log("[sqlite] Added column accounts.username (cool leaderboard handle)");
+  }
+  database.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_username_unique
+      ON accounts (username)
+      WHERE username IS NOT NULL AND TRIM(username) != '';
+  `);
+
+  ensureDailyPrizeWinnersSchema(database);
 }

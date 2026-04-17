@@ -5,6 +5,13 @@ import type Database from "better-sqlite3";
 
 type SqliteDb = InstanceType<typeof Database>;
 
+/** Prefer cool username; fall back to masked email for legacy rows. */
+export function leaderboardLabel(username: string | null | undefined, email: string): string {
+  const u = username?.trim();
+  if (u) return u;
+  return maskEmail(email);
+}
+
 export function maskEmail(email: string): string {
   const e = email.trim().toLowerCase();
   const at = e.indexOf("@");
@@ -23,6 +30,10 @@ export type LeaderboardRow = {
   label: string;
   qusd: number;
   is_you: boolean;
+  /** False after this account has received the daily QUSD prize (one win per account, lifetime). */
+  prize_eligible: boolean;
+  /** Position among prize-eligible traders only; null if already won. */
+  prize_rank: number | null;
 };
 
 export function queryLeaderboard(database: SqliteDb, opts: { limit: number; yourAccountId: string | null }): LeaderboardRow[] {
@@ -35,22 +46,37 @@ export function queryLeaderboard(database: SqliteDb, opts: { limit: number; your
          FROM qusd_ledger
          GROUP BY account_id
        )
-       SELECT a.id AS account_id, a.email AS email, bal.qusd AS qusd
+       SELECT a.id AS account_id, a.email AS email, a.username AS username, bal.qusd AS qusd,
+              (w.account_id IS NOT NULL) AS has_won_daily_prize
        FROM bal
        INNER JOIN accounts a ON a.id = bal.account_id
+       LEFT JOIN daily_prize_winners w ON w.account_id = bal.account_id
        WHERE a.email IS NOT NULL AND TRIM(a.email) != ''
          AND bal.qusd > 1e-9
        ORDER BY bal.qusd DESC, a.id ASC
        LIMIT ?`,
     )
-    .all(limit) as { account_id: string; email: string; qusd: number }[];
+    .all(limit) as {
+      account_id: string;
+      email: string;
+      username: string | null;
+      qusd: number;
+      has_won_daily_prize: number;
+    }[];
 
   const your = opts.yourAccountId;
-  return rows.map((r, i) => ({
-    rank: i + 1,
-    account_id: r.account_id,
-    label: maskEmail(r.email),
-    qusd: Number(r.qusd) || 0,
-    is_you: your != null && r.account_id === your,
-  }));
+  let prizeCounter = 0;
+  return rows.map((r, i) => {
+    const prize_eligible = !r.has_won_daily_prize;
+    if (prize_eligible) prizeCounter += 1;
+    return {
+      rank: i + 1,
+      account_id: r.account_id,
+      label: leaderboardLabel(r.username, r.email),
+      qusd: Number(r.qusd) || 0,
+      is_you: your != null && r.account_id === your,
+      prize_eligible,
+      prize_rank: prize_eligible ? prizeCounter : null,
+    };
+  });
 }

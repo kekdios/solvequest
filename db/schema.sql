@@ -23,11 +23,17 @@ CREATE TABLE IF NOT EXISTS accounts (
   /* Legacy — unused for new accounts; user deposit addresses are user-verified only. */
   custodial_seckey_enc TEXT,
   custodial_derivation_index INTEGER,
-  sync_version INTEGER NOT NULL DEFAULT 0
+  sync_version INTEGER NOT NULL DEFAULT 0,
+  /** Public leaderboard handle: adjective-animal-color-number; set when email is verified. */
+  username TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_accounts_updated ON accounts (updated_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_email ON accounts (email) WHERE email IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_username_unique
+  ON accounts (username)
+  WHERE username IS NOT NULL AND TRIM(username) != '';
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_sol_receive_unique
   ON accounts (sol_receive_address)
@@ -122,3 +128,11 @@ CREATE TABLE IF NOT EXISTS visitors (
 );
 
 CREATE INDEX IF NOT EXISTS idx_visitors_created ON visitors (created_at DESC);
+
+/** Accounts that have already received the daily QUSD prize — at most one win per account (lifetime). */
+CREATE TABLE IF NOT EXISTS daily_prize_winners (
+  account_id TEXT PRIMARY KEY REFERENCES accounts (id) ON DELETE CASCADE,
+  won_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_prize_winners_won_at ON daily_prize_winners (won_at DESC);

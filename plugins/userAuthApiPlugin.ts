@@ -16,6 +16,7 @@ import { z } from "zod";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
 import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
 import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
+import { assignCoolUsernameIfMissing } from "../server/coolUsername";
 import { insertEmailOtpVerificationBonus } from "../server/qusdLedger";
 
 const USER_COOKIE = "auth_token";
@@ -273,6 +274,7 @@ export function createUserAuthMiddleware(env: Record<string, string>, mode: stri
               ensureVisitorsSchema(database);
               const { accountId } = ensureAccountRowForEmail(database, email);
               insertEmailOtpVerificationBonus(database, accountId, Date.now());
+              assignCoolUsernameIfMissing(database, accountId);
               database.close();
             }
           } catch (e) {

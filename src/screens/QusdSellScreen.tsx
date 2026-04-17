@@ -88,7 +88,8 @@ export default function QusdSellScreen({
 
       <p style={{ marginTop: 18, lineHeight: 1.6, maxWidth: 640 }}>
         <strong>Competition:</strong> you&apos;re racing for this <strong>QUSD</strong> amount on the leaderboard each
-        day (rules and eligibility below — they can change). That&apos;s separate from{" "}
+        day (rules and eligibility below — they can change).{" "}
+        <strong>Each account may win the daily prize at most once.</strong> That&apos;s separate from{" "}
         <strong>trading profits</strong>: when you close trades in the green, your balance grows in QUSD too.
       </p>
 
@@ -144,7 +145,7 @@ export default function QusdSellScreen({
         <label style={uiFieldLabel}>Leaderboard</label>
         <p style={{ margin: "6px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--muted)" }}>
           Daily prize competition uses total QUSD (ledger) — open <strong>Leaderboard</strong> in the sidebar for live
-          rankings.
+          rankings and your <strong>Prize #</strong> (eligible traders only; previous winners show “—”).
         </p>
       </div>
 

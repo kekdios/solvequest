@@ -240,7 +240,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           Top traders right now
         </h2>
         <p className="lp-section-lead lp-section-lead--tight">
-          Real QUSD balances from our server leaderboard (masked emails for privacy).
+          Real QUSD balances from our server leaderboard (cool usernames after email verification).
         </p>
         <div className="lp-table-scroll">
           <table className="lp-mini-table">
