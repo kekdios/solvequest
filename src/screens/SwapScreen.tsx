@@ -239,6 +239,16 @@ export default function SwapScreen({
 
   return (
     <div className="app-page">
+      <div style={card}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <QusdIcon size={22} />
+          <span style={{ fontSize: 14, color: "var(--muted)" }}>Your QUSD balance</span>
+        </div>
+        <p style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700 }} className="mono">
+          {qusdUnlocked.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+        </p>
+      </div>
+
       {!isDemo && (buyDepositOverride || (solReceiveVerified && displayAddr)) ? (
         <section style={dep.panel} aria-label="Swap USDC to QUSD">
           <div style={dep.header}>
@@ -285,16 +295,6 @@ export default function SwapScreen({
           </p>
         </section>
       ) : null}
-
-      <div style={card}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <QusdIcon size={22} />
-          <span style={{ fontSize: 14, color: "var(--muted)" }}>Your QUSD balance</span>
-        </div>
-        <p style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700 }} className="mono">
-          {qusdUnlocked.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-        </p>
-      </div>
 
       {!solReceiveVerified ? (
         <div style={card}>
