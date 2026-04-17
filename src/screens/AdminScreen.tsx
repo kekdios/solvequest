@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useSessionAuth } from "../auth/sessionAuth";
-import { uiBtnGhost, uiBtnPrimary } from "../ui/appSurface";
+import { uiBtnGhost, uiBtnPrimary, uiFieldLabel, uiInput } from "../ui/appSurface";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
@@ -102,6 +102,11 @@ export default function AdminScreen() {
   const [depositScanErr, setDepositScanErr] = useState<string | null>(null);
   const [depositScanOk, setDepositScanOk] = useState<string | null>(null);
   const [depositScanReports, setDepositScanReports] = useState<DepositScanAccountReport[] | null>(null);
+  const [creditSol, setCreditSol] = useState("");
+  const [creditAmt, setCreditAmt] = useState("");
+  const [creditBusy, setCreditBusy] = useState(false);
+  const [creditErr, setCreditErr] = useState<string | null>(null);
+  const [creditOk, setCreditOk] = useState<string | null>(null);
   const dataRef = useRef<DashboardPayload | null>(null);
   dataRef.current = data;
 
@@ -198,6 +203,60 @@ export default function AdminScreen() {
     }
   }, [authLoading, user, depositScanBusy, refreshUser, load]);
 
+  const submitCreditQusd = useCallback(async () => {
+    if (authLoading || !user || creditBusy) return;
+    const amt = Number.parseFloat(creditAmt.trim());
+    if (!creditSol.trim() || !Number.isFinite(amt) || amt <= 0) {
+      setCreditErr("Enter a valid Solana address and a positive QUSD amount.");
+      return;
+    }
+    setCreditBusy(true);
+    setCreditErr(null);
+    setCreditOk(null);
+    try {
+      let r = await fetch("/api/admin/credit-qusd", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ solana_address: creditSol.trim(), qusd_amount: amt }),
+      });
+      if (r.status === 401) {
+        await refreshUser();
+        r = await fetch("/api/admin/credit-qusd", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ solana_address: creditSol.trim(), qusd_amount: amt }),
+        });
+      }
+      const j = (await r.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+        qusd_credited?: number;
+        sol_receive_address?: string;
+      };
+      if (r.status === 403) {
+        setCreditErr("You do not have permission.");
+        return;
+      }
+      if (!r.ok) {
+        setCreditErr(j.message || j.error || `Request failed (${r.status}).`);
+        return;
+      }
+      setCreditOk(
+        `Credited ${j.qusd_credited?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? amt} QUSD to account with ${j.sol_receive_address?.slice(0, 8) ?? "…"}…`,
+      );
+      setCreditAmt("");
+      const cur = dataRef.current;
+      void load(cur?.swaps.page ?? 1, cur?.swap_errors.page ?? 1, cur?.usdc_deposits?.page ?? 1);
+    } catch {
+      setCreditErr("Network error.");
+    } finally {
+      setCreditBusy(false);
+    }
+  }, [authLoading, user, creditBusy, creditSol, creditAmt, refreshUser, load]);
+
   const envRows = data
     ? [
         ["SOLANA_TREASURY_ADDRESS", data.env.SOLANA_TREASURY_ADDRESS],
@@ -234,6 +293,69 @@ export default function AdminScreen() {
 
       {data ? (
         <>
+          <section style={s.section}>
+            <h2 className="app-section-title" style={s.sectionTitle}>
+              Credit QUSD by Solana address
+            </h2>
+            <p style={{ ...s.mutedP, marginBottom: 12 }}>
+              Adds unlocked QUSD to the account whose <strong>verified</strong> receive address matches the wallet you
+              enter (same value as on their Account page). This writes an <span className="mono">admin_grant</span>{" "}
+              ledger row.
+            </p>
+            <div style={s.creditBlock}>
+              <div>
+                <label htmlFor="admin-credit-sol" style={uiFieldLabel}>
+                  Solana receive address
+                </label>
+                <input
+                  id="admin-credit-sol"
+                  type="text"
+                  name="solanaAddress"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="Verified user wallet (base58)"
+                  value={creditSol}
+                  onChange={(e) => setCreditSol(e.target.value)}
+                  style={{ ...uiInput, width: "100%", boxSizing: "border-box", marginTop: 6 }}
+                />
+              </div>
+              <div style={s.creditAmtRow}>
+                <div style={{ flex: "1 1 160px", minWidth: 0 }}>
+                  <label htmlFor="admin-credit-amt" style={uiFieldLabel}>
+                    QUSD amount
+                  </label>
+                  <input
+                    id="admin-credit-amt"
+                    type="text"
+                    inputMode="decimal"
+                    name="qusdAmount"
+                    autoComplete="off"
+                    placeholder="e.g. 1000"
+                    value={creditAmt}
+                    onChange={(e) => setCreditAmt(e.target.value)}
+                    style={{ ...uiInput, width: "100%", boxSizing: "border-box", marginTop: 6 }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  style={{ ...uiBtnPrimary, opacity: creditBusy ? 0.75 : 1, alignSelf: "flex-end" }}
+                  disabled={creditBusy || loading}
+                  onClick={() => void submitCreditQusd()}
+                >
+                  {creditBusy ? "Applying…" : "Apply credit"}
+                </button>
+              </div>
+            </div>
+            {creditErr ? (
+              <p role="alert" style={{ color: "var(--danger)", marginTop: 10, fontSize: 13 }}>
+                {creditErr}
+              </p>
+            ) : null}
+            {creditOk ? (
+              <p style={{ color: "var(--ok)", marginTop: 10, fontSize: 13 }}>{creditOk}</p>
+            ) : null}
+          </section>
+
           <section style={s.section}>
             <h2 className="app-section-title" style={s.sectionTitle}>
               USDC deposit scanner
@@ -682,6 +804,18 @@ const s: Record<string, CSSProperties> = {
     color: "color-mix(in srgb, var(--ok) 70%, var(--muted))",
   },
   scanReportLi: { marginBottom: 4 },
+  creditBlock: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+    maxWidth: 640,
+  },
+  creditAmtRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 12,
+    alignItems: "flex-end",
+  },
   addrGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",

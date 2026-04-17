@@ -1,7 +1,9 @@
 /**
  * GET /api/admin/swap-dashboard — admin-only: swap env snapshot, treasury/receive balances, paginated USDC→QUSD deposits, swaps & refund errors.
  * POST /api/admin/run-deposit-scan — admin-only: one full USDC→QUSD deposit scan (same logic as background worker).
+ * POST /api/admin/credit-qusd — admin-only: credit QUSD to the account with this verified Solana receive address.
  */
+import crypto from "node:crypto";
 import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Connect } from "vite";
@@ -14,6 +16,7 @@ import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
 import { getUsdcAtaBalanceUi } from "../server/solanaUsdcScan";
 import { recordDepositScanTickComplete } from "../server/depositScanHealth";
 import { runQusdBuyScanOnce } from "../server/qusdBuyScanWorker";
+import { insertAdminQusdGrant } from "../server/qusdLedger";
 import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
 
 type SqliteDb = InstanceType<typeof Database>;
@@ -39,6 +42,15 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
   res.end(JSON.stringify(body));
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
 }
 
 function isAdminEmail(email: string, env: Record<string, string>): boolean {
@@ -184,6 +196,94 @@ export function createAdminSwapDashboardApiMiddleware(
             error: e instanceof Error ? e.message : String(e),
           });
         }
+      })();
+      return;
+    }
+
+    if (url === "/api/admin/credit-qusd" && req.method === "POST") {
+      void (async () => {
+        if (!requireAdmin(req, res)) return;
+        const database = getDb();
+        if (!database) {
+          sendJson(res, 503, { error: "db_unavailable" });
+          return;
+        }
+        let raw: string;
+        try {
+          raw = await readBody(req);
+        } catch {
+          sendJson(res, 400, { error: "bad_body" });
+          return;
+        }
+        let body: { solana_address?: unknown; qusd_amount?: unknown };
+        try {
+          body = JSON.parse(raw || "{}") as typeof body;
+        } catch {
+          sendJson(res, 400, { error: "invalid_json" });
+          return;
+        }
+        const addrRaw = String(body.solana_address ?? "").trim();
+        const amt = Number(body.qusd_amount);
+        if (!addrRaw) {
+          sendJson(res, 400, { error: "missing_solana_address", message: "Enter a Solana address." });
+          return;
+        }
+        let ownerPk: PublicKey;
+        try {
+          ownerPk = new PublicKey(addrRaw);
+        } catch {
+          sendJson(res, 400, { error: "invalid_solana_address", message: "Not a valid Solana public key." });
+          return;
+        }
+        const normalized = ownerPk.toBase58();
+        if (!Number.isFinite(amt) || amt <= 0) {
+          sendJson(res, 400, { error: "invalid_amount", message: "Enter a positive QUSD amount." });
+          return;
+        }
+        if (amt > 1e12) {
+          sendJson(res, 400, { error: "amount_too_large", message: "Amount exceeds safety limit." });
+          return;
+        }
+        const row = database
+          .prepare(
+            `SELECT id AS account_id, email, username FROM accounts
+             WHERE sol_receive_address IS NOT NULL AND TRIM(sol_receive_address) = ?`,
+          )
+          .get(normalized) as { account_id: string; email: string | null; username: string | null } | undefined;
+        if (!row) {
+          sendJson(res, 404, {
+            error: "account_not_found",
+            message: "No account has this verified Solana receive address.",
+          });
+          return;
+        }
+        const now = Date.now();
+        const refId = `admin_${now}_${crypto.randomUUID()}`;
+        try {
+          database.transaction(() => {
+            insertAdminQusdGrant(database, row.account_id, amt, now, refId);
+            database
+              .prepare(`UPDATE accounts SET sync_version = sync_version + 1, updated_at = ? WHERE id = ?`)
+              .run(now, row.account_id);
+          })();
+        } catch (e) {
+          console.error("[admin] credit-qusd:", e);
+          sendJson(res, 500, {
+            error: "ledger_failed",
+            message: e instanceof Error ? e.message : String(e),
+          });
+          return;
+        }
+        console.log(
+          `[admin] credited ${amt} QUSD → account ${row.account_id.slice(0, 8)}… (${normalized.slice(0, 8)}…) ref ${refId.slice(0, 24)}…`,
+        );
+        sendJson(res, 200, {
+          ok: true,
+          account_id: row.account_id,
+          sol_receive_address: normalized,
+          qusd_credited: amt,
+          ref_id: refId,
+        });
       })();
       return;
     }

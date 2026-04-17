@@ -151,3 +151,20 @@ export function insertDailyPrizeLedgerCredit(
     .run(accountId, at, qusdAmount);
 }
 
+/** Manual admin credit; `refId` must be unique per grant (e.g. UUID). */
+export function insertAdminQusdGrant(
+  database: SqliteDb,
+  accountId: string,
+  qusdAmount: number,
+  at: number,
+  refId: string,
+): void {
+  if (!Number.isFinite(qusdAmount) || qusdAmount <= 0) return;
+  database
+    .prepare(
+      `INSERT INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
+       VALUES (?, ?, 'admin_grant', ?, 0, 'admin_grant', ?)`,
+    )
+    .run(accountId, at, qusdAmount, refId);
+}
+
