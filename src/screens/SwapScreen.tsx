@@ -94,6 +94,13 @@ export default function SwapScreen({
     return computeSwapAmounts(qIn, rate, maxU, treasuryU);
   }, [qIn, rate, maxU, treasuryU]);
 
+  /** Uncapped USDC if full balance above minimum were swappable: (balance − SWAP_ABOVE_AMOUNT) ÷ rate. */
+  const hypotheticalFullBalanceUsdc = useMemo(() => {
+    const b = qusdUnlocked - minAbove;
+    if (!(rate > 0) || !Number.isFinite(b) || b <= 0) return null;
+    return Math.round((b / rate) * 100) / 100;
+  }, [qusdUnlocked, minAbove, rate]);
+
   const canSubmit =
     !isDemo &&
     !busy &&
@@ -206,6 +213,57 @@ export default function SwapScreen({
         <label style={uiFieldLabel} htmlFor="swap-qusd-in">
           QUSD to swap
         </label>
+        {cfg && rate > 0 ? (
+          <div
+            style={{
+              marginTop: 10,
+              marginBottom: 14,
+              padding: 14,
+              borderRadius: 8,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+              (QUSD balance − <span className="mono">SWAP_ABOVE_AMOUNT</span>) ÷{" "}
+              <span className="mono">SWAP_QUSD_USDC_RATE</span> = USDC
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <img src={USDC_ICON} alt="" width={28} height={28} />
+              <div>
+                <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>If you could swap that full amount</p>
+                <p style={{ margin: "4px 0 0", fontSize: "1.2rem", fontWeight: 700 }} className="mono">
+                  {hypotheticalFullBalanceUsdc != null
+                    ? `${hypotheticalFullBalanceUsdc.toLocaleString(undefined, {
+                        maximumFractionDigits: 2,
+                        minimumFractionDigits: 2,
+                      })} USDC`
+                    : "—"}
+                </p>
+              </div>
+            </div>
+            <p
+              style={{
+                margin: "10px 0 0",
+                fontSize: 12,
+                color: "var(--muted)",
+                lineHeight: 1.5,
+              }}
+              className="mono"
+            >
+              (
+              {qusdUnlocked.toLocaleString(undefined, { maximumFractionDigits: 2 })} −{" "}
+              {minAbove.toLocaleString(undefined, { maximumFractionDigits: 8 })}) ÷{" "}
+              {rate.toLocaleString(undefined, { maximumFractionDigits: 8 })} ={" "}
+              {hypotheticalFullBalanceUsdc != null
+                ? `${hypotheticalFullBalanceUsdc.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 2,
+                  })} USDC`
+                : "—"}
+            </p>
+          </div>
+        ) : null}
         <input
           id="swap-qusd-in"
           type="text"
