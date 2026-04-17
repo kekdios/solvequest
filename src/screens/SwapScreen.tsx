@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type CSSProp
 import { uiBtnPrimary, uiInput } from "../ui/appSurface";
 import { QUSD_PER_USD } from "../engine/qusdVault";
 import { QusdIcon } from "../Qusd";
-import { computeSwapAmounts } from "../lib/swapAmounts";
+import { computeSwapAmounts, effectiveQusdForUsdcSwap } from "../lib/swapAmounts";
 import { friendlyQusdToUsdcSwapError } from "../lib/swapFriendlyMessages";
 
 const TestReceiveAddresses = lazy(() => import("../components/TestReceiveAddresses"));
@@ -423,10 +423,22 @@ export default function SwapScreen({
   const minAbove = cfg?.swap_above_amount ?? 0;
   const treasuryU = pf?.treasury_usdc ?? 0;
 
+  /** Gross QUSD designated for this swap (capped by balance). */
+  const grossQusd = useMemo(() => {
+    if (!Number.isFinite(qIn) || qIn <= 0) return 0;
+    return Math.min(qIn, qusdUnlocked);
+  }, [qIn, qusdUnlocked]);
+
+  /** Only QUSD above SWAP_ABOVE_AMOUNT converts; see `effectiveQusdForUsdcSwap`. */
+  const effectiveQusd = useMemo(
+    () => effectiveQusdForUsdcSwap(qIn, minAbove, qusdUnlocked),
+    [qIn, minAbove, qusdUnlocked],
+  );
+
   const { qusdDebit, usdcOut } = useMemo(() => {
-    if (!Number.isFinite(qIn) || qIn <= 0) return { qusdDebit: 0, usdcOut: 0 };
-    return computeSwapAmounts(qIn, rate, maxU, treasuryU);
-  }, [qIn, rate, maxU, treasuryU]);
+    if (!(effectiveQusd > 0) || !(rate > 0)) return { qusdDebit: 0, usdcOut: 0 };
+    return computeSwapAmounts(effectiveQusd, rate, maxU, treasuryU);
+  }, [effectiveQusd, rate, maxU, treasuryU]);
 
   /** Uncapped USDC if full balance above minimum were swappable: (balance − SWAP_ABOVE_AMOUNT) ÷ rate. */
   const hypotheticalFullBalanceUsdc = useMemo(() => {
@@ -449,7 +461,8 @@ export default function SwapScreen({
     qIn <= qusdUnlocked + 1e-9 &&
     usdcOut > 0 &&
     qusdDebit > 0 &&
-    qusdDebit <= qusdUnlocked + 1e-9;
+    qusdDebit <= qusdUnlocked + 1e-9 &&
+    effectiveQusd > 0;
 
   useEffect(() => {
     if (!busy) {
@@ -701,8 +714,9 @@ export default function SwapScreen({
               1 USDC = {rate > 0 ? rate.toLocaleString(undefined, { maximumFractionDigits: 8 }) : "—"} QUSD
             </p>
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
-              USDC received = your QUSD ÷ this rate, rounded to 2 decimal places (before per-transaction and treasury
-              caps).
+              USDC received = <strong>(QUSD you enter − {minAbove.toLocaleString()} QUSD floor)</strong> ÷ this rate,
+              after capping your entry to your balance — then rounded to 2 decimal places (before per-transaction and
+              treasury caps).
             </p>
             <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
               Minimum swap: greater than {minAbove.toLocaleString()} QUSD · Max USDC per transaction:{" "}
@@ -774,10 +788,23 @@ export default function SwapScreen({
             <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }} className="mono">
               {usdcOut.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })} USDC
             </p>
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)" }}>
-              QUSD deducted after caps:{" "}
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+              Eligible QUSD for conversion:{" "}
+              <strong className="mono">
+                {effectiveQusd.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </strong>
+              <span className="mono" style={{ color: "var(--muted)" }}>
+                {" "}
+                = (min(entered, balance) − floor) = ({grossQusd.toLocaleString(undefined, {
+                  maximumFractionDigits: 2,
+                })}{" "}
+                − {minAbove.toLocaleString(undefined, { maximumFractionDigits: 2 })})
+              </span>
+            </p>
+            <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--muted)" }}>
+              QUSD debited after caps:{" "}
               <strong className="mono">{qusdDebit.toLocaleString(undefined, { maximumFractionDigits: 8 })}</strong>
-              {qusdDebit < qIn - 1e-9 ? (
+              {qusdDebit < effectiveQusd - 1e-9 ? (
                 <span> (capped by treasury balance or max USDC)</span>
               ) : null}
             </p>
@@ -878,8 +905,9 @@ export default function SwapScreen({
             above).
           </li>
           <li style={dep.summaryListLi}>
-            USDC out = QUSD ÷ exchange rate (QUSD per 1 USDC), rounded to 2 decimals, then capped by the max USDC per
-            transaction and by treasury USDC on hand (if capped, QUSD deducted matches the USDC actually sent).
+            USDC out = <strong>(QUSD you enter − the minimum floor, after capping to your balance)</strong> ÷ exchange
+            rate (QUSD per 1 USDC), rounded to 2 decimals, then capped by the max USDC per transaction and by treasury
+            USDC on hand (if capped, QUSD deducted matches the USDC actually sent).
           </li>
           <li style={dep.summaryListLi}>
             Swaps only run when the treasury holds USDC and enough SOL for fees (≥ 0.001 SOL).

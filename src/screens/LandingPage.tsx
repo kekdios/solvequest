@@ -163,7 +163,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
               <a
                 href="#lp-swap-footnote"
                 className="lp-hero-swap-asterisk"
-                aria-label="See footnote: in-app Swap, profits only, verified Solana address"
+                aria-label="See footnote: in-app Swap, profits only, verified Solana address, minimum QUSD floor"
               >
                 {" "}
                 *
@@ -347,8 +347,9 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
                 "Prize"
               )}{" "}
               page for eligibility and timing. <strong>USDC</strong> is real on-chain stablecoin: you receive it when you
-              use <strong>Swap</strong> to convert QUSD to USDC at the app&apos;s published rate to your verified Solana
-              address — that&apos;s separate from the daily prize competition.
+              use <strong>Swap</strong> to convert QUSD to USDC at the app&apos;s published rate (only QUSD above the
+              minimum shown on Swap converts) to your verified Solana address — that&apos;s separate from the daily prize
+              competition.
             </p>
           </details>
           <details className="lp-faq-item">
@@ -364,7 +365,8 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             <summary>How do I get USDC?</summary>
             <p>
               Use <strong>Swap</strong> in the app to convert QUSD to USDC; USDC is sent on <strong>Solana</strong> to the
-              receive address you verify on <strong>Account</strong>. Rates, minimums, and treasury availability apply.
+              receive address you verify on <strong>Account</strong>. Rates, per-swap QUSD minimums (a floor before the
+              rate applies), and treasury availability apply.
               The daily QUSD prize is paid in QUSD per the Prize page — it is not the same flow as Swap.
             </p>
           </details>
@@ -558,7 +560,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
 
       <p id="lp-swap-footnote" className="lp-page-footnote" tabIndex={-1}>
         <span className="lp-page-footnote-mark">*</span> In-app <strong>Swap</strong> — profits only; a verified Solana
-        receive address is required.
+        receive address is required. Only QUSD above the app minimum (see Swap) converts at the published rate.
       </p>
 
       {onTerms && onPrivacy ? (

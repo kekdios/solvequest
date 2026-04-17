@@ -79,7 +79,8 @@ export default function LeaderboardScreen() {
         You compete for this QUSD amount <strong>daily</strong> per the <strong>Prize</strong> page —{" "}
         <strong>one daily prize win per account</strong> (lifetime). Rankings below are total QUSD (ledger). The{" "}
         <strong>Prize #</strong> column is your standing among traders still eligible for that prize. To convert trading
-        profits to real <strong>USDC</strong>, use <strong>Swap</strong> after you verify your Solana address.
+        profits to real <strong>USDC</strong>, use <strong>Swap</strong> after you verify your Solana address (see Swap
+        for the QUSD minimum and rate).
       </p>
 
       <p style={{ marginTop: 12, lineHeight: 1.55, maxWidth: 640, fontSize: 13, color: "var(--muted)" }}>

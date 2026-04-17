@@ -59,7 +59,9 @@ export default function TermsScreen() {
       <p>
         Where the Service allows swapping or conversion between QUSD and USDC, the availability, rules, and execution of
         those swaps are determined solely by Solve Quest. Exchange rates for QUSD and USDC (in either direction) are set
-        solely by Solve Quest and may change, subject to these Terms and any rates or limits shown in the app.
+        solely by Solve Quest and may change, subject to these Terms and any rates or limits shown in the app. For
+        QUSD→USDC swaps, the Service may apply a configured minimum QUSD threshold so that only QUSD above that amount
+        (after capping to your balance) converts at the published rate, as described on the Swap screen.
       </p>
 
       <h2>7. Prohibited conduct</h2>

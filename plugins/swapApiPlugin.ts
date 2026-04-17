@@ -18,7 +18,7 @@ import { z } from "zod";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
 import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
 import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
-import { computeSwapAmounts } from "../src/lib/swapAmounts";
+import { computeSwapAmounts, effectiveQusdForUsdcSwap } from "../src/lib/swapAmounts";
 import {
   getLedgerBalances,
   insertQusdSwapRefund,
@@ -129,7 +129,7 @@ export function createSwapApiMiddleware(env: Record<string, string>, root: strin
 
   const treasuryEnv = envForTreasury(env);
   const swapAbove = parseEnvNumber(env.SWAP_ABOVE_AMOUNT, 0);
-  /** QUSD per 1 USDC; USDC out = QUSD ÷ rate (see `computeSwapAmounts`). */
+  /** QUSD per 1 USDC; effective QUSD = min(amount, balance) − SWAP_ABOVE; USDC out from `computeSwapAmounts(effective, ...)`. */
   const swapRate = parseEnvNumber(env.SWAP_QUSD_USDC_RATE, 0);
   const swapMaxUsdc = parseEnvNumber(env.SWAP_MAXIMUM_USDC_AMOUNT, 0);
   const buyDepositAddr = (env.SWAP_USDC_RECEIVE_ADDRESS ?? "").trim();
@@ -343,6 +343,15 @@ export function createSwapApiMiddleware(env: Record<string, string>, root: strin
           return;
         }
 
+        const effectiveQusd = effectiveQusdForUsdcSwap(qusdIn, swapAbove, spendable);
+        if (!(effectiveQusd > 1e-9)) {
+          sendJson(res, 400, {
+            error: "below_effective_minimum",
+            message: `After reserving ${swapAbove} QUSD, nothing remains to convert. Enter a larger amount.`,
+          });
+          return;
+        }
+
         const treasuryResolved = resolveTreasurySigningKeypair(treasuryEnv);
         if (!treasuryResolved.ok) {
           sendJson(res, 503, {
@@ -369,7 +378,7 @@ export function createSwapApiMiddleware(env: Record<string, string>, root: strin
           return;
         }
 
-        const { qusdDebit, usdcOut } = computeSwapAmounts(qusdIn, swapRate, swapMaxUsdc, treasuryUsdcUi);
+        const { qusdDebit, usdcOut } = computeSwapAmounts(effectiveQusd, swapRate, swapMaxUsdc, treasuryUsdcUi);
         if (usdcOut <= 0 || qusdDebit <= 0) {
           sendJson(res, 400, {
             error: "zero_after_caps",

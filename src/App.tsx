@@ -227,7 +227,7 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   },
   swap: {
     title: "Swap",
-    lead: "Convert QUSD to USDC — sent to your verified Solana address.",
+    lead: "Convert QUSD (above the app minimum) to USDC — sent to your verified Solana address.",
   },
   history: {
     title: "History",

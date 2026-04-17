@@ -30,6 +30,10 @@ export function friendlyQusdToUsdcSwapError(
       return msg.length > 0 && msg.length < 160
         ? msg
         : "That amount is below the minimum for a swap. Enter a larger amount.";
+    case "below_effective_minimum":
+      return msg.length > 0 && msg.length < 160
+        ? msg
+        : "After the reserved QUSD floor, nothing is left to convert. Enter a larger gross amount.";
     case "insufficient_qusd":
       return msg.length > 0 && msg.length < 160
         ? msg

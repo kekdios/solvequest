@@ -144,8 +144,8 @@ export default function QusdSellScreen({
 
       <p style={{ marginTop: 14, lineHeight: 1.6, maxWidth: 640 }}>
         Open <strong>Swap</strong> in the sidebar to convert QUSD (including trading profits) to <strong>USDC</strong> on
-        Solana at the app&apos;s rate, sent to your verified receive address. Limits, treasury balance, and verification
-        rules apply — see Swap for details.
+        Solana. Only QUSD above the app&apos;s minimum floor (shown on Swap) converts at the published rate; limits and
+        treasury balance still apply. USDC is sent to your verified receive address — see Swap for details.
       </p>
 
       <PrizeContactLine />
