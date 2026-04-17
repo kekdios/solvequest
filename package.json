@@ -16,6 +16,7 @@
     "db:migrate": "node scripts/migrate-all.mjs",
     "db:provision": "tsx scripts/provision-account.ts",
     "prize:record-winner": "tsx scripts/record-daily-prize-winner.ts",
+    "test:swap-preflight": "tsx scripts/test-swap-treasury-preflight.ts",
     "treasury:gen": "tsx scripts/generate-treasury-keypair.ts",
     "treasury:b64-to-wallet": "tsx scripts/treasury-b64-to-wallet.ts"
   },
