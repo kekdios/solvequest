@@ -286,23 +286,6 @@ export default function SwapScreen({
         </section>
       ) : null}
 
-      {cfg ? (
-        <div style={card}>
-          <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--muted)" }}>Exchange rate</p>
-          <p style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>
-            1 USDC = {rate > 0 ? rate.toLocaleString(undefined, { maximumFractionDigits: 8 }) : "—"} QUSD
-          </p>
-          <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)" }}>
-            USDC received = your QUSD ÷ this rate, rounded to 2 decimal places (before per-transaction and treasury
-            caps).
-          </p>
-          <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--muted)" }}>
-            Minimum swap: greater than {minAbove.toLocaleString()} QUSD · Max USDC per transaction:{" "}
-            {maxU.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-          </p>
-        </div>
-      ) : null}
-
       <div style={card}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <QusdIcon size={22} />
@@ -339,10 +322,34 @@ export default function SwapScreen({
             Swap QUSD to USDC
           </h2>
         </div>
+        {cfg ? (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "14px 16px",
+              borderRadius: 8,
+              background: "color-mix(in srgb, var(--accent) 5%, var(--bg))",
+              border: "1px solid color-mix(in srgb, var(--accent) 22%, var(--border))",
+            }}
+          >
+            <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--muted)" }}>Exchange rate</p>
+            <p style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>
+              1 USDC = {rate > 0 ? rate.toLocaleString(undefined, { maximumFractionDigits: 8 }) : "—"} QUSD
+            </p>
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
+              USDC received = your QUSD ÷ this rate, rounded to 2 decimal places (before per-transaction and treasury
+              caps).
+            </p>
+            <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
+              Minimum swap: greater than {minAbove.toLocaleString()} QUSD · Max USDC per transaction:{" "}
+              {maxU.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            </p>
+          </div>
+        ) : null}
         {cfg && rate > 0 ? (
           <div
             style={{
-              marginTop: 10,
+              marginTop: 0,
               marginBottom: 14,
               padding: 14,
               borderRadius: 8,
@@ -448,7 +455,7 @@ export default function SwapScreen({
         >
           <li>You need a verified Solana address on Account — USDC is sent there.</li>
           <li>
-            Each swap amount must be <strong>greater than</strong> the minimum QUSD (see the rate card and swap field
+            Each swap amount must be <strong>greater than</strong> the minimum QUSD (see Exchange rate in the panel
             above).
           </li>
           <li>
