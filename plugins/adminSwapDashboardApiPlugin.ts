@@ -1,5 +1,6 @@
 /**
  * GET /api/admin/swap-dashboard — admin-only: swap env snapshot, treasury/receive balances, paginated swaps & refund errors.
+ * POST /api/admin/run-deposit-scan — admin-only: one full USDC→QUSD deposit scan (same logic as background worker).
  */
 import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -11,6 +12,8 @@ import { resolveSolvequestDbPath } from "../server/accountEnsure";
 import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
 import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
 import { getUsdcAtaBalanceUi } from "../server/solanaUsdcScan";
+import { recordDepositScanTickComplete } from "../server/depositScanHealth";
+import { runQusdBuyScanOnce } from "../server/qusdBuyScanWorker";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -123,8 +126,67 @@ export function createAdminSwapDashboardApiMiddleware(
     }
   };
 
+  const requireAdmin = (
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): { email: string } | null => {
+    if (!jwtOk) {
+      sendJson(res, 503, { error: "auth_not_configured" });
+      return null;
+    }
+    const token = parseCookies(req.headers.cookie)[USER_COOKIE];
+    if (!token) {
+      sendJson(res, 401, { error: "not_authenticated" });
+      return null;
+    }
+    let email: string;
+    try {
+      const p = jwt.verify(token, jwtSecret!) as { email?: string };
+      if (!p.email || typeof p.email !== "string") {
+        sendJson(res, 401, { error: "invalid_token" });
+        return null;
+      }
+      email = p.email.toLowerCase();
+    } catch {
+      sendJson(res, 401, { error: "invalid_token" });
+      return null;
+    }
+    if (!isAdminEmail(email, env)) {
+      sendJson(res, 403, { error: "forbidden" });
+      return null;
+    }
+    return { email };
+  };
+
   return (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
     const url = req.url?.split("?")[0] ?? "";
+
+    if (url === "/api/admin/run-deposit-scan" && req.method === "POST") {
+      void (async () => {
+        if (!requireAdmin(req, res)) return;
+        try {
+          const result = await runQusdBuyScanOnce(root, process.env, { verbose: true });
+          if (result.ok) {
+            recordDepositScanTickComplete();
+            sendJson(res, 200, {
+              ok: true,
+              accounts_scanned: result.accountsScanned,
+              reports: result.reports ?? [],
+            });
+          } else {
+            sendJson(res, 500, { ok: false, error: result.error });
+          }
+        } catch (e) {
+          console.error("[admin] run-deposit-scan:", e);
+          sendJson(res, 500, {
+            ok: false,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      })();
+      return;
+    }
+
     if (url !== "/api/admin/swap-dashboard") {
       next();
       return;
@@ -135,31 +197,7 @@ export function createAdminSwapDashboardApiMiddleware(
     }
 
     void (async () => {
-      if (!jwtOk) {
-        sendJson(res, 503, { error: "auth_not_configured" });
-        return;
-      }
-      const token = parseCookies(req.headers.cookie)[USER_COOKIE];
-      if (!token) {
-        sendJson(res, 401, { error: "not_authenticated" });
-        return;
-      }
-      let email: string;
-      try {
-        const p = jwt.verify(token, jwtSecret!) as { email?: string };
-        if (!p.email || typeof p.email !== "string") {
-          sendJson(res, 401, { error: "invalid_token" });
-          return;
-        }
-        email = p.email.toLowerCase();
-      } catch {
-        sendJson(res, 401, { error: "invalid_token" });
-        return;
-      }
-      if (!isAdminEmail(email, env)) {
-        sendJson(res, 403, { error: "forbidden" });
-        return;
-      }
+      if (!requireAdmin(req, res)) return;
 
       const database = getDb();
       if (!database) {

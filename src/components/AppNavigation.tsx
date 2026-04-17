@@ -113,7 +113,7 @@ const visitorsItem = { id: "visitors" as const, label: "Visitors", Icon: NavIcon
 const adminItem = { id: "admin" as const, label: "Admin", Icon: NavIconAdmin };
 
 export const APP_VERSION_SEMVER = "1.0.0";
-export const APP_VERSION_DATE = "16-Apr-26";
+export const APP_VERSION_DATE = "14-Apr-26";
 
 type NavListProps = {
   screen: AppScreen;

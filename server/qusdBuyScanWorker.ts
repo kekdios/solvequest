@@ -39,6 +39,25 @@ export function rpcUrl(env: NodeJS.ProcessEnv): string {
   );
 }
 
+/** Optional hook for admin UI / logs (one line per call). */
+export type DepositScanReporter = {
+  log: (line: string) => void;
+};
+
+export type DepositScanAccountReport = {
+  account_id: string;
+  sol_receive_address: string;
+  /** Completed scan; `skipped` = invalid address or early exit without throwing. */
+  status: "ok" | "error" | "skipped";
+  error?: string;
+  lines: string[];
+};
+
+export type RunQusdBuyScanOnceOptions = {
+  /** When true, returns per-account `reports` with step lines and errors. */
+  verbose?: boolean;
+};
+
 /**
  * One full pass over all accounts with a deposit address (USDC scan → QUSD credit).
  * Opens and closes the DB for each run.
@@ -46,7 +65,12 @@ export function rpcUrl(env: NodeJS.ProcessEnv): string {
 export async function runQusdBuyScanOnce(
   root: string,
   env: NodeJS.ProcessEnv,
-): Promise<{ ok: true; accountsScanned: number } | { ok: false; error: string }> {
+  options?: RunQusdBuyScanOnceOptions,
+): Promise<
+  | { ok: true; accountsScanned: number; reports?: DepositScanAccountReport[] }
+  | { ok: false; error: string }
+> {
+  const verbose = options?.verbose === true;
   const dbPath = resolveDbPath(root, env);
   if (!fs.existsSync(dbPath)) {
     return { ok: false, error: `database missing at ${dbPath}` };
@@ -63,6 +87,8 @@ export async function runQusdBuyScanOnce(
   const qusdPerUsdc = parseQusdMultiplier(env.QUSD_MULTIPLIER ?? env.VITE_QUSD_MULTIPLIER);
   const connection = new Connection(rpcUrl(env), "confirmed");
 
+  const reports: DepositScanAccountReport[] = [];
+
   try {
     let rows: { id: string; sol_receive_address: string }[];
     try {
@@ -78,13 +104,36 @@ export async function runQusdBuyScanOnce(
     }
 
     for (const { id: accountId, sol_receive_address: addr } of rows) {
+      const lines: string[] = [];
+      const reporter: DepositScanReporter | undefined = verbose
+        ? { log: (line: string) => lines.push(line) }
+        : undefined;
       try {
-        await processAccount(database, connection, accountId, addr, qusdPerUsdc, env);
+        const outcome = await processAccount(database, connection, accountId, addr, qusdPerUsdc, env, reporter);
+        if (verbose) {
+          reports.push({
+            account_id: accountId,
+            sol_receive_address: addr.trim(),
+            status: outcome === "skipped" ? "skipped" : "ok",
+            lines,
+          });
+        }
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         console.error(`[qusd-buy] account ${accountId}:`, e);
+        if (verbose) {
+          lines.push(`Error: ${msg}`);
+          reports.push({
+            account_id: accountId,
+            sol_receive_address: addr.trim(),
+            status: "error",
+            error: msg,
+            lines,
+          });
+        }
       }
     }
-    return { ok: true, accountsScanned: rows.length };
+    return { ok: true, accountsScanned: rows.length, reports: verbose ? reports : undefined };
   } finally {
     try {
       database.close();
@@ -144,7 +193,7 @@ export function startQusdBuyScanWorker(root: string, env: NodeJS.ProcessEnv): vo
 
     for (const { id: accountId, sol_receive_address: addr } of rows) {
       try {
-        await processAccount(database, connection, accountId, addr, qusdPerUsdc, env);
+        await processAccount(database, connection, accountId, addr, qusdPerUsdc, env, undefined);
       } catch (e) {
         console.error(`[qusd-buy] account ${accountId}:`, e);
       }
@@ -159,6 +208,7 @@ export function startQusdBuyScanWorker(root: string, env: NodeJS.ProcessEnv): vo
   );
 }
 
+/** `skipped` = invalid address (nothing to do). */
 export async function processAccount(
   database: SqliteDb,
   connection: Connection,
@@ -166,14 +216,19 @@ export async function processAccount(
   solReceiveAddress: string,
   qusdPerUsdc: number,
   env: NodeJS.ProcessEnv,
-): Promise<void> {
+  reporter?: DepositScanReporter,
+): Promise<"completed" | "skipped"> {
   let owner: PublicKey;
   try {
     owner = new PublicKey(solReceiveAddress.trim());
   } catch {
     console.warn(`[qusd-buy] invalid sol_receive_address for ${accountId}`);
-    return;
+    reporter?.log("Skipped: sol_receive_address is not a valid Solana public key.");
+    return "skipped";
   }
+
+  reporter?.log(`Receive address: ${owner.toBase58()}`);
+  reporter?.log(`QUSD per 1 USDC (multiplier): ${qusdPerUsdc}`);
 
   const wmRow = database
     .prepare(`SELECT watermark_signature FROM deposit_scan_state WHERE account_id = ?`)
@@ -192,16 +247,28 @@ export async function processAccount(
 
   /** Old bug: watermark advanced with zero credits — incremental scan then finds nothing new. */
   const onChainUi = await getUsdcAtaBalanceUi(connection, owner);
+  reporter?.log(`On-chain USDC balance (canonical ATA): ${onChainUi.toFixed(6)} USDC`);
   const sumCredited = Number(creditedBefore?.s ?? 0);
+  reporter?.log(`Prior USDC total credited (deposit_credits): ${sumCredited.toFixed(6)}`);
+  reporter?.log(
+    ledger.watermarkUsdcAta
+      ? `Scan watermark signature: ${ledger.watermarkUsdcAta.slice(0, 16)}…`
+      : "Scan watermark: none (full history pagination from chain)",
+  );
   if (onChainUi > 1e-6 && sumCredited < 1e-6 && ledger.watermarkUsdcAta != null) {
     database.prepare(`DELETE FROM deposit_scan_state WHERE account_id = ?`).run(accountId);
     ledger = { watermarkUsdcAta: null };
     console.warn(
       `[qusd-buy] cleared stale watermark for ${accountId.slice(0, 8)}… (USDC on-chain, no deposit_credits)`,
     );
+    reporter?.log(
+      "Cleared stale watermark (USDC on-chain but no deposit_credits rows) — rescanning from older signatures.",
+    );
   }
 
+  reporter?.log("Fetching new USDC transfers from chain…");
   const { credits, ledger: next } = await scanNewUsdcDeposits(connection, owner, ledger);
+  reporter?.log(`Parsed ${credits.length} new deposit(s) not yet credited.`);
 
   const creditOne = database.transaction(
     (signature: string, amountUsdc: number, creditedAt: number) => {
@@ -227,6 +294,9 @@ export async function processAccount(
 
   const now = Date.now();
   for (const c of credits) {
+    reporter?.log(
+      `Ledger: apply ${c.amountUsdc.toFixed(6)} USDC · sig ${c.signature.slice(0, 18)}…`,
+    );
     try {
       creditOne(c.signature, c.amountUsdc, now);
     } catch (e) {
@@ -243,4 +313,11 @@ export async function processAccount(
        ON CONFLICT(account_id) DO UPDATE SET watermark_signature = excluded.watermark_signature`,
     )
     .run(accountId, next.watermarkUsdcAta);
+  reporter?.log(
+    next.watermarkUsdcAta
+      ? `Saved scan watermark: ${next.watermarkUsdcAta.slice(0, 20)}…`
+      : "Saved scan watermark: (none)",
+  );
+  reporter?.log("Account pass complete.");
+  return "completed";
 }
