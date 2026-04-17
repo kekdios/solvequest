@@ -281,7 +281,7 @@ a.lp-hero-swap-asterisk:hover {
 .lp-hero-media {
   margin: 0 auto;
   padding: 0;
-  max-width: 70%;
+  max-width: 52.5%;
   border-radius: var(--lp-radius-sm);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 85%, var(--text));
