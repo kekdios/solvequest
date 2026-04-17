@@ -15,6 +15,7 @@ function fmtTs(ms: number): string {
 }
 
 const SOLSCAN = "https://solscan.io/account";
+const SOLSCAN_TX = "https://solscan.io/tx";
 
 type AddrBalance = {
   address: string | null;
@@ -43,12 +44,29 @@ type ErrRow = {
   message: string;
 };
 
+type UsdcDepositRow = {
+  id: number;
+  account_id: string;
+  account_email: string | null;
+  signature: string;
+  usdc_amount: number;
+  qusd_credited: number;
+  credited_at: number;
+};
+
 type DashboardPayload = {
   env: Record<string, string>;
   treasury: AddrBalance;
   receive_address: AddrBalance;
   swaps: { page: number; page_size: number; total: number; rows: SwapRow[] };
   swap_errors: { page: number; page_size: number; total: number; rows: ErrRow[] };
+  usdc_deposits: {
+    page: number;
+    page_size: number;
+    total: number;
+    qusd_per_usdc: number;
+    rows: UsdcDepositRow[];
+  };
 };
 
 type DepositScanAccountReport = {
@@ -88,7 +106,7 @@ export default function AdminScreen() {
   dataRef.current = data;
 
   const load = useCallback(
-    async (sp: number, ep: number) => {
+    async (sp: number, ep: number, dp: number) => {
       if (authLoading || !user) {
         setLoading(false);
         return;
@@ -96,14 +114,20 @@ export default function AdminScreen() {
       setLoading(true);
       setError(null);
       try {
-        let r = await fetch(`/api/admin/swap-dashboard?swaps_page=${sp}&errors_page=${ep}`, {
-          credentials: "include",
-        });
+        let r = await fetch(
+          `/api/admin/swap-dashboard?swaps_page=${sp}&errors_page=${ep}&deposits_page=${dp}`,
+          {
+            credentials: "include",
+          },
+        );
         if (r.status === 401) {
           await refreshUser();
-          r = await fetch(`/api/admin/swap-dashboard?swaps_page=${sp}&errors_page=${ep}`, {
-            credentials: "include",
-          });
+          r = await fetch(
+            `/api/admin/swap-dashboard?swaps_page=${sp}&errors_page=${ep}&deposits_page=${dp}`,
+            {
+              credentials: "include",
+            },
+          );
         }
         if (r.status === 403) {
           setError("You do not have access to this page.");
@@ -127,7 +151,7 @@ export default function AdminScreen() {
   );
 
   useEffect(() => {
-    void load(1, 1);
+    void load(1, 1, 1);
   }, [load]);
 
   const runDepositScan = useCallback(async () => {
@@ -166,7 +190,7 @@ export default function AdminScreen() {
       setDepositScanOk(`Scan finished. Accounts in pass: ${n}. Step-by-step output below.`);
       setDepositScanReports(Array.isArray(j.reports) ? j.reports : []);
       const cur = dataRef.current;
-      void load(cur?.swaps.page ?? 1, cur?.swap_errors.page ?? 1);
+      void load(cur?.swaps.page ?? 1, cur?.swap_errors.page ?? 1, cur?.usdc_deposits?.page ?? 1);
     } catch {
       setDepositScanErr("Network error.");
     } finally {
@@ -190,10 +214,13 @@ export default function AdminScreen() {
 
   const swaps = data?.swaps;
   const errs = data?.swap_errors;
+  const deps = data?.usdc_deposits;
   const swapPageSize = swaps?.page_size ?? 20;
   const errPageSize = errs?.page_size ?? 20;
+  const depPageSize = deps?.page_size ?? 20;
   const swapTotalPages = swaps ? Math.max(1, Math.ceil(swaps.total / swapPageSize)) : 1;
   const errTotalPages = errs ? Math.max(1, Math.ceil(errs.total / errPageSize)) : 1;
+  const depTotalPages = deps ? Math.max(1, Math.ceil(deps.total / depPageSize)) : 1;
 
   return (
     <div className="app-page admin-page" style={s.wrap}>
@@ -296,6 +323,75 @@ export default function AdminScreen() {
 
           <section style={s.section}>
             <h2 className="app-section-title" style={s.sectionTitle}>
+              USDC → QUSD deposits
+            </h2>
+            <p style={{ ...s.mutedP, marginBottom: 12 }}>
+              On-chain USDC credited as QUSD (
+              <span className="mono">{deps?.qusd_per_usdc?.toFixed(0) ?? "—"}</span> QUSD per $1 USDC).
+            </p>
+            <div className="app-table-scroll">
+              <table className="data-table" style={{ width: "100%", minWidth: 720, fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Account</th>
+                    <th>USDC</th>
+                    <th>QUSD credited</th>
+                    <th>Transaction</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(deps?.rows ?? []).map((row) => (
+                    <tr key={row.id}>
+                      <td className="mono">{fmtTs(row.credited_at)}</td>
+                      <td style={{ wordBreak: "break-all" }}>{row.account_email ?? row.account_id}</td>
+                      <td className="mono">{row.usdc_amount.toFixed(6)}</td>
+                      <td className="mono">{row.qusd_credited.toFixed(2)}</td>
+                      <td>
+                        <a
+                          href={`${SOLSCAN_TX}/${encodeURIComponent(row.signature)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mono"
+                          style={{ ...s.adminLink, marginBottom: 0, fontSize: 12 }}
+                        >
+                          Solscan
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {deps && deps.total === 0 ? (
+              <p style={{ color: "var(--muted)", marginTop: 8 }}>No USDC deposit credits recorded.</p>
+            ) : null}
+            {deps && deps.total > 0 ? (
+              <Pager
+                page={deps.page}
+                totalPages={depTotalPages}
+                total={deps.total}
+                loading={loading}
+                onPrev={() =>
+                  void load(
+                    data.swaps.page,
+                    data.swap_errors.page,
+                    Math.max(1, deps.page - 1),
+                  )
+                }
+                onNext={() =>
+                  void load(
+                    data.swaps.page,
+                    data.swap_errors.page,
+                    Math.min(depTotalPages, deps.page + 1),
+                  )
+                }
+              />
+            ) : null}
+          </section>
+
+          <section style={s.section}>
+            <h2 className="app-section-title" style={s.sectionTitle}>
               QUSD → USDC swaps (ledger)
             </h2>
             <div className="app-table-scroll">
@@ -338,10 +434,18 @@ export default function AdminScreen() {
                 total={swaps.total}
                 loading={loading}
                 onPrev={() =>
-                  void load(Math.max(1, swaps.page - 1), data.swap_errors.page)
+                  void load(
+                    Math.max(1, swaps.page - 1),
+                    data.swap_errors.page,
+                    data.usdc_deposits.page,
+                  )
                 }
                 onNext={() =>
-                  void load(Math.min(swapTotalPages, swaps.page + 1), data.swap_errors.page)
+                  void load(
+                    Math.min(swapTotalPages, swaps.page + 1),
+                    data.swap_errors.page,
+                    data.usdc_deposits.page,
+                  )
                 }
               />
             ) : null}
@@ -387,10 +491,18 @@ export default function AdminScreen() {
                 total={errs.total}
                 loading={loading}
                 onPrev={() =>
-                  void load(data.swaps.page, Math.max(1, errs.page - 1))
+                  void load(
+                    data.swaps.page,
+                    Math.max(1, errs.page - 1),
+                    data.usdc_deposits.page,
+                  )
                 }
                 onNext={() =>
-                  void load(data.swaps.page, Math.min(errTotalPages, errs.page + 1))
+                  void load(
+                    data.swaps.page,
+                    Math.min(errTotalPages, errs.page + 1),
+                    data.usdc_deposits.page,
+                  )
                 }
               />
             ) : null}

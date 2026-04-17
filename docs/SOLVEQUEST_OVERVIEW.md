@@ -97,6 +97,12 @@ Defaults below match **`scripts/deploy.sh`** and **`scripts/solvequest.service.e
 
 - API and workers use **WAL** + **busy_timeout** to reduce lock errors when the QUSD buy scan worker and HTTP API touch the same file.
 
+### VPS / host: system `sqlite3` vs the app
+
+- **Runtime**: The Node process uses **`better-sqlite3`** (npm dependency). SQLite is embedded there — you do **not** need a separate SQLite “server” or daemon. The app opens the file at **`SOLVEQUEST_DB_PATH`** (default **`data/solvequest.db`** under the app root, e.g. **`/opt/solvequest/data/solvequest.db`** on a typical droplet).
+- **Optional CLI**: Many distros also ship the **`sqlite3`** command (e.g. **`/usr/bin/sqlite3`**) for ad-hoc queries and backups. That package is **not required** for Solve Quest to run; it is only for operators.
+- **Permissions**: The **Unix user** that runs **`node`** / **systemd** must be able to **read and write** the `.db` file (and `-wal` / `-shm` siblings when WAL is active). If the file is owned only by **`root`** but the service runs as another user, fix ownership or group (e.g. `chown` / `chmod` / dedicated `solvequest` user) — otherwise you may see “unable to open database” or similar.
+
 ### Production droplet: delete SQLite and recreate (fresh DB)
 
 Use this when the server DB is corrupt, locked, or inconsistent and you accept **losing all server-side account data** (ledger, positions, deposit idempotency rows). Defaults: **`root@152.42.168.173`**, **`/opt/solvequest`**, unit **`solvequest`**, DB file **`/opt/solvequest/data/solvequest.db`**.

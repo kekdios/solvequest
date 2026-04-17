@@ -14,6 +14,7 @@ import Database from "better-sqlite3";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { PERP_SYMBOLS } from "../src/engine/perps";
+import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
 import { ensureAccountRowForEmail, resolveSolvequestDbPath } from "../server/accountEnsure";
 import { assignCoolUsernameIfMissing } from "../server/coolUsername";
 import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
@@ -457,6 +458,89 @@ export function createAccountApiMiddleware(env: Record<string, string>, root: st
         console.error("[account-api] GET /api/account/swap-history:", e);
         sendJson(res, 500, {
           error: "swap_history_query_failed",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+      return;
+    }
+
+    if (req.method === "GET" && url === "/api/account/usdc-deposit-history") {
+      const token = parseCookies(req.headers.cookie)[USER_COOKIE];
+      if (!token) {
+        sendJson(res, 401, { error: "Not authenticated" });
+        return;
+      }
+      let payload: { email?: string };
+      try {
+        payload = jwt.verify(token, jwtSecret!) as { email?: string };
+      } catch {
+        sendJson(res, 401, { error: "Invalid token" });
+        return;
+      }
+      if (!payload.email || typeof payload.email !== "string") {
+        sendJson(res, 401, { error: "Invalid token" });
+        return;
+      }
+      try {
+        const email = payload.email.toLowerCase();
+        const row = loadOrCreateRow(email);
+        if (!row?.id) {
+          sendJson(res, 503, { error: "no_account" });
+          return;
+        }
+        const database = getDb();
+        if (!database) {
+          sendJson(res, 503, { error: "db_missing" });
+          return;
+        }
+        const accountId = String(row.id);
+        const qs = new URL(req.url ?? "", "http://localhost").searchParams;
+        const page = Math.max(1, Number.parseInt(qs.get("page") ?? "1", 10) || 1);
+        const pageSize = Math.min(100, Math.max(1, Number.parseInt(qs.get("page_size") ?? "15", 10) || 15));
+        const offset = (page - 1) * pageSize;
+        const qusdPerUsdc = parseQusdMultiplier(env.QUSD_MULTIPLIER ?? env.VITE_QUSD_MULTIPLIER);
+        const countRow = database
+          .prepare(
+            `SELECT COUNT(*) AS c FROM deposit_credits WHERE account_id = ? AND chain = 'solana' AND kind = 'usdc'`,
+          )
+          .get(accountId) as { c: number };
+        const total = Number(countRow.c) || 0;
+        const rawRows = database
+          .prepare(
+            `SELECT id, signature, amount_human, credited_at
+             FROM deposit_credits
+             WHERE account_id = ? AND chain = 'solana' AND kind = 'usdc'
+             ORDER BY credited_at DESC
+             LIMIT ? OFFSET ?`,
+          )
+          .all(accountId, pageSize, offset) as {
+          id: number;
+          signature: string;
+          amount_human: number | null;
+          credited_at: number;
+        }[];
+        const rows = rawRows.map((r) => {
+          const usdc = Number(r.amount_human ?? 0);
+          const qusd = usdc * qusdPerUsdc;
+          return {
+            id: r.id,
+            signature: r.signature,
+            usdc_amount: usdc,
+            qusd_credited: qusd,
+            credited_at: r.credited_at,
+          };
+        });
+        sendJson(res, 200, {
+          rows,
+          total,
+          page,
+          page_size: pageSize,
+          qusd_per_usdc: qusdPerUsdc,
+        });
+      } catch (e) {
+        console.error("[account-api] GET /api/account/usdc-deposit-history:", e);
+        sendJson(res, 500, {
+          error: "usdc_deposit_history_query_failed",
           message: e instanceof Error ? e.message : String(e),
         });
       }

@@ -1,5 +1,5 @@
 /**
- * GET /api/admin/swap-dashboard — admin-only: swap env snapshot, treasury/receive balances, paginated swaps & refund errors.
+ * GET /api/admin/swap-dashboard — admin-only: swap env snapshot, treasury/receive balances, paginated USDC→QUSD deposits, swaps & refund errors.
  * POST /api/admin/run-deposit-scan — admin-only: one full USDC→QUSD deposit scan (same logic as background worker).
  */
 import fs from "node:fs";
@@ -14,6 +14,7 @@ import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
 import { getUsdcAtaBalanceUi } from "../server/solanaUsdcScan";
 import { recordDepositScanTickComplete } from "../server/depositScanHealth";
 import { runQusdBuyScanOnce } from "../server/qusdBuyScanWorker";
+import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
 
 type SqliteDb = InstanceType<typeof Database>;
 
@@ -208,8 +209,11 @@ export function createAdminSwapDashboardApiMiddleware(
       const qs = new URL(req.url ?? "", "http://localhost").searchParams;
       const swapsPage = Math.max(1, Number.parseInt(qs.get("swaps_page") ?? "1", 10) || 1);
       const errorsPage = Math.max(1, Number.parseInt(qs.get("errors_page") ?? "1", 10) || 1);
+      const depositsPage = Math.max(1, Number.parseInt(qs.get("deposits_page") ?? "1", 10) || 1);
       const swapsOffset = (swapsPage - 1) * PAGE_SIZE;
       const errorsOffset = (errorsPage - 1) * PAGE_SIZE;
+      const depositsOffset = (depositsPage - 1) * PAGE_SIZE;
+      const qusdPerUsdc = parseQusdMultiplier(env.QUSD_MULTIPLIER ?? env.VITE_QUSD_MULTIPLIER);
 
       const envSnapshot = {
         SOLANA_TREASURY_ADDRESS: (env.SOLANA_TREASURY_ADDRESS ?? "").trim(),
@@ -270,6 +274,28 @@ export function createAdminSwapDashboardApiMiddleware(
           account_email: string | null;
         }[];
 
+        const depCountRow = database
+          .prepare(`SELECT COUNT(*) AS c FROM deposit_credits WHERE chain = 'solana' AND kind = 'usdc'`)
+          .get() as { c: number };
+        const depTotal = Number(depCountRow.c) || 0;
+        const depRawRows = database
+          .prepare(
+            `SELECT d.id, d.account_id, d.signature, d.amount_human, d.credited_at, a.email AS account_email
+             FROM deposit_credits d
+             INNER JOIN accounts a ON a.id = d.account_id
+             WHERE d.chain = 'solana' AND d.kind = 'usdc'
+             ORDER BY d.credited_at DESC
+             LIMIT ? OFFSET ?`,
+          )
+          .all(PAGE_SIZE, depositsOffset) as {
+          id: number;
+          account_id: string;
+          signature: string;
+          amount_human: number | null;
+          credited_at: number;
+          account_email: string | null;
+        }[];
+
         sendJson(res, 200, {
           env: envSnapshot,
           treasury: treasuryBalances,
@@ -292,6 +318,24 @@ export function createAdminSwapDashboardApiMiddleware(
               qusd_refunded: Math.abs(Number(r.unlocked_delta) || 0),
               message: "On-chain USDC transfer failed; QUSD was refunded to the account.",
             })),
+          },
+          usdc_deposits: {
+            page: depositsPage,
+            page_size: PAGE_SIZE,
+            total: depTotal,
+            qusd_per_usdc: qusdPerUsdc,
+            rows: depRawRows.map((r) => {
+              const usdc = Number(r.amount_human ?? 0);
+              return {
+                id: r.id,
+                account_id: r.account_id,
+                account_email: r.account_email,
+                signature: r.signature,
+                usdc_amount: usdc,
+                qusd_credited: usdc * qusdPerUsdc,
+                credited_at: r.credited_at,
+              };
+            }),
           },
         });
       } catch (e) {

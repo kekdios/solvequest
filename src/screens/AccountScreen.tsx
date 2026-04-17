@@ -6,6 +6,17 @@ import { QusdAmount } from "../Qusd";
 const LINK_VERIFY_BONUS_QUSD = 10_000;
 
 const SWAP_HISTORY_PAGE_SIZE = 15;
+const DEPOSIT_HISTORY_PAGE_SIZE = 15;
+
+const SOLSCAN_TX = "https://solscan.io/tx";
+
+type DepositHistoryRow = {
+  id: number;
+  credited_at: number;
+  usdc_amount: number;
+  qusd_credited: number;
+  signature: string;
+};
 
 type SwapHistoryRow = {
   id: number;
@@ -65,12 +76,64 @@ export default function AccountScreen({
   const [swapRows, setSwapRows] = useState<SwapHistoryRow[]>([]);
   const [swapLoading, setSwapLoading] = useState(false);
   const [swapError, setSwapError] = useState<string | null>(null);
+  const [depositPage, setDepositPage] = useState(1);
+  const [depositTotal, setDepositTotal] = useState(0);
+  const [depositRows, setDepositRows] = useState<DepositHistoryRow[]>([]);
+  const [depositLoading, setDepositLoading] = useState(false);
+  const [depositError, setDepositError] = useState<string | null>(null);
   const verified = Boolean(solReceiveVerified);
   const displayAddr = serverDepositAddress?.trim() ?? "";
 
   useEffect(() => {
     if (verified && displayAddr) setDraftAddress(displayAddr);
   }, [verified, displayAddr]);
+
+  const loadDepositHistory = useCallback(
+    async (p: number) => {
+      if (isDemo || authLoading || !user) {
+        setDepositLoading(false);
+        return;
+      }
+      setDepositLoading(true);
+      setDepositError(null);
+      try {
+        let r = await fetch(
+          `/api/account/usdc-deposit-history?page=${p}&page_size=${DEPOSIT_HISTORY_PAGE_SIZE}`,
+          { credentials: "include" },
+        );
+        if (r.status === 401) {
+          await refreshUser();
+          r = await fetch(
+            `/api/account/usdc-deposit-history?page=${p}&page_size=${DEPOSIT_HISTORY_PAGE_SIZE}`,
+            { credentials: "include" },
+          );
+        }
+        if (!r.ok) {
+          setDepositError(
+            r.status === 401 ? "Sign in to see deposit history." : "Could not load USDC deposit history.",
+          );
+          setDepositRows([]);
+          setDepositTotal(0);
+          return;
+        }
+        const data = (await r.json()) as {
+          rows?: DepositHistoryRow[];
+          total?: number;
+          page?: number;
+        };
+        setDepositRows(data.rows ?? []);
+        setDepositTotal(Number(data.total) || 0);
+        setDepositPage(Number(data.page) || p);
+      } catch {
+        setDepositError("Network error.");
+        setDepositRows([]);
+        setDepositTotal(0);
+      } finally {
+        setDepositLoading(false);
+      }
+    },
+    [isDemo, authLoading, user, refreshUser],
+  );
 
   const submitVerify = useCallback(async () => {
     const addr = draftAddress.trim();
@@ -96,12 +159,13 @@ export default function AccountScreen({
         return;
       }
       await onRefreshAccount?.();
+      void loadDepositHistory(1);
     } catch (e) {
       setVerifyError(e instanceof Error ? e.message : "Network error");
     } finally {
       setVerifyBusy(false);
     }
-  }, [draftAddress, verifyBusy, verified, onRefreshAccount]);
+  }, [draftAddress, verifyBusy, verified, onRefreshAccount, loadDepositHistory]);
 
   const loadSwapHistory = useCallback(
     async (p: number) => {
@@ -152,6 +216,11 @@ export default function AccountScreen({
     if (isDemo) return;
     void loadSwapHistory(1);
   }, [isDemo, loadSwapHistory]);
+
+  useEffect(() => {
+    if (isDemo) return;
+    void loadDepositHistory(1);
+  }, [isDemo, loadDepositHistory]);
 
   const displayName = coolUsername?.trim() || "";
 
@@ -262,6 +331,101 @@ export default function AccountScreen({
             </>
           )}
         </section>
+
+        {!isDemo ? (
+          <section style={{ ...s.statHero, ...s.swapHistoryPanel }} aria-label="USDC to QUSD deposit history">
+            <div style={s.buyMoreHeader}>
+              <img
+                src="/icon-sol.png"
+                alt=""
+                width={28}
+                height={28}
+                style={{ ...s.buyMoreIcon, objectFit: "contain" }}
+              />
+              <h2 style={s.buyMoreTitle}>USDC → QUSD deposits</h2>
+            </div>
+            <p style={{ ...s.statSub, marginBottom: 12 }}>
+              On-chain USDC sent to your deposit address, credited as QUSD at the current rate.
+            </p>
+            {depositError ? (
+              <p style={s.err} role="alert">
+                {depositError}
+              </p>
+            ) : null}
+            {depositLoading && depositRows.length === 0 ? (
+              <p style={{ color: "var(--muted)", fontSize: 13 }}>Loading…</p>
+            ) : (
+              <div className="app-table-scroll">
+                <table className="data-table" style={{ width: "100%", minWidth: 480, fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>USDC</th>
+                      <th>QUSD credited</th>
+                      <th>Transaction</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {depositRows.map((row) => (
+                      <tr key={row.id}>
+                        <td className="mono" style={{ whiteSpace: "nowrap" }}>
+                          {fmtSwapTs(row.credited_at)}
+                        </td>
+                        <td className="mono">{row.usdc_amount.toFixed(6)}</td>
+                        <td className="mono">{row.qusd_credited.toFixed(2)}</td>
+                        <td>
+                          <a
+                            href={`${SOLSCAN_TX}/${encodeURIComponent(row.signature)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mono"
+                            style={{ fontSize: 12 }}
+                          >
+                            Solscan
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {depositRows.length === 0 && !depositLoading && !depositError ? (
+              <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>No USDC deposits yet.</p>
+            ) : null}
+            {depositTotal > 0 ? (
+              <div style={s.swapPager}>
+                <span style={{ color: "var(--muted)", fontSize: 13 }}>
+                  Page {depositPage} of {Math.max(1, Math.ceil(depositTotal / DEPOSIT_HISTORY_PAGE_SIZE))} ·{" "}
+                  {depositTotal} total
+                </span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    style={{ ...uiBtnGhost, opacity: depositPage <= 1 ? 0.45 : 1 }}
+                    disabled={depositPage <= 1 || depositLoading}
+                    onClick={() => void loadDepositHistory(Math.max(1, depositPage - 1))}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      ...uiBtnGhost,
+                      opacity: depositPage >= Math.ceil(depositTotal / DEPOSIT_HISTORY_PAGE_SIZE) ? 0.45 : 1,
+                    }}
+                    disabled={
+                      depositPage >= Math.ceil(depositTotal / DEPOSIT_HISTORY_PAGE_SIZE) || depositLoading
+                    }
+                    onClick={() => void loadDepositHistory(depositPage + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         {!isDemo ? (
           <section style={{ ...s.statHero, ...s.swapHistoryPanel }} aria-label="QUSD to USDC swap history">
