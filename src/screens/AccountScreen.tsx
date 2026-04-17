@@ -379,7 +379,7 @@ export default function AccountScreen({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mono"
-                            style={{ fontSize: 12 }}
+                            style={s.depositTxLink}
                           >
                             Solscan
                           </a>
@@ -631,6 +631,12 @@ const s: Record<string, CSSProperties> = {
   },
   swapHistoryPanel: {
     width: "100%",
+  },
+  /** Solscan tx link — `var(--ok)` so it matches app success green, not default link blue/purple */
+  depositTxLink: {
+    fontSize: 12,
+    color: "var(--ok)",
+    textDecorationColor: "color-mix(in srgb, var(--ok) 45%, transparent)",
   },
   swapPager: {
     display: "flex",
