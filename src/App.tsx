@@ -22,6 +22,7 @@ import QuickStartScreen from "./screens/QuickStartScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import QusdSellScreen from "./screens/QusdSellScreen";
 import VisitorsScreen from "./screens/VisitorsScreen";
+import AdminScreen from "./screens/AdminScreen";
 import LeaderboardScreen from "./screens/LeaderboardScreen";
 import AuthScreen from "./screens/AuthScreen";
 import TermsScreen from "./screens/TermsScreen";
@@ -247,6 +248,10 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   visitors: {
     title: "Visitors",
     lead: "Recent SPA views (IP, location, page).",
+  },
+  admin: {
+    title: "Admin",
+    lead: "Swap configuration, treasury balances, and ledger activity.",
   },
   auth: {
     title: "Login / Register",
@@ -525,7 +530,7 @@ function AppInner() {
   }, [authLoading, user]);
 
   useEffect(() => {
-    if (screen === "visitors" && ledgerAccountRow?.is_admin !== true) {
+    if ((screen === "visitors" || screen === "admin") && ledgerAccountRow?.is_admin !== true) {
       setScreen("trade");
     }
   }, [screen, ledgerAccountRow?.is_admin]);
@@ -784,6 +789,8 @@ function AppInner() {
           )}
 
           {screen === "visitors" && ledgerAccountRow?.is_admin === true ? <VisitorsScreen /> : null}
+
+          {screen === "admin" && ledgerAccountRow?.is_admin === true ? <AdminScreen /> : null}
 
           {screen === "terms" && <TermsScreen />}
 

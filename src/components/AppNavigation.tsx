@@ -89,6 +89,15 @@ function NavIconVisitors() {
   );
 }
 
+function NavIconAdmin() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" strokeLinejoin="round" />
+      <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const mainAppItemsBase: { id: AppScreen; label: string; Icon: () => ReactNode }[] = [
   { id: "landing", label: "Home", Icon: NavIconHome },
   { id: "trade", label: "Trade", Icon: NavIconPerps },
@@ -101,6 +110,7 @@ const mainAppItemsBase: { id: AppScreen; label: string; Icon: () => ReactNode }[
 ];
 
 const visitorsItem = { id: "visitors" as const, label: "Visitors", Icon: NavIconVisitors };
+const adminItem = { id: "admin" as const, label: "Admin", Icon: NavIconAdmin };
 
 export const APP_VERSION_SEMVER = "1.0.0";
 export const APP_VERSION_DATE = "16-Apr-26";
@@ -115,7 +125,7 @@ type NavListProps = {
 };
 
 export function AppNavigationList({ screen, onNavigate, showVisitors, itemClass, activeClass }: NavListProps) {
-  const mainAppItems = showVisitors ? [...mainAppItemsBase, visitorsItem] : mainAppItemsBase;
+  const mainAppItems = showVisitors ? [...mainAppItemsBase, visitorsItem, adminItem] : mainAppItemsBase;
   return (
     <>
       {mainAppItems.map(({ id, label, Icon }) => {
