@@ -67,7 +67,6 @@ const dep: Record<string, CSSProperties> = {
     gap: 12,
     marginBottom: 14,
   },
-  icon: { flexShrink: 0 },
   title: {
     margin: 0,
     fontSize: "1.15rem",
@@ -243,7 +242,6 @@ export default function SwapScreen({
       {!isDemo && (buyDepositOverride || (solReceiveVerified && displayAddr)) ? (
         <section style={dep.panel} aria-label="Swap USDC to QUSD">
           <div style={dep.header}>
-            <QusdIcon size={28} style={dep.icon} />
             <h2 style={dep.title}>Swap USDC to QUSD</h2>
           </div>
           <p style={dep.lead}>
@@ -335,10 +333,12 @@ export default function SwapScreen({
         </p>
       ) : null}
 
-      <div style={card}>
-        <label style={{ ...dep.title, display: "block", marginBottom: 10 }} htmlFor="swap-qusd-in">
-          Swap QUSD to USDC
-        </label>
+      <section style={dep.panel} aria-labelledby="swap-qusd-to-usdc-heading">
+        <div style={dep.header}>
+          <h2 style={dep.title} id="swap-qusd-to-usdc-heading">
+            Swap QUSD to USDC
+          </h2>
+        </div>
         {cfg && rate > 0 ? (
           <div
             style={{
@@ -392,6 +392,7 @@ export default function SwapScreen({
           onChange={(e) => setDraft(e.target.value)}
           style={{ ...uiInput, maxWidth: 280, marginTop: 6 }}
           disabled={busy || !solReceiveVerified}
+          aria-labelledby="swap-qusd-to-usdc-heading"
         />
         {Number.isFinite(qIn) && qIn > 0 && rate > 0 ? (
           <div style={{ marginTop: 16, padding: 14, borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)" }}>
@@ -431,7 +432,7 @@ export default function SwapScreen({
             {okMsg}
           </p>
         ) : null}
-      </div>
+      </section>
 
       <div style={card}>
         <p style={{ margin: "0 0 10px", fontWeight: 650, fontSize: "0.95rem" }}>Swap rules (summary)</p>
