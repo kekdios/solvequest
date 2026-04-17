@@ -15,6 +15,7 @@ import {
 import type { PersistedAccountRow } from "./db/persistedAccount";
 import { persistedRowToAppSlice } from "./lib/accountHydration";
 import PerpsTradeScreen from "./screens/PerpsTradeScreen";
+import SwapScreen from "./screens/SwapScreen";
 import LandingPage from "./screens/LandingPage";
 import AccountScreen from "./screens/AccountScreen";
 import QuickStartScreen from "./screens/QuickStartScreen";
@@ -222,6 +223,10 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   trade: {
     title: "Trade",
     lead: "",
+  },
+  swap: {
+    title: "Swap",
+    lead: "Convert QUSD to USDC — sent to your verified Solana address.",
   },
   history: {
     title: "History",
@@ -733,6 +738,16 @@ function AppInner() {
           )}
 
           {screen === "leaderboard" && <LeaderboardScreen />}
+
+          {screen === "swap" && (
+            <SwapScreen
+              isDemo={demo}
+              qusdUnlocked={state.qusd.unlocked}
+              solReceiveVerified={ledgerAccountRow?.sol_receive_verified_at != null}
+              onRefreshAccount={refreshAccountFromServer}
+              onGoToAccount={() => setScreen("account")}
+            />
+          )}
 
           {screen === "trade" && (
             <PerpsTradeScreen

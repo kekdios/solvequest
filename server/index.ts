@@ -14,6 +14,7 @@ import { createQusdSellApiMiddleware } from "../plugins/qusdSellApiPlugin";
 import { createVisitorsApiMiddleware } from "../plugins/visitorsApiPlugin";
 import { createLeaderboardApiMiddleware } from "../plugins/leaderboardApiPlugin";
 import { createLandingStatsApiMiddleware } from "../plugins/landingStatsApiPlugin";
+import { createSwapApiMiddleware } from "../plugins/swapApiPlugin";
 import { startQusdBuyScanWorker } from "./qusdBuyScanWorker";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -73,6 +74,7 @@ app.use(createQusdSellApiMiddleware(env, root));
 app.use(createVisitorsApiMiddleware(env, root));
 app.use(createLeaderboardApiMiddleware(env, root));
 app.use(createLandingStatsApiMiddleware(env, root));
+app.use(createSwapApiMiddleware(env, root));
 
 const solanaTarget =
   env.SOLANA_RPC_PROXY_TARGET?.trim() || "https://api.mainnet-beta.solana.com";

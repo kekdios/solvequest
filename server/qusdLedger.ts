@@ -136,3 +136,36 @@ export function insertQuestPurchaseRefund(
     .run(accountId, at, qusdAmount, buyId);
 }
 
+/** Spend QUSD for QUSD→USDC swap (server sends USDC from treasury). Idempotent per swap_id. */
+export function insertQusdSwapSpend(
+  database: SqliteDb,
+  accountId: string,
+  qusdAmount: number,
+  swapId: string,
+  at: number,
+): void {
+  if (qusdAmount <= 0) return;
+  database
+    .prepare(
+      `INSERT OR IGNORE INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
+       VALUES (?, ?, 'qusd_swap', ?, 0, 'swap', ?)`,
+    )
+    .run(accountId, at, -qusdAmount, swapId);
+}
+
+export function insertQusdSwapRefund(
+  database: SqliteDb,
+  accountId: string,
+  qusdAmount: number,
+  swapId: string,
+  at: number,
+): void {
+  if (qusdAmount <= 0) return;
+  database
+    .prepare(
+      `INSERT OR IGNORE INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
+       VALUES (?, ?, 'qusd_swap_refund', ?, 0, 'swap_refund', ?)`,
+    )
+    .run(accountId, at, qusdAmount, swapId);
+}
+

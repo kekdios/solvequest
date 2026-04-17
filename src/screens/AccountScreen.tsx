@@ -47,8 +47,23 @@ export default function AccountScreen({
   /** On-chain QUEST from `/api/qusd/sell/me` (same logic as Prize page). */
   const [questBalance, setQuestBalance] = useState<number | null>(null);
   const [questLoading, setQuestLoading] = useState(() => !isDemo);
+  /** When set (SWAP_USDC_RECEIVE_ADDRESS), Buy QUSD shows this deposit address instead of the user wallet. */
+  const [buyDepositOverride, setBuyDepositOverride] = useState<string | null>(null);
   const verified = Boolean(solReceiveVerified);
   const displayAddr = serverDepositAddress?.trim() ?? "";
+
+  useEffect(() => {
+    if (isDemo) return;
+    void fetch("/api/config/buy-qusd-deposit", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const a = j && typeof j === "object" && typeof (j as { address?: string }).address === "string"
+          ? (j as { address: string }).address.trim()
+          : "";
+        setBuyDepositOverride(a || null);
+      })
+      .catch(() => setBuyDepositOverride(null));
+  }, [isDemo]);
 
   const loadQuestFromSellMe = useCallback(async () => {
     if (isDemo) return;
@@ -226,7 +241,7 @@ export default function AccountScreen({
           )}
         </section>
 
-        {!isDemo && verified && displayAddr ? (
+        {!isDemo && (buyDepositOverride || (verified && displayAddr)) ? (
           <section style={s.buyMorePanel} aria-label="Buy more QUSD">
             <div style={s.buyMoreHeader}>
               <QusdIcon size={28} style={s.buyMoreIcon} />
@@ -234,23 +249,34 @@ export default function AccountScreen({
             </div>
             <p style={s.buyMoreLead}>
               Send <strong style={{ color: "var(--text)" }}>USDC (SPL)</strong> on Solana to{" "}
-              <strong style={{ color: "var(--text)" }}>your verified address</strong> below. The server credits QUSD
-              at <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong> after on-chain
+              <strong style={{ color: "var(--text)" }}>
+                {buyDepositOverride ? "the deposit address" : "your verified address"}
+              </strong>{" "}
+              below. The server credits QUSD at{" "}
+              <strong style={{ color: "var(--text)" }}>{QUSD_PER_USD} QUSD per $1 USDC</strong> after on-chain
               confirmation.
             </p>
             <div style={s.receiveAddressesBlock}>
               <Suspense fallback={<p style={s.suspenseFallback}>Loading…</p>}>
                 <TestReceiveAddresses
-                  serverDepositAddress={displayAddr}
+                  serverDepositAddress={buyDepositOverride ?? displayAddr}
                   depositAddressError={null}
                   addressReady
                   variant="user_deposit"
                   depositHintOverride={
-                    <>
-                      Only send <strong style={s.buyMoreHintStrong}>USDC</strong> on the{" "}
-                      <strong style={s.buyMoreHintStrong}>Solana Network</strong> to this <strong>verified</strong>{" "}
-                      wallet — your linked receive address for QUSD credits.
-                    </>
+                    buyDepositOverride ? (
+                      <>
+                        Only send <strong style={s.buyMoreHintStrong}>USDC</strong> on the{" "}
+                        <strong style={s.buyMoreHintStrong}>Solana Network</strong> to this deposit address (configured
+                        on the server for QUSD credits).
+                      </>
+                    ) : (
+                      <>
+                        Only send <strong style={s.buyMoreHintStrong}>USDC</strong> on the{" "}
+                        <strong style={s.buyMoreHintStrong}>Solana Network</strong> to this <strong>verified</strong>{" "}
+                        wallet — your linked receive address for QUSD credits.
+                      </>
+                    )
                   }
                 />
               </Suspense>
