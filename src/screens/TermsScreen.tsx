@@ -19,6 +19,14 @@ export default function TermsScreen() {
         is an offer or solicitation to buy or sell securities, derivatives, or regulated financial products in any
         jurisdiction.
       </p>
+      <p>
+        <strong>Open positions.</strong> Your open positions are not monitored or marked to market while you are not
+        actively using the Service (for example, when you have closed the site or your session is not loaded in the
+        app). When you log back in or return to the Service, current reference prices are applied and your positions may
+        be evaluated for liquidation under the app’s rules at that time. As a result, a position that would have been
+        liquidated had you stayed online may instead be auto-liquidated when you next use the app, and outcomes can differ
+        from what you would have seen with continuous monitoring.
+      </p>
 
       <h2>2. Not financial advice</h2>
       <p>

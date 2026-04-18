@@ -107,6 +107,9 @@ export default function AdminScreen() {
   const [creditBusy, setCreditBusy] = useState(false);
   const [creditErr, setCreditErr] = useState<string | null>(null);
   const [creditOk, setCreditOk] = useState<string | null>(null);
+  const [prizeAwardBusy, setPrizeAwardBusy] = useState(false);
+  const [prizeAwardErr, setPrizeAwardErr] = useState<string | null>(null);
+  const [prizeAwardOk, setPrizeAwardOk] = useState<string | null>(null);
   const dataRef = useRef<DashboardPayload | null>(null);
   dataRef.current = data;
 
@@ -202,6 +205,66 @@ export default function AdminScreen() {
       setDepositScanBusy(false);
     }
   }, [authLoading, user, depositScanBusy, refreshUser, load]);
+
+  const runDailyPrizeAward = useCallback(async () => {
+    if (authLoading || !user || prizeAwardBusy) return;
+    setPrizeAwardBusy(true);
+    setPrizeAwardErr(null);
+    setPrizeAwardOk(null);
+    try {
+      let r = await fetch("/api/admin/run-daily-prize-award", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (r.status === 401) {
+        await refreshUser();
+        r = await fetch("/api/admin/run-daily-prize-award", {
+          method: "POST",
+          credentials: "include",
+        });
+      }
+      if (r.status === 403) {
+        setPrizeAwardErr("You do not have permission to run the prize award.");
+        return;
+      }
+      const j = (await r.json().catch(() => ({}))) as {
+        ok?: boolean;
+        skipped?: boolean;
+        reason?: string;
+        error?: string;
+        winner?: { label: string; prize_amount: number; awarded_at: number };
+      };
+      if (!r.ok || j.ok === false) {
+        setPrizeAwardErr(j.error || `Prize award failed (${r.status}).`);
+        return;
+      }
+      if (j.skipped) {
+        const reason = j.reason ?? "unknown";
+        const lines: Record<string, string> = {
+          disabled: "Daily prize award is disabled (SOLVEQUEST_DISABLE_DAILY_PRIZE_AWARD).",
+          prize_amount_zero: "PRIZE_AMOUNT is missing or zero — set it in server env.",
+          already_awarded_today: "An award was already recorded for today (Eastern calendar day).",
+          no_eligible: "No prize-eligible player found (e.g. everyone who could win already has, or no qualifying balances).",
+        };
+        setPrizeAwardOk(lines[reason] ?? `Skipped: ${reason}`);
+        return;
+      }
+      if (j.winner) {
+        const { label, prize_amount: amt, awarded_at: at } = j.winner;
+        setPrizeAwardOk(
+          `Awarded ${amt.toLocaleString()} QUSD to ${label} · ${fmtTs(at)} (server time display).`,
+        );
+        const cur = dataRef.current;
+        void load(cur?.swaps.page ?? 1, cur?.swap_errors.page ?? 1, cur?.usdc_deposits?.page ?? 1);
+        return;
+      }
+      setPrizeAwardOk("Completed.");
+    } catch {
+      setPrizeAwardErr("Network error.");
+    } finally {
+      setPrizeAwardBusy(false);
+    }
+  }, [authLoading, user, prizeAwardBusy, refreshUser, load]);
 
   const submitCreditQusd = useCallback(async () => {
     if (authLoading || !user || creditBusy) return;
@@ -353,6 +416,33 @@ export default function AdminScreen() {
             ) : null}
             {creditOk ? (
               <p style={{ color: "var(--ok)", marginTop: 10, fontSize: 13 }}>{creditOk}</p>
+            ) : null}
+          </section>
+
+          <section style={s.section}>
+            <h2 className="app-section-title" style={s.sectionTitle}>
+              Daily prize pool award
+            </h2>
+            <p style={{ ...s.mutedP, marginBottom: 12 }}>
+              Runs the same logic as the scheduled 4 PM Eastern job and{" "}
+              <span className="mono">npm run prize:award</span>: credits <span className="mono">PRIZE_AMOUNT</span> QUSD
+              to the top prize-eligible leaderboard player, at most once per Eastern calendar day.
+            </p>
+            <button
+              type="button"
+              style={{ ...uiBtnPrimary, opacity: prizeAwardBusy ? 0.75 : 1 }}
+              disabled={prizeAwardBusy || loading}
+              onClick={() => void runDailyPrizeAward()}
+            >
+              {prizeAwardBusy ? "Running…" : "Run daily prize award"}
+            </button>
+            {prizeAwardErr ? (
+              <p role="alert" style={{ color: "var(--danger)", marginTop: 10, fontSize: 13 }}>
+                {prizeAwardErr}
+              </p>
+            ) : null}
+            {prizeAwardOk ? (
+              <p style={{ color: "var(--ok)", marginTop: 10, fontSize: 13 }}>{prizeAwardOk}</p>
             ) : null}
           </section>
 

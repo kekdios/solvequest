@@ -2,6 +2,7 @@
  * GET /api/admin/swap-dashboard — admin-only: swap env snapshot, treasury/receive balances, paginated USDC→QUSD deposits, swaps & refund errors.
  * POST /api/admin/run-deposit-scan — admin-only: one full USDC→QUSD deposit scan (same logic as background worker).
  * POST /api/admin/credit-qusd — admin-only: credit QUSD to the account with this verified Solana receive address.
+ * POST /api/admin/run-daily-prize-award — admin-only: run daily QUSD prize award (same logic as scheduled job / CLI).
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -17,6 +18,7 @@ import { getUsdcAtaBalanceUi } from "../server/solanaUsdcScan";
 import { recordDepositScanTickComplete } from "../server/depositScanHealth";
 import { runQusdBuyScanOnce } from "../server/qusdBuyScanWorker";
 import { insertAdminQusdGrant } from "../server/qusdLedger";
+import { runDailyPrizeAward } from "../server/dailyPrizeAward";
 import { parseQusdMultiplier } from "../src/lib/qusdMultiplier";
 
 type SqliteDb = InstanceType<typeof Database>;
@@ -173,6 +175,28 @@ export function createAdminSwapDashboardApiMiddleware(
 
   return (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
     const url = req.url?.split("?")[0] ?? "";
+
+    if (url === "/api/admin/run-daily-prize-award" && req.method === "POST") {
+      void (async () => {
+        if (!requireAdmin(req, res)) return;
+        const database = getDb();
+        if (!database) {
+          sendJson(res, 503, { ok: false, error: "db_unavailable" });
+          return;
+        }
+        try {
+          const result = runDailyPrizeAward(database, process.env);
+          sendJson(res, result.ok ? 200 : 500, result);
+        } catch (e) {
+          console.error("[admin] run-daily-prize-award:", e);
+          sendJson(res, 500, {
+            ok: false,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      })();
+      return;
+    }
 
     if (url === "/api/admin/run-deposit-scan" && req.method === "POST") {
       void (async () => {
