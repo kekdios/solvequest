@@ -443,6 +443,11 @@ export default function PerpsTradeScreen({
           </div>
         )}
       </div>
+
+      <p style={s.sessionFinePrint} role="note">
+        Positions are not monitored while you are not using the app; when you log back in, they may be auto-liquidated
+        based on current index prices.
+      </p>
     </div>
   );
 }
@@ -765,5 +770,12 @@ const s: Record<string, CSSProperties> = {
     padding: "4px 10px",
     fontSize: 12,
     cursor: "pointer",
+  },
+  sessionFinePrint: {
+    margin: "4px 0 0",
+    fontSize: 11,
+    lineHeight: 1.45,
+    color: "var(--muted)",
+    maxWidth: "min(42rem, 100%)",
   },
 };
