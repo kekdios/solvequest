@@ -75,27 +75,6 @@ export default function LeaderboardScreen() {
         <span style={{ color: "var(--muted)", fontSize: 14 }}>daily prize pool</span>
       </div>
 
-      <p style={{ marginTop: 18, lineHeight: 1.6, maxWidth: 640 }}>
-        You compete for this QUSD amount <strong>daily</strong> per the <strong>Prize</strong> page —{" "}
-        <strong>one daily prize win per account</strong> (lifetime). Rankings below are total QUSD (ledger). The{" "}
-        <strong>Prize #</strong> column is your standing among traders still eligible for that prize. To convert trading
-        profits to real <strong>USDC</strong>, use <strong>Swap</strong> after you verify your Solana address (see Swap
-        for the QUSD minimum and rate).
-      </p>
-
-      <p style={{ marginTop: 12, lineHeight: 1.55, maxWidth: 640, fontSize: 13, color: "var(--muted)" }}>
-        <strong style={{ color: "var(--text)" }}>Automatic award:</strong> at <strong>4:00 PM US Eastern</strong> each
-        day, the server credits <strong>PRIZE_AMOUNT</strong> QUSD to the top prize-eligible player (see{" "}
-        <strong>Prize</strong> for details). Recent winners are listed below.
-      </p>
-
-      <h2 style={s.h2}>Top players by QUSD</h2>
-      <p style={s.lead}>
-        Overall # is leaderboard order. Prize # applies only if you have not already won the daily prize. Players show
-        as <strong>cool usernames</strong> (set when you verify email); older rows may still show a masked email until
-        you load the app once signed in.
-      </p>
-
       {rows.length === 0 && !loadErr ? (
         <p style={{ color: "var(--muted)", marginTop: 12 }}>No balances to show yet.</p>
       ) : (
@@ -147,6 +126,27 @@ export default function LeaderboardScreen() {
           </table>
         </div>
       )}
+
+      <p style={{ marginTop: 22, lineHeight: 1.6, maxWidth: 640 }}>
+        You compete for this QUSD amount <strong>daily</strong> per the <strong>Prize</strong> page —{" "}
+        <strong>one daily prize win per account</strong> (lifetime). The table above shows total QUSD (ledger). The{" "}
+        <strong>Prize #</strong> column is your standing among traders still eligible for that prize. To convert trading
+        profits to real <strong>USDC</strong>, use <strong>Swap</strong> after you verify your Solana address (see Swap
+        for the QUSD minimum and rate).
+      </p>
+
+      <p style={{ marginTop: 12, lineHeight: 1.55, maxWidth: 640, fontSize: 13, color: "var(--muted)" }}>
+        <strong style={{ color: "var(--text)" }}>Automatic award:</strong> at <strong>4:00 PM US Eastern</strong> each
+        day, the server credits <strong>PRIZE_AMOUNT</strong> QUSD to the top prize-eligible player (see{" "}
+        <strong>Prize</strong> for details). Recent winners are listed below.
+      </p>
+
+      <h2 style={s.h2}>Top players by QUSD</h2>
+      <p style={s.lead}>
+        Overall # is leaderboard order. Prize # applies only if you have not already won the daily prize. Players show
+        as <strong>cool usernames</strong> (set when you verify email); older rows may still show a masked email until
+        you load the app once signed in.
+      </p>
 
       <PrizeAwardRoll
         rows={awardRows}
