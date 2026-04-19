@@ -157,3 +157,17 @@ CREATE TABLE IF NOT EXISTS daily_prize_award_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_prize_award_log_awarded ON daily_prize_award_log (awarded_at DESC);
+
+/** BIP39 word-order puzzle (Agent Activation); server stores solution until expiry or solve. */
+CREATE TABLE IF NOT EXISTS puzzle_sessions (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  words_json TEXT NOT NULL,
+  solution_json TEXT NOT NULL,
+  solved_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_puzzle_sessions_account ON puzzle_sessions (account_id);
+CREATE INDEX IF NOT EXISTS idx_puzzle_sessions_expires ON puzzle_sessions (expires_at);

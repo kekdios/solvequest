@@ -17,6 +17,7 @@ import { persistedRowToAppSlice } from "./lib/accountHydration";
 import PerpsTradeScreen from "./screens/PerpsTradeScreen";
 import SwapScreen from "./screens/SwapScreen";
 import LandingPage from "./screens/LandingPage";
+import AgentPuzzleScreen from "./screens/AgentPuzzleScreen";
 import AccountScreen from "./screens/AccountScreen";
 import QuickStartScreen from "./screens/QuickStartScreen";
 import HistoryScreen from "./screens/HistoryScreen";
@@ -264,6 +265,10 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
   privacy: {
     title: "Privacy Policy",
     lead: "How we collect and use information.",
+  },
+  agentPuzzle: {
+    title: "Agent Activation",
+    lead: "BIP39 phrase puzzle — bonus QUSD for human solvers.",
   },
 };
 
@@ -715,6 +720,7 @@ function AppInner() {
             <LandingPage
               onStartNow={() => setScreen("trade")}
               onGoToPrize={() => setScreen("sellQusd")}
+              onGoToAgentPuzzle={() => setScreen("agentPuzzle")}
               onTerms={() => setScreen("terms")}
               onPrivacy={() => setScreen("privacy")}
             />
@@ -795,6 +801,16 @@ function AppInner() {
           {screen === "terms" && <TermsScreen />}
 
           {screen === "privacy" && <PrivacyScreen />}
+
+          {screen === "agentPuzzle" && (
+            <AgentPuzzleScreen
+              isDemo={demo}
+              signedIn={Boolean(user)}
+              onGoAuth={() => setScreen("auth")}
+              onGoTrade={() => setScreen("trade")}
+              onRefreshAccount={refreshAccountFromServer}
+            />
+          )}
         </main>
       </div>
     </div>

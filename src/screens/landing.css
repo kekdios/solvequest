@@ -1277,6 +1277,15 @@ button.lp-text-link:hover {
   margin: 0;
 }
 
+.lp-daily-prize-agent-link {
+  text-align: center;
+  margin: 20px auto 0;
+  max-width: 48ch;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
 .lp-btn-secondary {
   display: inline-flex;
   align-items: center;

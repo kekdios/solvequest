@@ -9,6 +9,8 @@ type Props = {
   onStartNow: () => void;
   /** Navigate to Prize (sell QUSD) screen — used for in-app links from the landing copy. */
   onGoToPrize?: () => void;
+  /** Agent Activation puzzle (not in sidebar). */
+  onGoToAgentPuzzle?: () => void;
   onTerms?: () => void;
   onPrivacy?: () => void;
 };
@@ -97,7 +99,7 @@ function PrizeCountdown({ atMs, scheduleLabel }: { atMs: number | null; schedule
   );
 }
 
-export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivacy }: Props) {
+export default function LandingPage({ onStartNow, onGoToPrize, onGoToAgentPuzzle, onTerms, onPrivacy }: Props) {
   const [prizeAmount, setPrizeAmount] = useState<number | null | undefined>(undefined);
   const [nextAwardAtMs, setNextAwardAtMs] = useState<number | null>(null);
   const [awardScheduleLabel, setAwardScheduleLabel] = useState("4:00 PM US Eastern Time");
@@ -320,6 +322,16 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             Read the full prize rules
           </a>
         </p>
+        {onGoToAgentPuzzle ? (
+          <p className="lp-daily-prize-agent-link">
+            <strong>Agent Activation Protocol</strong> — bonus QUSD for solving a short BIP39 word-order puzzle (not on the
+            main menu).{" "}
+            <button type="button" className="lp-text-link" onClick={onGoToAgentPuzzle}>
+              Open puzzle page
+            </button>
+            .
+          </p>
+        ) : null}
       </section>
 
       <section className="lp-section lp-leader-preview" aria-labelledby="lp-lb-heading">

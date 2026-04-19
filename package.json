@@ -22,6 +22,7 @@
     "treasury:b64-to-wallet": "tsx scripts/treasury-b64-to-wallet.ts"
   },
   "dependencies": {
+    "@scure/bip39": "^2.0.1",
     "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-phantom": "^0.9.29",

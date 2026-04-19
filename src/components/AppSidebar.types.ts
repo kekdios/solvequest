@@ -11,4 +11,6 @@ export type AppScreen =
   | "admin"
   | "auth"
   | "terms"
-  | "privacy";
+  | "privacy"
+  /** Linked from landing only — not in sidebar. */
+  | "agentPuzzle";

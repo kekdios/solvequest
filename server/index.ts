@@ -16,6 +16,7 @@ import { createAdminSwapDashboardApiMiddleware } from "../plugins/adminSwapDashb
 import { createLeaderboardApiMiddleware } from "../plugins/leaderboardApiPlugin";
 import { createLandingStatsApiMiddleware } from "../plugins/landingStatsApiPlugin";
 import { createSwapApiMiddleware } from "../plugins/swapApiPlugin";
+import { createAgentPuzzleApiMiddleware } from "../plugins/agentPuzzleApiPlugin";
 import { getDepositScanHealth } from "./depositScanHealth";
 import { startQusdBuyScanWorker } from "./qusdBuyScanWorker";
 import { startDailyPrizeScheduler } from "./dailyPrizeScheduler";
@@ -85,6 +86,7 @@ app.use(createAdminSwapDashboardApiMiddleware(env, root));
 app.use(createLeaderboardApiMiddleware(env, root));
 app.use(createLandingStatsApiMiddleware(env, root));
 app.use(createSwapApiMiddleware(env, root));
+app.use(createAgentPuzzleApiMiddleware(env, root));
 
 const solanaTarget =
   env.SOLANA_RPC_PROXY_TARGET?.trim() || "https://api.mainnet-beta.solana.com";

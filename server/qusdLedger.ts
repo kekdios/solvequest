@@ -168,3 +168,38 @@ export function insertAdminQusdGrant(
     .run(accountId, at, qusdAmount, refId);
 }
 
+/** Sum of puzzle QUSD credits for one US Eastern calendar day (`ref_id` prefix `YYYY-MM-DD|`). */
+export function sumPuzzleRewardsForEasternDay(
+  database: SqliteDb,
+  accountId: string,
+  awardDayEst: string,
+): number {
+  const row = database
+    .prepare(
+      `SELECT COALESCE(SUM(unlocked_delta), 0) AS s FROM qusd_ledger
+       WHERE account_id = ? AND entry_type = 'puzzle_reward' AND ref_id LIKE ?`,
+    )
+    .get(accountId, `${awardDayEst}|%`) as { s: number } | undefined;
+  return Number(row?.s ?? 0);
+}
+
+/** Idempotent per `awardDayEst|sessionId`. Returns true if a new ledger row was inserted. */
+export function insertPuzzleReward(
+  database: SqliteDb,
+  accountId: string,
+  qusdAmount: number,
+  awardDayEst: string,
+  sessionId: string,
+  at: number,
+): boolean {
+  if (!Number.isFinite(qusdAmount) || qusdAmount <= 0) return false;
+  const refId = `${awardDayEst}|${sessionId}`;
+  const r = database
+    .prepare(
+      `INSERT OR IGNORE INTO qusd_ledger (account_id, created_at, entry_type, unlocked_delta, locked_delta, ref_type, ref_id)
+       VALUES (?, ?, 'puzzle_reward', ?, 0, 'puzzle', ?)`,
+    )
+    .run(accountId, at, qusdAmount, refId);
+  return Number(r.changes) > 0;
+}
+
