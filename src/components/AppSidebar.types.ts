@@ -12,5 +12,5 @@ export type AppScreen =
   | "auth"
   | "terms"
   | "privacy"
-  /** Cursor AI prompt (Tetris spec) — linked from landing only; not in sidebar. */
+  /** Daily Tetris (iframe) — linked from landing only; not in sidebar. */
   | "agentPuzzle";

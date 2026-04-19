@@ -324,10 +324,10 @@ export default function LandingPage({ onStartNow, onGoToPrize, onGoToAgentPuzzle
         </p>
         {onGoToAgentPuzzle ? (
           <p className="lp-daily-prize-agent-link">
-            <strong>Build with Cursor</strong> — a Composer-ready prompt to generate a SolveQuest-themed Tetris prototype
-            (single HTML file; not on the main menu).{" "}
+            <strong>Daily Tetris</strong> — neon mini-game with potential <strong>QUSD</strong> scoring (prototype; not on the
+            main menu).{" "}
             <button type="button" className="lp-text-link" onClick={onGoToAgentPuzzle}>
-              Open prompt page
+              Play
             </button>
             .
           </p>

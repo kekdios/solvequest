@@ -267,8 +267,8 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
     lead: "How we collect and use information.",
   },
   agentPuzzle: {
-    title: "Prompt for Cursor AI",
-    lead: "Copy a Composer-ready Tetris + SolveQuest spec.",
+    title: "Daily Tetris",
+    lead: "SolveQuest-themed run — claim flow is simulated until wired.",
   },
 };
 

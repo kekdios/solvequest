@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>SolveQuest — Daily Tetris</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl-fast.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sq: { bg: "#050810", panel: "#0a1020", cyan: "#22d3ee", violet: "#a78bfa", blue: "#38bdf8" }
+          },
+          boxShadow: {
+            neon: "0 0 12px rgba(56, 189, 248, 0.45), 0 0 28px rgba(167, 139, 250, 0.25)"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    html, body { height: 100%; margin: 0; background: #050810; color: #e2e8f0; }
+    .glow-text { text-shadow: 0 0 12px rgba(34, 211, 238, 0.55); }
+    .timer-warn { color: #f87171 !important; text-shadow: 0 0 14px rgba(248, 113, 113, 0.7); }
+    #gameCanvas { touch-action: none; image-rendering: pixelated; }
+    .touch-btn { min-height: 44px; min-width: 44px; }
+  </style>
+</head>
+<body class="min-h-screen bg-sq-bg text-slate-200 antialiased">
+  <!-- ========== LANDING ========== -->
+  <div id="screen-landing" class="min-h-screen flex flex-col items-center justify-center px-4 py-8">
+    <div class="max-w-lg w-full rounded-2xl border border-cyan-500/30 bg-sq-panel/90 p-6 shadow-neon backdrop-blur-sm">
+      <p class="text-xs tracking-[0.2em] text-cyan-400 font-bold mb-2">SOLVEQUEST.IO</p>
+      <h1 class="text-2xl sm:text-3xl font-black glow-text text-white mb-2">Play Daily Tetris</h1>
+      <p class="text-violet-300/90 text-sm mb-4">Earn up to <span class="text-cyan-300 font-semibold">750 QUSD</span> (potential — see in-game note)</p>
+      <div class="rounded-xl border border-white/10 bg-black/40 p-4 mb-5">
+        <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Next daily reset (US Eastern)</p>
+        <p id="countdown-reset" class="text-lg font-mono text-cyan-300">—</p>
+        <p class="text-[11px] text-slate-500 mt-1">Awards reference 4:00 PM ET (operator schedule).</p>
+      </div>
+      <div class="relative group mb-5">
+        <button type="button" id="btn-how" class="text-xs text-violet-400 underline decoration-dotted">How it works</button>
+        <div id="how-tooltip" class="hidden absolute z-20 left-0 right-0 top-full mt-2 p-3 rounded-lg border border-violet-500/40 bg-slate-900/95 text-xs text-slate-300 shadow-xl">
+          High scores build engagement; on-platform <strong class="text-cyan-300">QUSD</strong> from trading and contests is separate from this mini-game prototype. Use <strong>Claim</strong> to exercise the placeholder wallet flow — wire your backend when ready.
+        </div>
+      </div>
+      <button type="button" id="btn-play" class="w-full py-4 rounded-xl font-bold text-sq-bg bg-gradient-to-r from-cyan-400 to-violet-500 shadow-neon hover:opacity-95 active:scale-[0.99] transition">
+        Start 3:00 Run
+      </button>
+      <p class="text-[11px] text-slate-500 mt-4 text-center">Max 750 QUSD per user per day from Tetris — enforced server-side when integrated.</p>
+    </div>
+  </div>
+
+  <!-- ========== GAME ========== -->
+  <div id="screen-game" class="hidden min-h-screen flex flex-col">
+    <header class="shrink-0 border-b border-cyan-500/20 bg-sq-panel/80 px-3 py-2 flex flex-wrap gap-2 items-center justify-between">
+      <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs font-mono">
+        <span>Score <strong id="hud-score" class="text-cyan-300">0</strong></span>
+        <span>Lines <strong id="hud-lines" class="text-violet-300">0</strong></span>
+        <span>Lv <strong id="hud-level" class="text-white">1</strong></span>
+        <span class="text-amber-300/90">QUSD <strong id="hud-qusd">0</strong></span>
+      </div>
+      <div id="hud-timer" class="text-sm font-mono font-bold text-cyan-300 tabular-nums">3:00</div>
+    </header>
+    <div class="flex-1 flex flex-col lg:flex-row gap-2 p-2 max-w-5xl mx-auto w-full">
+      <div class="flex-1 flex justify-center items-start min-h-0">
+        <canvas id="gameCanvas" width="360" height="600" class="rounded-lg border border-cyan-500/25 max-w-full h-auto"></canvas>
+      </div>
+      <aside class="w-full lg:w-40 shrink-0 flex flex-row lg:flex-col gap-3">
+        <div class="rounded-xl border border-violet-500/30 bg-black/35 p-3 flex-1">
+          <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Next</p>
+          <canvas id="nextCanvas" width="100" height="100" class="mx-auto"></canvas>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-black/35 p-3 text-[10px] text-slate-400 flex-1">
+          <p><kbd class="px-1 rounded bg-white/10">←→</kbd> move</p>
+          <p><kbd class="px-1 rounded bg-white/10">↑</kbd> rotate</p>
+          <p><kbd class="px-1 rounded bg-white/10">↓</kbd> soft</p>
+          <p><kbd class="px-1 rounded bg-white/10">Space</kbd> hard</p>
+        </div>
+      </aside>
+    </div>
+    <div class="shrink-0 grid grid-cols-5 gap-1 px-2 pb-3 max-w-lg mx-auto w-full">
+      <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-cyan-500/30 text-lg" data-act="left" aria-label="Left">←</button>
+      <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-cyan-500/30 text-lg" data-act="rot" aria-label="Rotate">↻</button>
+      <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-cyan-500/30 text-lg" data-act="right" aria-label="Right">→</button>
+      <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-violet-500/30 text-sm" data-act="soft" aria-label="Soft drop">▼</button>
+      <button type="button" class="touch-btn rounded-lg bg-violet-600/80 border border-violet-400/50 text-sm font-bold" data-act="hard" aria-label="Hard drop">⤓</button>
+    </div>
+  </div>
+
+  <!-- ========== GAME OVER ========== -->
+  <div id="screen-over" class="hidden min-h-screen flex flex-col items-center justify-center px-4 py-8">
+    <div class="max-w-md w-full rounded-2xl border border-violet-500/35 bg-sq-panel/95 p-6 text-center shadow-neon">
+      <h2 class="text-2xl font-black text-white mb-2">Run complete</h2>
+      <p class="text-slate-400 text-sm mb-4" id="over-reason">Time’s up or stack out.</p>
+      <div class="grid grid-cols-2 gap-3 text-left text-sm mb-6 font-mono">
+        <div class="rounded-lg bg-black/40 p-3 border border-white/10"><div class="text-slate-500 text-xs">Score</div><div id="over-score" class="text-cyan-300 text-lg">0</div></div>
+        <div class="rounded-lg bg-black/40 p-3 border border-white/10"><div class="text-slate-500 text-xs">Lines</div><div id="over-lines" class="text-violet-300 text-lg">0</div></div>
+        <div class="rounded-lg bg-black/40 p-3 border border-white/10"><div class="text-slate-500 text-xs">Potential QUSD</div><div id="over-qusd" class="text-amber-300 text-lg">0</div></div>
+        <div class="rounded-lg bg-black/40 p-3 border border-white/10"><div class="text-slate-500 text-xs">Behavior score</div><div id="over-behavior" class="text-slate-200 text-lg">—</div></div>
+      </div>
+      <button type="button" id="btn-claim" class="w-full py-3 rounded-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-500 text-sq-bg mb-3 shadow-lg">
+        Claim QUSD
+      </button>
+      <p id="claim-status" class="text-xs text-slate-500 min-h-[1rem]"></p>
+      <button type="button" id="btn-again" class="mt-4 text-sm text-violet-400 underline">Play again</button>
+    </div>
+  </div>
+
+  <script>
+  /* =============================================================================
+   * SolveQuest Tetris — single-file prototype
+   * Sound placeholders: search PLAY_TONE for Web Audio hook points.
+   * ============================================================================= */
+
+  const DateTime = window.luxon && window.luxon.DateTime;
+
+  const COLORS = {
+    I: "#22d3ee", O: "#fbbf24", T: "#a78bfa", S: "#4ade80", Z: "#f87171", J: "#60a5fa", L: "#fb923c"
+  };
+  const STATIC_LABELS = { I: "HODL", O: "VAULT", T: "TRADE", S: "LONG", Z: "SHORT" };
+  const BIP39_POOL = [
+    "agent", "mnemonic", "oracle", "ledger", "yield", "swap", "vault", "trade", "margin", "signal",
+    "alpha", "beta", "delta", "gamma", "block", "chain", "proof", "stake", "pool", "route", "cipher", "hash", "index", "candle"
+  ];
+
+  const TYPES = ["I", "O", "T", "S", "Z", "J", "L"];
+
+  /** 4x4 matrices, rotation index 0..3 */
+  const SHAPES = {
+    I: [
+      [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+      [[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]],
+      [[0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0]],
+      [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]]
+    ],
+    O: [
+      [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],
+      [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],
+      [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],
+      [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]]
+    ],
+    T: [
+      [[0,1,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+      [[0,1,0,0],[0,1,1,0],[0,1,0,0],[0,0,0,0]],
+      [[0,0,0,0],[1,1,1,0],[0,1,0,0],[0,0,0,0]],
+      [[0,1,0,0],[1,1,0,0],[0,1,0,0],[0,0,0,0]]
+    ],
+    S: [
+      [[0,1,1,0],[1,1,0,0],[0,0,0,0],[0,0,0,0]],
+      [[0,1,0,0],[0,1,1,0],[0,0,1,0],[0,0,0,0]],
+      [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]],
+      [[1,0,0,0],[1,1,0,0],[0,1,0,0],[0,0,0,0]]
+    ],
+    Z: [
+      [[1,1,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],
+      [[0,0,1,0],[0,1,1,0],[0,1,0,0],[0,0,0,0]],
+      [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]],
+      [[0,1,0,0],[1,1,0,0],[1,0,0,0],[0,0,0,0]]
+    ],
+    J: [
+      [[1,0,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+      [[0,1,1,0],[0,1,0,0],[0,1,0,0],[0,0,0,0]],
+      [[0,0,0,0],[1,1,1,0],[0,0,1,0],[0,0,0,0]],
+      [[0,1,0,0],[0,1,0,0],[1,1,0,0],[0,0,0,0]]
+    ],
+    L: [
+      [[0,0,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+      [[0,1,0,0],[0,1,0,0],[0,1,1,0],[0,0,0,0]],
+      [[0,0,0,0],[1,1,1,0],[1,0,0,0],[0,0,0,0]],
+      [[1,1,0,0],[0,1,0,0],[0,1,0,0],[0,0,0,0]]
+    ]
+  };
+
+  /** SRS wall kicks: piece type, fromRot, toRot (clockwise +1) → [dx,dy] attempts */
+  const KICKS_JLSTZ = {
+    "0-1": [[0,0],[-1,0],[-1,1],[0,-2],[-1,-2]],
+    "1-2": [[0,0],[1,0],[1,-1],[0,2],[1,2]],
+    "2-3": [[0,0],[1,0],[1,1],[0,-2],[1,-2]],
+    "3-0": [[0,0],[-1,0],[-1,-1],[0,2],[-2,2]]
+  };
+  const KICKS_I = {
+    "0-1": [[0,0],[-2,0],[1,0],[-2,-1],[1,2]],
+    "1-2": [[0,0],[-1,0],[2,0],[-1,2],[2,-1]],
+    "2-3": [[0,0],[2,0],[-1,0],[2,1],[-1,-2]],
+    "3-0": [[0,0],[1,0],[-2,0],[1,-2],[-2,1]]
+  };
+
+  const W = 10, H = 20;
+  const GAME_MS = 180000;
+
+  let canvas, ctx, nextC, nextCtx;
+  let cell = 24, offX = 0, offY = 0;
+
+  let board = [];
+  let bag = [];
+  let piece = null;
+  let nextType = null;
+  let score = 0, lines = 0, level = 1, themedClears = 0;
+  let dropMs = 1000;
+  let lastTick = 0, accDrop = 0;
+  let lockReset = 0, lockMoves = 0;
+  const LOCK_DELAY = 500, LOCK_RESET_MAX = 15;
+
+  let gameStart = 0, timeLeftMs = GAME_MS;
+  let running = false, rafId = 0;
+
+  /** Anti-bot / engagement telemetry */
+  const behavior = {
+    keyTimes: [],
+    mouseMoves: 0,
+    mouseDist: 0,
+    lastMouse: null,
+    lastKeyT: 0
+  };
+
+  function potentialQusd() {
+    return Math.floor(score / 8000) + 25 * themedClears;
+  }
+
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function refillBag() {
+    bag = shuffle([...TYPES]);
+  }
+
+  function pullType() {
+    if (!bag.length) refillBag();
+    return bag.pop();
+  }
+
+  function labelForType(t) {
+    if (t === "J" || t === "L") return BIP39_POOL[(Math.random() * BIP39_POOL.length) | 0];
+    return STATIC_LABELS[t];
+  }
+
+  function emptyBoard() {
+    board = Array.from({ length: H }, () => Array(W).fill(null));
+  }
+
+  function shapeAt(type, rot) {
+    return SHAPES[type][rot & 3].map(r => [...r]);
+  }
+
+  function eachCell(mat, fn) {
+    for (let r = 0; r < 4; r++)
+      for (let c = 0; c < 4; c++)
+        if (mat[r][c]) fn(r, c);
+  }
+
+  function collide(px, py, mat) {
+    let hit = false;
+    eachCell(mat, (r, c) => {
+      const x = px + c, y = py + r;
+      if (x < 0 || x >= W || y >= H) hit = true;
+      if (y >= 0 && y < H && board[y][x]) hit = true;
+    });
+    return hit;
+  }
+
+  function tryRotate() {
+    if (!piece) return false;
+    const from = piece.rot;
+    const to = (from + 1) & 3;
+    const mat = shapeAt(piece.type, to);
+    const key = `${from}-${to}`;
+    const kicks =
+      piece.type === "O" ? [[0, 0]] : piece.type === "I" ? (KICKS_I[key] || [[0, 0]]) : (KICKS_JLSTZ[key] || [[0, 0]]);
+    for (const [dx, dy] of kicks) {
+      if (!collide(piece.x + dx, piece.y + dy, mat)) {
+        piece.rot = to;
+        piece.mat = mat;
+        piece.x += dx;
+        piece.y += dy;
+        bumpLockReset();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function bumpLockReset() {
+    if (lockMoves < LOCK_RESET_MAX) {
+      lockReset = performance.now();
+      lockMoves++;
+    }
+  }
+
+  function spawn() {
+    const t = nextType ?? pullType();
+    nextType = pullType();
+    const mat = shapeAt(t, 0);
+    let px = t === "I" ? 3 : 3, py = t === "I" ? -1 : -1;
+    if (t === "O") px = 4;
+    piece = { type: t, x: px, y: py, rot: 0, mat, label: labelForType(t), onGround: false };
+    if (collide(piece.x, piece.y, piece.mat)) {
+      endGame("Stack reached the top.");
+    }
+  }
+
+  function lockPiece() {
+    /* PLAY_TONE: short lock "thud" — oscillator 80Hz, gain envelope */
+    eachCell(piece.mat, (r, c) => {
+      if (!piece.mat[r][c]) return;
+      const x = piece.x + c, y = piece.y + r;
+      if (y >= 0) board[y][x] = { color: COLORS[piece.type], label: piece.label };
+    });
+    clearLines();
+    spawn();
+    accDrop = 0;
+  }
+
+  function clearLines() {
+    const cleared = [];
+    for (let y = H - 1; y >= 0; y--) {
+      if (board[y].every(c => c !== null)) cleared.push(y);
+    }
+    if (!cleared.length) return;
+
+    let themedThisRound = 0;
+    for (const y of cleared) {
+      const labels = board[y].map(c => c && c.label).filter(Boolean);
+      const uniq = new Set(labels);
+      const hasThemedWordLine = labels.length > 0 && uniq.size >= 2;
+      if (hasThemedWordLine) {
+        themedThisRound++;
+        score += 800 * level;
+        burstConfetti();
+      } else if (labels.length > 0) {
+        score += 200 * level;
+        themedThisRound++;
+        burstConfetti(0.4);
+      }
+    }
+
+    const n = cleared.length;
+    const base = n === 1 ? 100 : n === 2 ? 300 : n === 3 ? 500 : 800;
+    score += base * level;
+    lines += n;
+    themedClears += themedThisRound;
+    level = 1 + (lines / 10 | 0);
+    dropMs = Math.max(80, 1000 - (level - 1) * 65);
+
+    /* PLAY_TONE: line clear arpeggio */
+    for (const y of cleared.sort((a, b) => b - a)) board.splice(y, 1);
+  }
+
+  function burstConfetti(st = 1) {
+    if (typeof confetti !== "function") return;
+    confetti({ particleCount: Math.floor(40 * st), spread: 70, origin: { y: 0.6 }, colors: ["#22d3ee", "#a78bfa", "#38bdf8"] });
+  }
+
+  function hardDrop() {
+    if (!piece || !running) return;
+    let d = 0;
+    while (!collide(piece.x, piece.y + 1, piece.mat)) {
+      piece.y++;
+      d += 2;
+    }
+    score += d;
+    lockPiece();
+  }
+
+  function softTick(dt) {
+    accDrop += dt;
+    if (accDrop < dropMs) return;
+    accDrop = 0;
+    if (!piece) return;
+    if (!collide(piece.x, piece.y + 1, piece.mat)) {
+      piece.onGround = false;
+      piece.y++;
+      score += 1;
+    } else {
+      if (!piece.onGround) {
+        piece.onGround = true;
+        lockReset = performance.now();
+        lockMoves = 0;
+      }
+      if (performance.now() - lockReset > LOCK_DELAY) lockPiece();
+    }
+  }
+
+  function drawBackground() {
+    const gw = W * cell, gh = H * cell;
+    const g = ctx.createLinearGradient(0, 0, gw, gh);
+    g.addColorStop(0, "#060b18");
+    g.addColorStop(1, "#0a1028");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, gw, gh);
+
+    ctx.strokeStyle = "rgba(34, 211, 238, 0.06)";
+    ctx.lineWidth = 1;
+    let seed = 42;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    let px = 0, py = gh * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(0, py);
+    for (let x = 0; x <= gw; x += 8) {
+      py += (rnd() - 0.48) * 6;
+      ctx.lineTo(x, py);
+    }
+    ctx.stroke();
+
+    const cw = gw / 14;
+    for (let i = 0; i < 14; i++) {
+      const o = i * cw + rnd() * 10;
+      const h = 20 + rnd() * (gh * 0.35);
+      const up = rnd() > 0.5;
+      ctx.fillStyle = up ? "rgba(74, 222, 128, 0.12)" : "rgba(248, 113, 113, 0.12)";
+      ctx.fillRect(o, gh * 0.55 - h, Math.max(3, cw * 0.35), h);
+    }
+  }
+
+  function drawGrid() {
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.15)";
+    ctx.shadowColor = "rgba(34, 211, 238, 0.25)";
+    ctx.shadowBlur = 8;
+    for (let x = 0; x <= W; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * cell, 0);
+      ctx.lineTo(x * cell, H * cell);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= H; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, y * cell);
+      ctx.lineTo(W * cell, y * cell);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function drawCell(x, y, color, label) {
+    const pad = 1;
+    ctx.fillStyle = color;
+    ctx.fillRect(x * cell + pad, y * cell + pad, cell - pad * 2, cell - pad * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.strokeRect(x * cell + pad, y * cell + pad, cell - pad * 2, cell - pad * 2);
+    if (label && cell >= 18) {
+      ctx.font = `600 ${Math.max(7, cell / 4)}px system-ui,sans-serif`;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillText(label.slice(0, 5), x * cell + 3, y * cell + cell / 2 + 3);
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.fillText(label.slice(0, 5), x * cell + 2, y * cell + cell / 2 + 2);
+    }
+  }
+
+  function drawPieceGhost() {
+    if (!piece) return;
+    let gy = piece.y;
+    while (!collide(piece.x, gy + 1, piece.mat)) gy++;
+    ctx.globalAlpha = 0.22;
+    eachCell(piece.mat, (r, c) => {
+      if (!piece.mat[r][c]) return;
+      const x = piece.x + c, y = gy + r;
+      if (y >= 0) {
+        ctx.fillStyle = COLORS[piece.type];
+        ctx.fillRect(x * cell + 1, y * cell + 1, cell - 2, cell - 2);
+      }
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  function drawActivePiece() {
+    if (!piece) return;
+    eachCell(piece.mat, (r, c) => {
+      if (!piece.mat[r][c]) return;
+      const x = piece.x + c, y = piece.y + r;
+      if (y >= 0) drawCell(x, y, COLORS[piece.type], piece.label);
+    });
+  }
+
+  function drawBoard() {
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const c = board[y][x];
+        if (c) drawCell(x, y, c.color, c.label);
+      }
+  }
+
+  function render() {
+    ctx.setTransform(1, 0, 0, 1, offX, offY);
+    drawBackground();
+    drawGrid();
+    drawBoard();
+    drawPieceGhost();
+    drawActivePiece();
+
+    nextCtx.setTransform(1, 0, 0, 1, 0, 0);
+    nextCtx.clearRect(0, 0, nextC.width, nextC.height);
+    if (nextType) {
+      const m = shapeAt(nextType, 0);
+      const cs = 18;
+      eachCell(m, (r, c) => {
+        if (!m[r][c]) return;
+        nextCtx.fillStyle = COLORS[nextType];
+        nextCtx.fillRect(20 + c * cs, 15 + r * cs, cs - 1, cs - 1);
+      });
+    }
+  }
+
+  function resizeCanvas() {
+    const maxW = Math.min(420, window.innerWidth - 24);
+    cell = Math.max(16, Math.floor(maxW / W));
+    const gw = W * cell, gh = H * cell;
+    canvas.width = gw;
+    canvas.height = gh;
+    offX = 0;
+    offY = 0;
+  }
+
+  function hud() {
+    document.getElementById("hud-score").textContent = String(score);
+    document.getElementById("hud-lines").textContent = String(lines);
+    document.getElementById("hud-level").textContent = String(level);
+    document.getElementById("hud-qusd").textContent = String(potentialQusd());
+    const sec = Math.max(0, Math.ceil(timeLeftMs / 1000));
+    const m = (sec / 60) | 0, s = sec % 60;
+    const el = document.getElementById("hud-timer");
+    el.textContent = `${m}:${String(s).padStart(2, "0")}`;
+    el.classList.toggle("timer-warn", sec <= 30);
+  }
+
+  function loop(t) {
+    if (!running) return;
+    const dt = t - lastTick;
+    lastTick = t;
+    timeLeftMs -= dt;
+    if (timeLeftMs <= 0) {
+      timeLeftMs = 0;
+      endGame("3:00 elapsed.");
+      return;
+    }
+    softTick(dt);
+    hud();
+    render();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function recordKey() {
+    const now = performance.now();
+    if (behavior.lastKeyT) behavior.keyTimes.push(now - behavior.lastKeyT);
+    behavior.lastKeyT = now;
+  }
+
+  function computeBehaviorScore() {
+    const intervals = behavior.keyTimes.slice(-40);
+    if (intervals.length < 4) return 72;
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const v = intervals.reduce((a, b) => a + (b - mean) ** 2, 0) / intervals.length;
+    const sd = Math.sqrt(v);
+    const cv = mean > 0 ? sd / mean : 1;
+    let b = 55 + Math.min(40, cv * 120);
+    b += Math.min(15, Math.log1p(behavior.mouseMoves) * 2);
+    if (cv < 0.04) b -= 25;
+    return Math.max(0, Math.min(100, Math.round(b)));
+  }
+
+  /** Placeholder: real app signs with wallet / session key */
+  async function signScore(finalScore, address) {
+    const msgStr = JSON.stringify({ finalScore, address, ts: Date.now(), puzzleId: "daily-tetris" });
+    const msg = new TextEncoder().encode(msgStr);
+    const kp = nacl.sign.keyPair();
+    const sig = nacl.sign.detached(msg, kp.secretKey);
+    const signature = btoa(String.fromCharCode(...sig));
+    return { signature, signingPublicKey: btoa(String.fromCharCode(...kp.publicKey)) };
+  }
+
+  /**
+   * Placeholder submit — replace with fetch("/api/tetris/claim", { body: JSON.stringify(payload) })
+   * Backend will use SET ... NX on address + date to prevent double claims.
+   */
+  async function submitClaim(payload) {
+    await new Promise(r => setTimeout(r, 600));
+    console.log("[tetris-claim]", payload);
+    return { ok: true, simulated: true };
+  }
+
+  function endGame(reason) {
+    if (!running) return;
+    running = false;
+    cancelAnimationFrame(rafId);
+    /* PLAY_TONE: game over low sweep */
+    document.getElementById("screen-game").classList.add("hidden");
+    document.getElementById("screen-over").classList.remove("hidden");
+    document.getElementById("over-reason").textContent = reason;
+    document.getElementById("over-score").textContent = String(score);
+    document.getElementById("over-lines").textContent = String(lines);
+    document.getElementById("over-qusd").textContent = String(potentialQusd());
+    document.getElementById("over-behavior").textContent = String(computeBehaviorScore());
+    document.getElementById("claim-status").textContent = "";
+
+    const hi = parseInt(localStorage.getItem("sq-tetris-hi") || "0", 10);
+    if (score > hi) {
+      localStorage.setItem("sq-tetris-hi", String(score));
+      if (typeof confetti === "function") {
+        confetti({ particleCount: 120, spread: 100, origin: { y: 0.45 }, ticks: 200 });
+      }
+    }
+  }
+
+  function startGame() {
+    document.getElementById("screen-landing").classList.add("hidden");
+    document.getElementById("screen-over").classList.add("hidden");
+    document.getElementById("screen-game").classList.remove("hidden");
+    emptyBoard();
+    refillBag();
+    nextType = pullType();
+    score = lines = level = themedClears = 0;
+    dropMs = 1000;
+    timeLeftMs = GAME_MS;
+    behavior.keyTimes.length = 0;
+    behavior.mouseMoves = 0;
+    behavior.mouseDist = 0;
+    behavior.lastMouse = null;
+    behavior.lastKeyT = 0;
+    lockMoves = 0;
+    lockReset = performance.now();
+    piece = null;
+    spawn();
+    running = true;
+    lastTick = performance.now();
+    accDrop = 0;
+    resizeCanvas();
+    hud();
+    render();
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function updateCountdown() {
+    const el = document.getElementById("countdown-reset");
+    try {
+      if (!DateTime) throw new Error("no luxon");
+      let next = DateTime.now().setZone("America/New_York").set({ hour: 16, minute: 0, second: 0, millisecond: 0 });
+      if (next <= DateTime.now().setZone("America/New_York")) next = next.plus({ days: 1 });
+      const ms = next.diff(DateTime.now()).milliseconds;
+      const h = (ms / 3600000) | 0, m = ((ms % 3600000) / 60000) | 0, s = ((ms % 60000) / 1000) | 0;
+      el.textContent = `${h}h ${m}m ${s}s · ${next.toFormat("LLL d, h:mm a")} ET`;
+    } catch {
+      el.textContent = "Daily reset 4:00 PM US Eastern";
+    }
+  }
+
+  document.getElementById("btn-how").addEventListener("click", () => {
+    document.getElementById("how-tooltip").classList.toggle("hidden");
+  });
+
+  document.getElementById("btn-play").addEventListener("click", startGame);
+
+  document.getElementById("btn-again").addEventListener("click", () => {
+    document.getElementById("screen-over").classList.add("hidden");
+    document.getElementById("screen-landing").classList.remove("hidden");
+  });
+
+  document.getElementById("btn-claim").addEventListener("click", async () => {
+    const status = document.getElementById("claim-status");
+    status.textContent = "Signing…";
+    const address = localStorage.getItem("sq-mock-sol") || "SoLveQuest111111111111111111111111111111111";
+    const sig = await signScore(score, address);
+    const payload = {
+      finalScore: score,
+      linesCleared: lines,
+      potentialQUSD: potentialQusd(),
+      timestamp: Date.now(),
+      signature: sig.signature,
+      signingPublicKey: sig.signingPublicKey,
+      solanaAddress: address,
+      puzzleId: "daily-tetris",
+      behaviorScore: computeBehaviorScore()
+    };
+    try {
+      const res = await submitClaim(payload);
+      status.textContent = res.ok ? "Success (simulated). Wire submitClaim to your API." : "Failed";
+    } catch (e) {
+      status.textContent = "Error — check console";
+    }
+  });
+
+  document.querySelectorAll("[data-act]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!running || !piece) return;
+      recordKey();
+      const a = btn.getAttribute("data-act");
+      if (a === "left" && !collide(piece.x - 1, piece.y, piece.mat)) { piece.x--; bumpLockReset(); }
+      if (a === "right" && !collide(piece.x + 1, piece.y, piece.mat)) { piece.x++; bumpLockReset(); }
+      if (a === "rot") tryRotate();
+      if (a === "soft") {
+        if (!collide(piece.x, piece.y + 1, piece.mat)) { piece.y++; score += 1; bumpLockReset(); }
+      }
+      if (a === "hard") hardDrop();
+      render();
+    });
+  });
+
+  window.addEventListener("keydown", e => {
+    if (!running || !piece) return;
+    const k = e.key;
+    if (["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "].includes(k)) e.preventDefault();
+    if (k === "ArrowLeft") { recordKey(); if (!collide(piece.x - 1, piece.y, piece.mat)) { piece.x--; bumpLockReset(); } }
+    if (k === "ArrowRight") { recordKey(); if (!collide(piece.x + 1, piece.y, piece.mat)) { piece.x++; bumpLockReset(); } }
+    if (k === "ArrowDown") { recordKey(); if (!collide(piece.x, piece.y + 1, piece.mat)) { piece.y++; score += 1; bumpLockReset(); } }
+    if (k === "ArrowUp") { recordKey(); tryRotate(); }
+    if (k === " ") { recordKey(); hardDrop(); }
+    render();
+  });
+
+  window.addEventListener("mousemove", e => {
+    if (!behavior.lastMouse) behavior.lastMouse = { x: e.clientX, y: e.clientY };
+    else {
+      behavior.mouseDist += Math.hypot(e.clientX - behavior.lastMouse.x, e.clientY - behavior.lastMouse.y);
+      behavior.lastMouse = { x: e.clientX, y: e.clientY };
+      behavior.mouseMoves++;
+    }
+  });
+
+  let touchStart = null;
+  canvas = document.getElementById("gameCanvas");
+  ctx = canvas.getContext("2d");
+  nextC = document.getElementById("nextCanvas");
+  nextCtx = nextC.getContext("2d");
+
+  canvas.addEventListener("touchstart", e => { touchStart = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }; }, { passive: true });
+  canvas.addEventListener("touchend", e => {
+    if (!touchStart || !running || !piece) return;
+    const x = e.changedTouches[0].clientX - touchStart.x;
+    const y = e.changedTouches[0].clientY - touchStart.y;
+    recordKey();
+    if (Math.abs(x) > Math.abs(y) && Math.abs(x) > 28) {
+      if (x < 0 && !collide(piece.x - 1, piece.y, piece.mat)) piece.x--;
+      else if (x > 0 && !collide(piece.x + 1, piece.y, piece.mat)) piece.x++;
+      bumpLockReset();
+    } else if (y < -24) tryRotate();
+    else if (y > 40) hardDrop();
+    touchStart = null;
+    render();
+  });
+
+  window.addEventListener("resize", () => { if (running) { resizeCanvas(); render(); } });
+
+  setInterval(updateCountdown, 1000);
+  updateCountdown();
+  </script>
+</body>
+</html>
