@@ -1,5 +1,5 @@
 /**
- * Public prize pool: `GET /api/prize/config` — `PRIZE_AMOUNT` from env.
+ * Public prize pool: `GET /api/prize/config` — `PRIZE_AMOUNT` from env plus next scheduled award time (4PM America/New_York).
  * `GET /api/prize/awards` — recent automatic daily prize winners (from SQLite).
  */
 import fs from "node:fs";
@@ -9,6 +9,7 @@ import Database from "better-sqlite3";
 import { resolveSolvequestDbPath } from "../server/accountEnsure";
 import { ensureAccountsSchema } from "../server/ensureAccountsSchema";
 import { ensureVisitorsSchema } from "../server/ensureVisitorsSchema";
+import { nextDailyPrizeAwardMs } from "../server/nextDailyPrizeAwardMs";
 import { queryRecentPrizeAwards } from "../server/prizeAwardHistory";
 
 type SqliteDb = InstanceType<typeof Database>;
@@ -58,7 +59,14 @@ export function createPrizeConfigApiMiddleware(
 
     if (url === "/api/prize/config") {
       const prizeAmount = parseEnvNumber(env.PRIZE_AMOUNT, 0);
-      sendJson(res, 200, { prize_amount: prizeAmount });
+      const now = new Date();
+      sendJson(res, 200, {
+        prize_amount: prizeAmount,
+        next_award_at_ms: nextDailyPrizeAwardMs(now),
+        award_timezone: "America/New_York",
+        award_local_hour: 16,
+        award_schedule_label: "4:00 PM US Eastern Time",
+      });
       return;
     }
 

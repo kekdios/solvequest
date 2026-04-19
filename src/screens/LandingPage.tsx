@@ -71,8 +71,36 @@ type LandingStats = {
   accounts_with_email: number | null;
 };
 
+type PrizeConfigResponse = {
+  prize_amount?: number;
+  next_award_at_ms?: number;
+  award_schedule_label?: string;
+};
+
+function PrizeCountdown({ atMs, scheduleLabel }: { atMs: number | null; scheduleLabel: string }) {
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  if (atMs == null || !Number.isFinite(atMs)) return null;
+  const sec = Math.max(0, Math.floor((atMs - tick) / 1000));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    <p className="lp-prize-countdown" role="status" aria-live="polite">
+      Next scheduled award: <strong className="mono">{pad(h)}</strong>h <strong className="mono">{pad(m)}</strong>m{" "}
+      <strong className="mono">{pad(s)}</strong>s · {scheduleLabel}
+    </p>
+  );
+}
+
 export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivacy }: Props) {
   const [prizeAmount, setPrizeAmount] = useState<number | null | undefined>(undefined);
+  const [nextAwardAtMs, setNextAwardAtMs] = useState<number | null>(null);
+  const [awardScheduleLabel, setAwardScheduleLabel] = useState("4:00 PM US Eastern Time");
   const [lbRows, setLbRows] = useState<LeaderboardPreviewRow[]>([]);
   const [lbLoading, setLbLoading] = useState(true);
   const [stats, setStats] = useState<LandingStats | null>(null);
@@ -87,11 +115,17 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
       .then(([cfg, lb, st]) => {
         if (cancelled) return;
         if (cfg && typeof cfg === "object" && "prize_amount" in cfg) {
-          const c = cfg as { prize_amount?: number };
+          const c = cfg as PrizeConfigResponse;
           const n = c.prize_amount;
           setPrizeAmount(typeof n === "number" && Number.isFinite(n) ? n : null);
+          const na = c.next_award_at_ms;
+          setNextAwardAtMs(typeof na === "number" && Number.isFinite(na) ? na : null);
+          if (typeof c.award_schedule_label === "string" && c.award_schedule_label.trim()) {
+            setAwardScheduleLabel(c.award_schedule_label.trim());
+          }
         } else {
           setPrizeAmount(null);
+          setNextAwardAtMs(null);
         }
         const rows =
           lb && typeof lb === "object" && Array.isArray((lb as { rows?: unknown }).rows)
@@ -112,6 +146,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
       .catch(() => {
         if (!cancelled) {
           setPrizeAmount(null);
+          setNextAwardAtMs(null);
           setLbRows([]);
           setLbLoading(false);
         }
@@ -141,15 +176,15 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             every day
           </h1>
           <p className="lp-hero-lead">
-            Compete on the daily leaderboard. <strong>One winner</strong> per Eastern day: the highest QUSD among{" "}
-            <strong>prize-eligible</strong> traders when the automatic award runs (
-            <strong>4:00&nbsp;PM US Eastern Time</strong>). The full pool goes to that trader —{" "}
-            <strong>no splitting</strong>.
+            Compete on the live leaderboard. <strong>One winner</strong> per Eastern day gets the full QUSD pool as a{" "}
+            <strong>QUSD ledger credit only</strong> — not USDC — until they (or any user) choose to swap. The automatic
+            award runs at <strong>4:00&nbsp;PM US Eastern Time</strong> for the #1 <strong>prize-eligible</strong> trader.{" "}
+            <strong>No splitting.</strong>
           </p>
           <div
             className="lp-hero-swap-highlight"
             role="region"
-            aria-label="Swap QUSD to USDC using the in-app Swap feature"
+            aria-label="Swap QUSD to Solana USDC using the in-app Swap feature"
           >
             <p className="lp-hero-swap-highlight-main">
               Swap{" "}
@@ -203,7 +238,9 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             </p>
           </div>
 
-          <p className="lp-sub lp-sub--hero">Trade using Hyperliquid index prices.</p>
+          <p className="lp-sub lp-sub--hero">
+            Trading is in-app on QUSD; marks reference Hyperliquid. Swap moves QUSD ↔ Solana USDC when you initiate it.
+          </p>
           <ul className="lp-hero-pills" aria-label="What you get">
             <li className="lp-hero-pill">
               <img src="/icon-qusd.png" alt="" width={20} height={20} />
@@ -224,7 +261,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             <li className="lp-hero-pill lp-hero-pill--swap">
               <img src="/prize-usdc.png" alt="" width={20} height={20} />
               <span>
-                <strong>Swap</strong> QUSD → USDC in-app
+                <strong>Swap</strong> QUSD → Solana USDC
               </span>
             </li>
           </ul>
@@ -243,38 +280,40 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           <span>Daily QUSD prize</span>
         </h2>
         <p className="lp-section-lead lp-daily-prize-lead">
-          <strong className="lp-daily-prize-strong">{prizePart} QUSD</strong> awarded each US Eastern calendar day to the{" "}
-          <strong>#1 prize-eligible trader</strong> (highest QUSD among traders who have not already won the daily prize).
-          QUSD is an in-app balance until you use Swap under the app&apos;s rules.
+          <strong className="lp-daily-prize-strong">{prizePart} QUSD</strong> (live configuration) awarded each US Eastern
+          calendar day to the <strong>#1 prize-eligible trader</strong>. The prize is a <strong>pure QUSD accounting entry</strong>{" "}
+          on our ledger — you stay in QUSD on the platform until you optionally convert.
         </p>
+        <PrizeCountdown atMs={nextAwardAtMs} scheduleLabel={awardScheduleLabel} />
         <div className="lp-daily-prize-how">
           <p className="lp-daily-prize-how-title">How it works</p>
           <ol className="lp-numbered-list">
             <li>Trade in the app — closed trades update your QUSD balance.</li>
             <li>
-              Climb the real-time leaderboard. Each day, the automatic award runs at{" "}
-              <strong>4:00&nbsp;PM US Eastern Time</strong> using the eligibility rules on the{" "}
+              Climb the real-time leaderboard. When the award runs at <strong>4:00&nbsp;PM US Eastern Time</strong>, the
+              top <strong>prize-eligible</strong> trader wins (see{" "}
               {onGoToPrize ? (
                 <button type="button" className="lp-text-link" onClick={onGoToPrize}>
                   Prize
                 </button>
               ) : (
                 "Prize"
-              )}{" "}
-              page.
+              )}
+              ).
             </li>
             <li>
-              After the award, the full <strong>{prizePart} QUSD</strong> (per current configuration) is credited to the
-              winner&apos;s account.
+              The winner&apos;s account is credited with <strong>{prizePart} QUSD</strong> — still QUSD, not automatic
+              USDC. The platform does <strong>not</strong> convert the prize to USDC for you.
             </li>
           </ol>
         </div>
         <p className="lp-daily-prize-cashout">
-          <strong>Cash out</strong> — swap QUSD for USDC using the built-in Swap after you verify your receive address.{" "}
+          <strong>Turning QUSD into USDC</strong> — use the{" "}
           <a href="#lp-swap-instructions" className="lp-text-link">
-            See the swap steps
-          </a>
-          .
+            Swap page
+          </a>{" "}
+          to exchange QUSD for <strong>Solana SPL USDC</strong> at the rate shown there, after you verify your Solana
+          address on <strong>Account</strong>.
         </p>
         <p className="lp-daily-prize-rules-cta">
           <a href="#lp-daily-prize-rules" className="lp-btn-secondary">
@@ -390,10 +429,19 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             <summary>What is QUSD vs real USDC?</summary>
             <p>
               <strong>QUSD</strong> is your in-app balance for perpetual-style trading: margin and closed-trade PnL
-              settle in QUSD. The <strong>daily prize</strong> is credited in QUSD to <strong>one</strong> eligible winner
-              per Eastern day. <strong>USDC</strong> is on-chain stablecoin: use <strong>Swap</strong> to convert QUSD at
-              the app&apos;s published rate (only QUSD above the minimum shown on Swap converts) to your verified receive
-              address — separate from the prize competition.
+              settle in QUSD. The <strong>daily prize</strong> is a <strong>QUSD ledger credit only</strong> to one
+              eligible winner per Eastern day — it is <strong>not</strong> auto-paid as USDC. <strong>USDC</strong> is
+              on-chain <strong>Solana SPL</strong>: use <strong>Swap</strong> when you want to convert QUSD at the
+              published rate (subject to the QUSD floor on Swap) to your verified Solana address.
+            </p>
+          </details>
+          <details className="lp-faq-item">
+            <summary>Does trading run on Solana?</summary>
+            <p>
+              <strong>No.</strong> Perpetual-style trading in the app uses your <strong>QUSD</strong> balance and
+              Hyperliquid-derived <strong>index marks</strong> for reference prices. <strong>Solana</strong> is used for
+              optional on-chain flows: <strong>Swap</strong> (QUSD ↔ USDC) and optional <strong>USDC deposits</strong> that
+              credit QUSD after verification.
             </p>
           </details>
           <details className="lp-faq-item">
@@ -545,30 +593,34 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
         aria-labelledby="lp-swap-instructions-heading"
       >
         <h2 id="lp-swap-instructions-heading" className="lp-section-title">
-          How to convert your QUSD to USDC
+          Swap QUSD → Solana USDC
         </h2>
         <p className="lp-section-lead lp-section-lead--tight">
-          Linked from the daily prize card — same flow for prize winnings or trading profits.
+          Optional — same flow for prize winnings, trading profits, or other QUSD. Trading itself stays in-app; this step
+          is where Solana on-chain USDC is used.
         </p>
         <ol className="lp-numbered-list">
           <li>
-            Verify your receive address on the <strong>Account</strong> page (in-app verification).
+            Verify your <strong>Solana wallet address</strong> on the <strong>Account</strong> page (in-app verification).
           </li>
           <li>
             Open <strong>Swap</strong> from the sidebar.
           </li>
           <li>
-            Under <strong>Swap QUSD to USDC</strong>, enter the amount to convert (only QUSD above the app minimum
-            converts at the published rate).
+            Review the <strong>QUSD → USDC rate</strong> shown on the page (operator-configured for this deployment — not a
+            Hyperliquid order-book price).
           </li>
           <li>
-            Confirm the swap — USDC is sent to your verified address after the transfer completes (timing depends on
-            network conditions).
+            Under <strong>Swap QUSD to USDC</strong>, enter the amount to convert (only QUSD above the app minimum
+            converts at that rate).
+          </li>
+          <li>
+            Confirm the swap — USDC is a <strong>Solana SPL</strong> token and is sent to your verified wallet after the
+            transfer confirms (typically shortly; depends on network conditions).
           </li>
         </ol>
         <p className="lp-swap-instructions-note">
-          <em>Note:</em> Only verified addresses can receive on-chain USDC. Verification is required before your first
-          swap.
+          <em>Note:</em> Only verified Solana addresses can receive USDC. Verification is required before your first swap.
         </p>
       </section>
 
@@ -582,7 +634,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
         <ul className="lp-rules-list">
           <li>
             The pool is <strong>{prizePart} QUSD</strong> per US Eastern calendar day (live configuration). QUSD is an
-            in-app unit, not a bank balance.
+            in-app ledger unit, not a bank balance.
           </li>
           <li>
             The winner is the single trader with the <strong>highest QUSD</strong> among accounts{" "}
@@ -593,10 +645,17 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
             Only <strong>one</strong> top-ranked eligible trader receives the prize each day; there is <strong>no</strong>{" "}
             sharing of the pool.
           </li>
-          <li>The prize is credited automatically to the winner&apos;s account after the scheduled award.</li>
           <li>
-            Winners may <strong>swap QUSD for USDC</strong> via Swap after verifying a receive address, subject to app
-            limits and treasury availability.
+            At the award, the winner&apos;s account is credited with QUSD only — a <strong>ledger / accounting entry</strong>.
+            The platform does <strong>not</strong> automatically convert the prize to USDC.
+          </li>
+          <li>
+            To obtain <strong>Solana SPL USDC</strong>, the winner (or any user) must initiate a <strong>Swap</strong> on
+            the Swap page. The conversion rate is the one displayed there for this deployment.
+          </li>
+          <li>
+            You can also fund QUSD by sending USDC through the app&apos;s deposit path (treasury attribution + ledger
+            credit), subject to verification — see Buy QUSD / Account.
           </li>
           <li>
             You must comply with the{" "}
@@ -650,7 +709,7 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
           <span className="lp-urgency-prize">
             <img src="/icon-qusd.png" alt="" className="lp-urgency-prize-icon" width={26} height={26} decoding="async" />
             <span>
-              {prizePart} QUSD daily; swap trading profits for USDC on <strong>Swap</strong>.
+              {prizePart} QUSD daily (ledger credit); optional <strong>Solana USDC</strong> via <strong>Swap</strong>.
             </span>
           </span>
         </p>
@@ -658,7 +717,8 @@ export default function LandingPage({ onStartNow, onGoToPrize, onTerms, onPrivac
 
       <p id="lp-swap-footnote" className="lp-page-footnote" tabIndex={-1}>
         <span className="lp-page-footnote-mark">*</span> In-app <strong>Swap</strong> — subject to app rules; a verified
-        receive address is required. Only QUSD above the app minimum (see Swap) converts at the published rate.
+        Solana receive address is required. USDC out is <strong>Solana SPL</strong>. Only QUSD above the app minimum (see
+        Swap) converts at the published rate.
       </p>
 
       {onTerms && onPrivacy ? (

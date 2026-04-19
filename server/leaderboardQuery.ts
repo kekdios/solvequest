@@ -30,9 +30,13 @@ export type LeaderboardRow = {
   label: string;
   qusd: number;
   is_you: boolean;
-  /** False after this account has received the daily QUSD prize (one win per account, lifetime). */
+  /**
+   * True if this account has not yet won the automatic daily prize (lifetime). This is **not** “only rank #1”:
+   * several rows may show `prize_eligible: true` at once. The **daily winner** is always the single highest-QUSD
+   * account among those eligible (`prize_rank === 1`).
+   */
   prize_eligible: boolean;
-  /** Position among prize-eligible traders only; null if already won. */
+  /** Among prize-eligible accounts only, by QUSD (same sort as overall `rank`). `null` if already won the daily prize. */
   prize_rank: number | null;
 };
 

@@ -713,6 +713,18 @@ export default function SwapScreen({
             <p style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>
               1 USDC = {rate > 0 ? rate.toLocaleString(undefined, { maximumFractionDigits: 8 }) : "—"} QUSD
             </p>
+            {rate > 0 ? (
+              <p style={{ margin: "6px 0 0", fontSize: "1rem", fontWeight: 600, color: "var(--text)" }}>
+                1 QUSD ≈{" "}
+                {(1 / rate).toLocaleString(undefined, { maximumFractionDigits: 8, minimumFractionDigits: 4 })} USDC
+                <span style={{ fontWeight: 500, color: "var(--muted)", fontSize: 13 }}> (effective QUSD after floor)</span>
+              </p>
+            ) : null}
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
+              Rate is set by Solve Quest for this deployment (shown above), not a live Hyperliquid order book. USDC you
+              receive is <strong>Solana SPL</strong>, sent to your verified Solana address after the on-chain transfer
+              confirms.
+            </p>
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
               USDC received = <strong>(QUSD you enter − {minAbove.toLocaleString()} QUSD floor)</strong> ÷ this rate,
               after capping your entry to your balance — then rounded to 2 decimal places (before per-transaction and

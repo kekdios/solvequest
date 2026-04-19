@@ -1,6 +1,6 @@
 # Solve Quest
 
-Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), **email (OTP) auth**, **Leaderboard** (top QUSD balances), and Solana flows: **buy QUSD** (USDC to your verified address → server credits QUSD), **swap** (QUSD → USDC from treasury; only QUSD **above** a configured **`SWAP_ABOVE_AMOUNT`** floor converts at **`SWAP_QUSD_USDC_RATE`** — see [docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)), and a **Prize** page (seasonal pool copy from **`PRIZE_AMOUNT`**). With a valid sign-in session, the SPA opens on **Trade**; without a session, it opens on **Home** (landing).
+Web app for **perpetual-style trading** against Hyperliquid-derived index marks, **QUSD** balances (ledger-backed), **email (OTP) auth**, **Leaderboard** (top QUSD balances), and Solana flows: **buy QUSD** (USDC to your verified address → server credits QUSD), **swap** (QUSD → USDC from treasury; only QUSD **above** a configured **`SWAP_ABOVE_AMOUNT`** floor converts at **`SWAP_QUSD_USDC_RATE`** — see [docs/SOLVEQUEST_OVERVIEW.md](docs/SOLVEQUEST_OVERVIEW.md)), and a **Prize** page (daily pool display and automatic award from **`PRIZE_AMOUNT`**). With a valid sign-in session, the SPA opens on **Trade**; without a session, it opens on **Home** (landing).
 
 **Stack:** React 19 + Vite · Express (`server/index.ts`) · SQLite (`better-sqlite3`) · Solana (web3.js, SPL).
 

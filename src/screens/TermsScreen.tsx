@@ -1,11 +1,12 @@
 import "./legal-doc.css";
 
-const SUPPORT_EMAIL = "privacyemail369@gmail.com";
+const LEGAL_EMAIL = "privacyemail369@gmail.com";
+const SUPPORT_EMAIL = "support@solvequest.io";
 
 export default function TermsScreen() {
   return (
     <article className="legal-doc">
-      <p className="legal-meta">Last updated: April 17, 2026</p>
+      <p className="legal-meta">Last updated: April 15, 2026</p>
       <p>
         These Terms of Service (“Terms”) govern your access to and use of the Solve Quest website and application
         (“Service”) operated by us (“we,” “us,” or “our”). By accessing or using the Service, you agree to these Terms.
@@ -56,20 +57,36 @@ export default function TermsScreen() {
         We may suspend or adjust promotions to prevent abuse or comply with law.
       </p>
       <p>
-        <strong>Daily QUSD prize.</strong> Where enabled, the Service may automatically credit a configured QUSD amount
-        (see the Prize and Leaderboard screens) to one eligible account per day based on leaderboard standings, subject
-        to a limit of one such prize per account over the lifetime of the account. Awards run on a schedule (for example
-        4:00 PM US Eastern Time) when the server is operating; we do not guarantee uninterrupted or error-free execution.
-        Displayed winner names use the public leaderboard handle assigned in the app.
+        <strong>Daily QUSD prize.</strong> Where enabled, the Service may automatically credit a <strong>configured</strong>{" "}
+        QUSD amount for that promotion (see the Prize screen and public configuration in the app) to <strong>one</strong>{" "}
+        winning account per <strong>US Eastern calendar day</strong> (as determined by the Service using the{" "}
+        <strong>America/New_York</strong> time zone). For each such day, the winner is the account with the{" "}
+        <strong>highest total QUSD balance</strong> (per the Service ledger) among accounts that are{" "}
+        <strong>prize-eligible</strong> for that award — meaning, unless the app states otherwise, registered accounts that{" "}
+        have <strong>not</strong> already received this automatic daily prize under the current rules (
+        <strong>one such win per account over the lifetime of the account</strong>). <strong>There is no splitting</strong>{" "}
+        of the pool: the full configured amount for that day is credited to that single winning account as{" "}
+        <strong>QUSD only</strong> (a ledger / accounting entry). The Service does <strong>not</strong> automatically
+        convert that prize to USDC; conversion or withdrawal in USDC requires a separate user-initiated swap or transfer
+        flow where offered, subject to app rules. The automatic run is scheduled for approximately{" "}
+        <strong>4:00 PM US Eastern Time</strong> when the server is operating; we do not guarantee uninterrupted or
+        error-free execution. How eligibility, “Prize #,” and any tie-breakers work is shown in the app (including
+        Leaderboard and Prize). Displayed winner names use the public leaderboard handle assigned in the app. We may
+        withhold or revoke prizes and take other account action if we believe the leaderboard or prize process was
+        manipulated (see Prohibited conduct).
       </p>
 
       <h2>6. QUSD and USDC swaps</h2>
       <p>
         Where the Service allows swapping or conversion between QUSD and USDC, the availability, rules, and execution of
         those swaps are determined solely by Solve Quest. Exchange rates for QUSD and USDC (in either direction) are set
-        solely by Solve Quest and may change, subject to these Terms and any rates or limits shown in the app. For
-        QUSD→USDC swaps, the Service may apply a configured minimum QUSD threshold so that only QUSD above that amount
-        (after capping to your balance) converts at the published rate, as described on the Swap screen.
+        solely by Solve Quest and may change, subject to these Terms and any rates or limits shown in the app. Rates are{" "}
+        <strong>set by Solve Quest</strong> for the deployment (as shown on the Swap screen) and are not necessarily tied
+        to a third-party order book. For QUSD→USDC swaps, the Service may apply a configured minimum QUSD threshold so
+        that only QUSD above that amount (after capping the amount you designate to your spendable balance) converts at
+        the published rate, as described on the Swap screen. Outgoing USDC may be delivered as <strong>Solana SPL</strong>{" "}
+        tokens to your verified address where that flow is supported. Swaps may also be subject to per-transaction
+        maximums, rounding, treasury USDC availability, and network or operational limits shown or enforced in the app.
       </p>
 
       <h2>7. Prohibited conduct</h2>
@@ -78,6 +95,10 @@ export default function TermsScreen() {
         <li>Use the Service in violation of law or third-party rights</li>
         <li>Attempt to gain unauthorized access, interfere with, or overload the Service</li>
         <li>Use automated means in a way that harms fair play or stability (including bots or scripts where prohibited)</li>
+        <li>
+          Manipulate leaderboards, prizes, or trading activity (including wash trading, collusion, or artificial volume)
+          in a way that undermines fair play or misleads the Service or other users
+        </li>
         <li>Mislead us or other users, or exploit bugs or vulnerabilities</li>
       </ul>
 
@@ -124,7 +145,8 @@ export default function TermsScreen() {
 
       <h2>14. Contact</h2>
       <p>
-        Questions about these Terms: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+        Questions about these Terms: <a href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</a>. Operational questions (including
+        prizes and swaps): <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
     </article>
   );
