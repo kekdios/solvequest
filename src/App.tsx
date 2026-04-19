@@ -267,8 +267,8 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
     lead: "How we collect and use information.",
   },
   agentPuzzle: {
-    title: "Solve For Bonus",
-    lead: "",
+    title: "Prompt for Cursor AI",
+    lead: "Copy a Composer-ready Tetris + SolveQuest spec.",
   },
 };
 
@@ -808,7 +808,6 @@ function AppInner() {
               signedIn={Boolean(user)}
               onGoAuth={() => setScreen("auth")}
               onGoTrade={() => setScreen("trade")}
-              onRefreshAccount={refreshAccountFromServer}
             />
           )}
         </main>

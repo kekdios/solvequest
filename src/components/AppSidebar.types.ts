@@ -12,5 +12,5 @@ export type AppScreen =
   | "auth"
   | "terms"
   | "privacy"
-  /** Solve For Bonus — linked from landing only; not in sidebar. */
+  /** Cursor AI prompt (Tetris spec) — linked from landing only; not in sidebar. */
   | "agentPuzzle";
