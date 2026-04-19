@@ -1,6 +1,6 @@
 /**
- * Agent Activation Protocol — BIP39 word-order puzzle + QUSD reward (SQLite, no Redis).
- * POST /api/puzzle/start — auth: new 6-word challenge.
+ * Solve For Bonus — word-order puzzle + QUSD reward (SQLite, no Redis).
+ * POST /api/puzzle/start — auth: new 4-word challenge.
  * POST /api/puzzle/submit — auth: validate order, credit ledger (idempotent, daily cap).
  */
 import { randomInt, randomUUID } from "node:crypto";
@@ -22,13 +22,13 @@ type SqliteDb = InstanceType<typeof Database>;
 
 const USER_COOKIE = "auth_token";
 
-const WORD_COUNT = 6;
+const WORD_COUNT = 4;
 const SESSION_TTL_MS = 20 * 60 * 1000;
 const BASE_QUSD = 100;
 const DAILY_CAP_QUSD = 500;
 const MIN_ELAPSED_MS = 8_000;
 const MAX_ELAPSED_MS = 15 * 60 * 1000;
-const MIN_DRAG_EVENTS = 4;
+const MIN_DRAG_EVENTS = 3;
 const MAX_STARTS_PER_HOUR = 12;
 
 function parseCookies(header: string | undefined): Record<string, string> {

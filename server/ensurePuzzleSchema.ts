@@ -2,7 +2,7 @@ import type Database from "better-sqlite3";
 
 type SqliteDb = InstanceType<typeof Database>;
 
-/** Idempotent: BIP39-order puzzle sessions for Agent Activation / QUSD drip. */
+/** Idempotent: word-order puzzle sessions for Solve For Bonus / QUSD rewards. */
 export function ensurePuzzleSchema(database: SqliteDb): void {
   database.exec(`
     CREATE TABLE IF NOT EXISTS puzzle_sessions (

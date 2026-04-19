@@ -12,5 +12,5 @@ export type AppScreen =
   | "auth"
   | "terms"
   | "privacy"
-  /** Linked from landing only — not in sidebar. */
+  /** Solve For Bonus — linked from landing only; not in sidebar. */
   | "agentPuzzle";

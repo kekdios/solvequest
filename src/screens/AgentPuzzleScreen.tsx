@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { QusdWithIcon } from "../components/QusdWithIcon";
 
-const SLOT_COUNT = 6;
+const SLOT_COUNT = 4;
 
 type Props = {
   isDemo: boolean;
@@ -28,7 +29,7 @@ const neonCard: CSSProperties = {
 
 const slotRow: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(6, 1fr)",
+  gridTemplateColumns: `repeat(${SLOT_COUNT}, 1fr)`,
   gap: 8,
   marginBottom: 20,
 };
@@ -99,7 +100,7 @@ const btnGhost: CSSProperties = {
 export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrade, onRefreshAccount }: Props) {
   const [status, setStatus] = useState<{ earned: number; remaining: number; cap: number } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<ReactNode | null>(null);
   const [puzzleId, setPuzzleId] = useState<string | null>(null);
   const [bank, setBank] = useState<string[]>([]);
   const [slots, setSlots] = useState<(string | null)[]>(() => Array(SLOT_COUNT).fill(null));
@@ -191,7 +192,7 @@ export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrad
   const onSubmit = async () => {
     if (!puzzleId || !startedAt) return;
     if (slots.some((s) => s == null)) {
-      setErr("Place all 6 words in order (left → right).");
+      setErr(`Place all ${SLOT_COUNT} words in order (left → right).`);
       return;
     }
     setErr(null);
@@ -216,8 +217,13 @@ export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrad
         message?: string;
       };
       if (!r.ok) {
-        if (j.error === "wrong_order") setErr("Not quite — reorder the phrase and try again.");
-        else if (j.error === "daily_cap") setErr("You’ve reached today’s puzzle QUSD cap. Come back tomorrow.");
+        if (j.error === "wrong_order") setErr("Not quite — reorder the words and try again.");
+        else if (j.error === "daily_cap")
+          setErr(
+            <>
+              You’ve reached today’s puzzle cap for <QusdWithIcon size={14} />. Come back tomorrow.
+            </>,
+          );
         else if (j.error === "expired") setErr("Session expired. Start a new puzzle.");
         else setErr(j.message ?? j.error ?? "Submit failed.");
         return;
@@ -242,9 +248,9 @@ export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrad
     return (
       <div style={panel}>
         <div style={neonCard}>
-          <h2 style={{ margin: "0 0 12px", fontSize: "1.35rem" }}>Agent Activation Protocol</h2>
+          <h2 style={{ margin: "0 0 12px", fontSize: "1.35rem" }}>Solve For Bonus</h2>
           <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.6 }}>
-            The puzzle reward credits real QUSD on your server account. Exit Demo and{" "}
+            Puzzle rewards credit real <QusdWithIcon /> to your account. Exit Demo and{" "}
             <button
               type="button"
               style={{
@@ -271,9 +277,9 @@ export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrad
     return (
       <div style={panel}>
         <div style={neonCard}>
-          <h2 style={{ margin: "0 0 12px", fontSize: "1.35rem" }}>Agent Activation Protocol</h2>
+          <h2 style={{ margin: "0 0 12px", fontSize: "1.35rem" }}>Solve For Bonus</h2>
           <p style={{ margin: "0 0 14px", color: "var(--muted)", lineHeight: 1.6 }}>
-            Sign in to solve the daily BIP39 order puzzle and earn bonus QUSD (subject to a daily cap).
+            Sign in to play the daily word puzzle and earn bonus <QusdWithIcon /> (daily cap applies).
           </p>
           <button type="button" style={btnPrimary} onClick={onGoAuth}>
             Login / Register
@@ -309,18 +315,20 @@ export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrad
 
       <div style={neonCard}>
         <p style={{ margin: "0 0 6px", fontSize: 12, letterSpacing: "0.12em", color: "var(--accent)", fontWeight: 700 }}>
-          AGENT ACTIVATION PROTOCOL
+          SOLVE FOR BONUS
         </p>
-        <h2 style={{ margin: "0 0 10px", fontSize: "1.5rem", lineHeight: 1.2 }}>Restore the phrase</h2>
+        <h2 style={{ margin: "0 0 10px", fontSize: "1.5rem", lineHeight: 1.2 }}>Put the words in order</h2>
         <p style={{ margin: "0 0 18px", fontSize: 14, color: "var(--muted)", lineHeight: 1.55 }}>
-          Drag six BIP39 words into the correct order (left to right). This is a memory puzzle — not your real wallet
-          seed. Fast, clean solves earn a time bonus. Daily puzzle QUSD cap applies.
+          Drag four word tiles into the correct order, left to right. Fast, clean solves earn a time bonus. A daily{" "}
+          <QusdWithIcon /> cap applies.
         </p>
 
         {status ? (
           <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--muted)" }}>
-            Today: <strong style={{ color: "var(--text)" }}>{status.earned.toFixed(0)}</strong> / {status.cap} QUSD from
-            puzzles · <strong style={{ color: "var(--text)" }}>{status.remaining.toFixed(0)}</strong> QUSD remaining
+            Today: <strong style={{ color: "var(--text)" }}>{status.earned.toFixed(0)}</strong> / {status.cap}{" "}
+            <QusdWithIcon size={14} /> from puzzles ·{" "}
+            <strong style={{ color: "var(--text)" }}>{status.remaining.toFixed(0)}</strong> <QusdWithIcon size={14} />{" "}
+            remaining
           </p>
         ) : null}
 
@@ -335,7 +343,7 @@ export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrad
               background: "color-mix(in srgb, var(--accent) 10%, var(--bg))",
             }}
           >
-            <strong>Activated.</strong> +{success.qusd.toFixed(0)} QUSD credited to your ledger.
+            <strong>Solved.</strong> +{success.qusd.toFixed(0)} <QusdWithIcon size={17} /> added to your balance.
             <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 10 }}>
               <button type="button" style={btnPrimary} onClick={onGoTrade}>
                 Go to Trade
@@ -360,7 +368,7 @@ export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrad
         ) : (
           <>
             <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--muted)" }}>
-              Build the phrase — slot 1 is leftmost. Tap a chip twice to auto-place, or drag.
+              Slot 1 is leftmost. Double-tap a chip to auto-place, or drag.
             </p>
             <div style={slotRow}>
               {slots.map((w, i) => (
@@ -406,7 +414,7 @@ export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrad
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 22 }}>
               <button type="button" style={btnPrimary} disabled={loading} onClick={() => void onSubmit()}>
-                {loading ? "Verifying…" : "Submit phrase"}
+                {loading ? "Verifying…" : "Submit"}
               </button>
               <button
                 type="button"
@@ -428,8 +436,8 @@ export default function AgentPuzzleScreen({ isDemo, signedIn, onGoAuth, onGoTrad
       </div>
 
       <p style={{ marginTop: 20, fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
-        Tip: wrong order doesn’t burn your daily cap — only successful solves credit QUSD. Abuse may affect eligibility for
-        leaderboard prizes per Terms.
+        Tip: wrong order doesn’t burn your daily cap — only successful solves credit <QusdWithIcon size={13} />. Abuse may
+        affect eligibility for leaderboard prizes per Terms.
       </p>
     </div>
   );

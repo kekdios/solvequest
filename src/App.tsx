@@ -267,8 +267,8 @@ const SCREEN_HEADER: Record<AppScreen, { title: string; lead: string }> = {
     lead: "How we collect and use information.",
   },
   agentPuzzle: {
-    title: "Agent Activation",
-    lead: "BIP39 phrase puzzle — bonus QUSD for human solvers.",
+    title: "Solve For Bonus",
+    lead: "",
   },
 };
 

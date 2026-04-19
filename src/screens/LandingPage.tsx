@@ -3,13 +3,14 @@
  * `src/screens/LandingPage.tsx` and `landing.css` → `src/screens/landing.css`.
  */
 import { useEffect, useState } from "react";
+import { QusdWithIcon } from "../components/QusdWithIcon";
 import "./landing.css";
 
 type Props = {
   onStartNow: () => void;
   /** Navigate to Prize (sell QUSD) screen — used for in-app links from the landing copy. */
   onGoToPrize?: () => void;
-  /** Agent Activation puzzle (not in sidebar). */
+  /** Solve For Bonus puzzle (not in sidebar). */
   onGoToAgentPuzzle?: () => void;
   onTerms?: () => void;
   onPrivacy?: () => void;
@@ -324,8 +325,8 @@ export default function LandingPage({ onStartNow, onGoToPrize, onGoToAgentPuzzle
         </p>
         {onGoToAgentPuzzle ? (
           <p className="lp-daily-prize-agent-link">
-            <strong>Agent Activation Protocol</strong> — bonus QUSD for solving a short BIP39 word-order puzzle (not on the
-            main menu).{" "}
+            <strong>Solve For Bonus</strong> — extra <QusdWithIcon size={14} /> for a quick daily word-order challenge (not on
+            the main menu).{" "}
             <button type="button" className="lp-text-link" onClick={onGoToAgentPuzzle}>
               Open puzzle page
             </button>
