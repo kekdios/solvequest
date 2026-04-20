@@ -66,16 +66,8 @@
       </div>
       <div id="hud-timer" class="text-sm font-mono font-bold text-cyan-300 tabular-nums">3:00</div>
     </header>
-    <div class="flex-1 flex flex-col lg:flex-row gap-2 p-2 max-w-5xl mx-auto w-full">
-      <div class="flex-1 flex justify-center items-start min-h-0">
-        <canvas id="gameCanvas" width="360" height="600" class="rounded-lg border border-cyan-500/25 max-w-full h-auto"></canvas>
-      </div>
-      <aside class="w-full lg:w-40 shrink-0 flex flex-row lg:flex-col gap-3">
-        <div class="rounded-xl border border-violet-500/30 bg-black/35 p-3 flex-1">
-          <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Next</p>
-          <canvas id="nextCanvas" width="100" height="100" class="mx-auto"></canvas>
-        </div>
-      </aside>
+    <div class="flex-1 flex justify-center items-start min-h-0 p-2 max-w-5xl mx-auto w-full">
+      <canvas id="gameCanvas" width="360" height="600" class="rounded-lg border border-cyan-500/25 max-w-full h-auto"></canvas>
     </div>
     <div class="shrink-0 max-w-lg mx-auto w-full px-2 pb-3">
       <div class="grid grid-cols-5 gap-1">
@@ -198,7 +190,7 @@
   const W = 10, H = 20;
   const GAME_MS = 180000;
 
-  let canvas, ctx, nextC, nextCtx;
+  let canvas, ctx;
   let cell = 12, offX = 0, offY = 0;
 
   let board = [];
@@ -493,18 +485,6 @@
     drawBoard();
     drawPieceGhost();
     drawActivePiece();
-
-    nextCtx.setTransform(1, 0, 0, 1, 0, 0);
-    nextCtx.clearRect(0, 0, nextC.width, nextC.height);
-    if (nextType) {
-      const m = shapeAt(nextType, 0);
-      const cs = 9;
-      eachCell(m, (r, c) => {
-        if (!m[r][c]) return;
-        nextCtx.fillStyle = COLORS[nextType];
-        nextCtx.fillRect(20 + c * cs, 15 + r * cs, cs - 1, cs - 1);
-      });
-    }
   }
 
   function resizeCanvas() {
@@ -726,8 +706,6 @@
   let touchStart = null;
   canvas = document.getElementById("gameCanvas");
   ctx = canvas.getContext("2d");
-  nextC = document.getElementById("nextCanvas");
-  nextCtx = nextC.getContext("2d");
 
   canvas.addEventListener("touchstart", e => { touchStart = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }; }, { passive: true });
   canvas.addEventListener("touchend", e => {
