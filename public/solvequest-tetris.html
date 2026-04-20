@@ -75,20 +75,25 @@
           <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Next</p>
           <canvas id="nextCanvas" width="100" height="100" class="mx-auto"></canvas>
         </div>
-        <div class="rounded-xl border border-white/10 bg-black/35 p-3 text-[10px] text-slate-400 flex-1">
-          <p><kbd class="px-1 rounded bg-white/10">←→</kbd> move</p>
-          <p><kbd class="px-1 rounded bg-white/10">↑</kbd> rotate</p>
-          <p><kbd class="px-1 rounded bg-white/10">↓</kbd> soft</p>
-          <p><kbd class="px-1 rounded bg-white/10">Space</kbd> hard</p>
-        </div>
       </aside>
     </div>
-    <div class="shrink-0 grid grid-cols-5 gap-1 px-2 pb-3 max-w-lg mx-auto w-full">
-      <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-cyan-500/30 text-lg" data-act="left" aria-label="Left">←</button>
-      <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-cyan-500/30 text-lg" data-act="rot" aria-label="Rotate">↻</button>
-      <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-cyan-500/30 text-lg" data-act="right" aria-label="Right">→</button>
-      <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-violet-500/30 text-sm" data-act="soft" aria-label="Soft drop">▼</button>
-      <button type="button" class="touch-btn rounded-lg bg-violet-600/80 border border-violet-400/50 text-sm font-bold" data-act="hard" aria-label="Hard drop">⤓</button>
+    <div class="shrink-0 max-w-lg mx-auto w-full px-2 pb-3">
+      <div class="grid grid-cols-5 gap-1">
+        <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-cyan-500/30 text-lg" data-act="left" aria-label="Left">←</button>
+        <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-cyan-500/30 text-lg" data-act="rot" aria-label="Rotate">↻</button>
+        <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-cyan-500/30 text-lg" data-act="right" aria-label="Right">→</button>
+        <button type="button" class="touch-btn rounded-lg bg-slate-800 border border-violet-500/30 text-sm" data-act="soft" aria-label="Soft drop">▼</button>
+        <button type="button" class="touch-btn rounded-lg bg-violet-600/80 border border-violet-400/50 text-sm font-bold" data-act="hard" aria-label="Hard drop">⤓</button>
+      </div>
+      <p class="mt-2 text-center text-[10px] sm:text-xs text-slate-400 font-mono leading-tight whitespace-nowrap overflow-x-auto">
+        <kbd class="px-1 rounded bg-white/10">←→</kbd> move
+        <span class="text-slate-600 mx-1">·</span>
+        <kbd class="px-1 rounded bg-white/10">↑</kbd> rotate
+        <span class="text-slate-600 mx-1">·</span>
+        <kbd class="px-1 rounded bg-white/10">↓</kbd> soft
+        <span class="text-slate-600 mx-1">·</span>
+        <kbd class="px-1 rounded bg-white/10">Space</kbd> hard
+      </p>
     </div>
   </div>
 
@@ -440,19 +445,12 @@
     ctx.shadowBlur = 0;
   }
 
-  function drawCell(x, y, color, label) {
+  function drawCell(x, y, color) {
     const pad = 1;
     ctx.fillStyle = color;
     ctx.fillRect(x * cell + pad, y * cell + pad, cell - pad * 2, cell - pad * 2);
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.strokeRect(x * cell + pad, y * cell + pad, cell - pad * 2, cell - pad * 2);
-    if (label && cell >= 9) {
-      ctx.font = `600 ${Math.max(7, cell / 4)}px system-ui,sans-serif`;
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillText(label.slice(0, 5), x * cell + 3, y * cell + cell / 2 + 3);
-      ctx.fillStyle = "rgba(255,255,255,0.92)";
-      ctx.fillText(label.slice(0, 5), x * cell + 2, y * cell + cell / 2 + 2);
-    }
   }
 
   function drawPieceGhost() {
@@ -476,7 +474,7 @@
     eachCell(piece.mat, (r, c) => {
       if (!piece.mat[r][c]) return;
       const x = piece.x + c, y = piece.y + r;
-      if (y >= 0) drawCell(x, y, COLORS[piece.type], piece.label);
+      if (y >= 0) drawCell(x, y, COLORS[piece.type]);
     });
   }
 
@@ -484,7 +482,7 @@
     for (let y = 0; y < H; y++)
       for (let x = 0; x < W; x++) {
         const c = board[y][x];
-        if (c) drawCell(x, y, c.color, c.label);
+        if (c) drawCell(x, y, c.color);
       }
   }
 
