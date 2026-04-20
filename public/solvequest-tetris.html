@@ -194,7 +194,7 @@
   const GAME_MS = 180000;
 
   let canvas, ctx, nextC, nextCtx;
-  let cell = 24, offX = 0, offY = 0;
+  let cell = 12, offX = 0, offY = 0;
 
   let board = [];
   let bag = [];
@@ -446,7 +446,7 @@
     ctx.fillRect(x * cell + pad, y * cell + pad, cell - pad * 2, cell - pad * 2);
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.strokeRect(x * cell + pad, y * cell + pad, cell - pad * 2, cell - pad * 2);
-    if (label && cell >= 18) {
+    if (label && cell >= 9) {
       ctx.font = `600 ${Math.max(7, cell / 4)}px system-ui,sans-serif`;
       ctx.fillStyle = "rgba(0,0,0,0.55)";
       ctx.fillText(label.slice(0, 5), x * cell + 3, y * cell + cell / 2 + 3);
@@ -500,7 +500,7 @@
     nextCtx.clearRect(0, 0, nextC.width, nextC.height);
     if (nextType) {
       const m = shapeAt(nextType, 0);
-      const cs = 18;
+      const cs = 9;
       eachCell(m, (r, c) => {
         if (!m[r][c]) return;
         nextCtx.fillStyle = COLORS[nextType];
@@ -511,7 +511,8 @@
 
   function resizeCanvas() {
     const maxW = Math.min(420, window.innerWidth - 24);
-    cell = Math.max(16, Math.floor(maxW / W));
+    /* Cell size is ~50% of “fill width” so blocks read half the previous scale. */
+    cell = Math.max(8, Math.floor(maxW / W / 2));
     const gw = W * cell, gh = H * cell;
     canvas.width = gw;
     canvas.height = gh;
